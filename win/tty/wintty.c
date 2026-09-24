@@ -13,6 +13,7 @@
 #define H2344_BROKEN
 
 #include "hack.h"
+#include "aipipe.h"
 
 #ifdef TTY_GRAPHICS
 #include "dlb.h"
@@ -3507,7 +3508,7 @@ tty_nhgetch()
     } else {
 #ifdef UNIX
         i = (++nesting == 1)
-              ? tgetch()
+              ? aipipe_getch() /* tgetch(), or keys from a controller */
               : (read(fileno(stdin), (genericptr_t) &nestbuf, 1) == 1)
                   ? (int) nestbuf : EOF;
         --nesting;

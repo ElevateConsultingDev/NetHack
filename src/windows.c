@@ -3,6 +3,7 @@
 /* NetHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
+#include "aipipe.h"
 #ifdef TTY_GRAPHICS
 #include "wintty.h"
 #endif
@@ -259,6 +260,7 @@ const char *s;
             if (winchoices[i].ini_routine)
                 (*winchoices[i].ini_routine)(WININIT);
             last_winchoice = &winchoices[i];
+            aipipe_install(); /* external controller, if NETHACK_CONTROL */
             return;
         }
     }

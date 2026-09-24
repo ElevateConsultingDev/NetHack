@@ -4,6 +4,7 @@
 /* NetHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
+#include "aipipe.h"
 
 #ifdef TTY_GRAPHICS
 
@@ -216,6 +217,7 @@ register const char *s; /* chars allowed besides return */
     register int c, x = ttyDisplay ? (int) ttyDisplay->dismiss_more : '\n';
 
     morc = 0;
+    aipipe_more(TRUE);
     while (
 #ifdef HANGUPHANDLING
         !program_state.done_hup &&
@@ -238,6 +240,7 @@ register const char *s; /* chars allowed besides return */
             tty_nhbell();
         }
     }
+    aipipe_more(FALSE);
 }
 
 /*
