@@ -8,6 +8,7 @@ done, failed, or something changed that the brain should look at.
 
 from __future__ import annotations
 
+import re
 from collections import deque
 from dataclasses import dataclass, field
 
@@ -78,6 +79,8 @@ class Memory:
     corridors: set = field(default_factory=set)   # (dlvl, x, y) corridor squares seen
     kills: dict = field(default_factory=dict)     # (dlvl, x, y) -> (monster, turn) where we killed it
     eating_corpse: bool = False                   # an 'e' for a floor corpse is in progress
+    stats: dict = field(default_factory=dict)     # counters for measuring the pilot
+    retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
 
 
 class View:
@@ -309,10 +312,18 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
             memory.eating_corpse = False
             name = corpse_name(prompt)
             ok, why = corpse_safe(name, memory, v)
+            memory.kills.pop((v.dlvl, *v.pos), None)
+            _count(memory, "corpses_eaten" if ok else "corpses_declined")
+            if not ok:
+                _count(memory, f"declined: {why}")
             return ("y", f"eat the {name} corpse") if ok else ("n", f"not eating it: {why}")
         if "eat it?" in prompt and memory.pending_food:
             return "n", "not the corpse: the item from the pack"
     return None
+
+
+def _count(memory: "Memory", key: str, n: int = 1) -> None:
+    memory.stats[key] = memory.stats.get(key, 0) + n
 
 
 def corpse_name(prompt: str) -> str:
@@ -328,7 +339,10 @@ def corpse_name(prompt: str) -> str:
 
 
 def corpse_safe(name: str, memory: "Memory", v: "View") -> tuple[bool, str]:
-    """Safe species, not our own kind, and fresh (our kill, recent)."""
+    """Safe species, not our own kind, and fresh (our kill, recent). The
+    same question also comes up for ordinary food lying here."""
+    if any(f in name for f in SAFE_FOOD):
+        return True, "ordinary food"
     if name not in SAFE_CORPSES:
         return False, f"{name} isn't on the safe list"
     race = v.status.get("race", "")
@@ -355,7 +369,9 @@ def _pick_from_menu(v: View, memory: Memory) -> str:
     for item in v.ctx.get("items", []):
         if not item["selectable"]:
             cls = MENU_HEADERS.get(item["text"].strip(), "")
-        elif item["key"] and cls and cls in memory.loot_classes:
+        elif item["key"] and cls and (cls in memory.loot_classes or (
+                cls == ")" and any(r in item["text"] for r in memory.retrieve))) \
+                and not any(w in item["text"] for w in NOT_CARRIED + ("corpse",)):
             keys += item["key"]
     memory.loot_classes = ""
     return keys + "\r"
@@ -395,14 +411,25 @@ def r_explore(v: View, memory: Memory, args: dict):
 
 
 def r_search_walls(v: View, memory: Memory, args: dict):
+    """Search next to walls that face unexplored space: a hidden door there
+    leads somewhere new. Walls between two known areas can't hide anything
+    useful, so they're skipped."""
+    def facing_unknown(x, y):
+        for dx, dy in ORTHO:
+            wx, wy = x + dx, y + dy
+            if v.ch(wx, wy) in WALL or (v.ch(wx, wy) == " " and not v.cells.get((wx, wy))):
+                beyond = [(wx + dx * k, wy + dy * k) for k in (1, 2, 3)]
+                if all(v.ch(bx, by) == " " and not v.cells.get((bx, by)) for bx, by in beyond):
+                    return True
+        return False
+
     def spot(x, y, rounds):
-        return memory.searched.get((v.dlvl, x, y), 0) < rounds and any(
-            v.ch(x + dx, y + dy) in WALL or v.ch(x + dx, y + dy) == " " for dx, dy in DIRS.values())
+        return memory.searched.get((v.dlvl, x, y), 0) < rounds and facing_unknown(x, y)
     here = (v.dlvl, *v.pos)
     for rounds in (1, 2):
         if spot(*v.pos, rounds):
             memory.searched[here] = memory.searched.get(here, 0) + 1
-            return "15s", "search the walls here"
+            return "10s", "search the walls here"
         path = bfs(v, lambda x, y: spot(x, y, rounds))
         if path:
             return _step(v, memory, path, f"go search near {path[-1]}")
@@ -473,6 +500,7 @@ def r_pray(v: View, memory: Memory, args: dict):
     if args.get("sent"):
         return None, "done: prayed"
     args["sent"] = True
+    _count(memory, "prayers")
     memory.pending_pray = True
     memory.last_pray_turn = v.status.get("turn", 0)
     return "#pray\n", "pray"
@@ -516,13 +544,61 @@ def r_step_away(v: View, memory: Memory, args: dict):
 
 
 def r_elbereth(v: View, memory: Memory, args: dict):
-    """Engrave Elbereth in the dust with a fingertip: most monsters won't
-    melee you while you stand on it (3.6: it erodes when you attack)."""
+    """Engrave Elbereth in the dust with a fingertip, then rest on it until
+    HP recovers: most monsters won't melee you while you stand on it (3.6:
+    attacking from it erodes it, so this never attacks)."""
+    st = v.status
+    if not args.get("sent"):
+        args["sent"], args["at"], args["turn"] = True, v.pos, st.get("turn", 0)
+        memory.engraving = True
+        return "E", "engrave Elbereth"
+    if v.pos != tuple(args["at"]) or st.get("turn", 0) - args["turn"] > 300:
+        return None, "done: left the Elbereth square"
+    if st.get("hp", 0) >= st.get("hpmax", 1) * 0.7:
+        return None, "done: healed up on Elbereth"
+    if any("You disturb the engraving" in m or "engraving now reads" in m for m in v.s.get("messages", [])):
+        args["sent"] = False  # Smudged: write it again.
+    return "5s", f"rest on Elbereth (HP {st.get('hp')}/{st.get('hpmax')})"
+
+
+THROWABLE = ("dagger", "knife", "spear", "javelin", "dart", "shuriken")
+
+
+def throwable(v: View) -> dict | None:
+    """A throwable item that isn't the wielded weapon."""
+    for item in v.s.get("inventory", []):
+        if item["class"] == ")" and any(t in item["text"] for t in THROWABLE) \
+                and "weapon in hand" not in item["text"]:
+            return item
+    return None
+
+
+def in_line(a: tuple, b: tuple) -> tuple[int, int] | None:
+    """The unit step from a toward b if they share a row, column or diagonal."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    if (dx == 0 or dy == 0 or abs(dx) == abs(dy)) and (dx or dy):
+        return ((dx > 0) - (dx < 0), (dy > 0) - (dy < 0))
+    return None
+
+
+def r_throw(v: View, memory: Memory, args: dict):
+    """Throw a dagger (or similar) at a monster in a straight line;
+    {target: name}. Wielded weapons are never thrown."""
     if args.get("sent"):
-        return None, "done: engraved Elbereth"
-    args["sent"] = True
-    memory.engraving = True
-    return "E", "engrave Elbereth"
+        return None, "done: thrown"
+    item = throwable(v)
+    if not item:
+        return None, "failed: nothing to throw"
+    target = (args.get("target") or "").lower()
+    for (x, y), c in v.cells.items():
+        if c["kind"] == "monster" and (not target or target in c["name"]):
+            step = in_line(v.pos, (x, y))
+            if step and max(abs(x - v.pos[0]), abs(y - v.pos[1])) <= 8:
+                args["sent"] = True
+                memory.retrieve.add(next(t for t in THROWABLE if t in item["text"]))
+                _count(memory, f"throws at {c['name']}")
+                return "t" + item["letter"] + KEY_FOR[step], f"throw {item['letter']} at the {c['name']}"
+    return None, "failed: no target in a straight line"
 
 
 def r_use(v: View, memory: Memory, args: dict):
@@ -545,10 +621,17 @@ def r_loot(v: View, memory: Memory, args: dict):
         args.pop("sent")
         args.pop("target", None)
         return None, "done: picked over"
+    if any(c["kind"] == "monster" and c["name"] == "shopkeeper" for c in v.cells.values()):
+        return None, "done: a shopkeeper is watching; nothing here is free"
+
     def wanted(x, y):
         c = v.cells.get((x, y))
+        if c is not None and c["kind"] == "object" and c.get("class") == ")" \
+                and any(r in c["name"] for r in memory.retrieve) \
+                and (v.dlvl, x, y) not in memory.looted:
+            return True  # Our thrown dagger.
         return (c is not None and c["kind"] == "object" and c.get("class", "") in classes
-                and not any(w in c["name"] for w in NOT_CARRIED)
+                and not any(w in c["name"] for w in NOT_CARRIED + ("corpse",))
                 and (v.dlvl, x, y) not in memory.looted and (v.dlvl, x, y) not in memory.blocked)
     if args.get("target") and tuple(args["target"]) == v.pos and here not in memory.looted:
         args["sent"] = True
@@ -602,6 +685,7 @@ ROUTINES = {
     "pick_up": (r_pick_up, "walk to an item and pick it up; {x, y} (default: here). A menu comes back to you as a prompt"),
     "loot": (r_loot, "pick up visible items of the given classes; {classes: e.g. '?!/=\"+('}"),
     "search_dead_ends": (r_search_dead_ends, "search corridor dead ends for hidden passages"),
+    "throw": (r_throw, "throw a dagger/knife/spear/dart at a monster in a straight line; {target: name}"),
     "elbereth": (r_elbereth, "engrave Elbereth in the dust here; most monsters won't melee you on it"),
     "step_away": (r_step_away, "back off from a monster; {target: optional name, max_steps: default 3}"),
     "use": (r_use, "a command that takes an item, e.g. {command: 'q', item: 'f'} to quaff f; also r read, W wear, w wield, P put on, z zap, T take off"),
@@ -611,6 +695,11 @@ ROUTINES = {
 
 HUNGER_RANK = ["", "Hungry", "Weak", "Fainting", "Fainted"]
 
+
+def _key(why: str) -> str:
+    """An escalation's identity, ignoring numbers (HP, difficulty) that change."""
+    return re.sub(r"\d+", "#", why)
+
 DEFAULT_ORDERS = {
     "fight_up_to": None,        # melee adjacent hostiles up to this difficulty (None: your level + 2)
     "avoid": sorted(DONT_MELEE),  # never melee these
@@ -619,9 +708,10 @@ DEFAULT_ORDERS = {
     "pray_when_critical": True,  # pray at critical HP when prayer should be safe
     "pickup_gold": True,        # walk to visible gold
     "descend": True,            # default activity ends by taking the stairs down
-    "loot": "$?!/=\"+(",         # item classes to pick up ($ gold ? scroll ! potion / wand = ring " amulet + book ( tool)
+    "loot": "$?!/=\"+(%",        # item classes to pick up ($ gold ? scroll ! potion / wand = ring " amulet + book ( tool % food, never corpses)
     "explore_fully": True,      # search dead ends for hidden passages before going down
     "eat_corpses": "unless_satiated",  # fresh safe kills: "unless_satiated", "hungry" or "never"
+    "ranged_kill": ["floating eye", "acid blob", "gas spore"],  # throw at these when in line
     "retreat_below": 0.35,      # badly hurt with a hostile adjacent: ask the brain before it's critical
 }
 
@@ -642,6 +732,16 @@ class Engine:
         self.acknowledged: set[str] = set()  # escalations the brain's routine is handling
         self.note = ""
         self._loot_args: dict = {"classes": self.orders["loot"]}
+        self._acct: tuple = ("start", None)  # (activity of the last keys, turn then)
+
+    def _activity(self) -> str:
+        """Which activity the last keys belonged to, for turn accounting."""
+        note = self.note or ""
+        if self.routine:
+            return self.routine
+        if note.startswith("standing order: "):
+            return note[16:].split(":")[0].split(",")[0].split(" the ")[0].split(" (")[0].strip()
+        return note.split(":")[0] if ":" in note else note.split(" ")[0]
 
     def order(self, routine: str, args: dict | None = None, handles: list[str] | None = None) -> None:
         """Run `routine` next. `handles`: the escalations it answers, so the
@@ -649,7 +749,7 @@ class Engine:
         if routine not in ROUTINES:
             raise ValueError(f"unknown routine {routine!r}")
         self.routine, self.args = routine, dict(args or {})
-        self.acknowledged = set(handles or [])
+        self.acknowledged = {_key(h) for h in handles or []}
 
     def set_orders(self, changes: dict) -> list[str]:
         """Update standing orders; returns what was rejected."""
@@ -673,6 +773,10 @@ class Engine:
             self.memory.visited.add((v.dlvl, *v.pos))
 
         self._record_kills(v)
+        turn = v.status.get("turn")
+        if turn is not None and self._acct[1] is not None and turn > self._acct[1]:
+            _count(self.memory, f"turns: {self._acct[0]}", turn - self._acct[1])
+        self._acct = (self._activity(), turn if turn is not None else self._acct[1])
         mech = mechanics(v, self.memory)
         if mech:
             self.note = mech[1]
@@ -721,6 +825,8 @@ class Engine:
                     name = msg[len(verb):].rstrip("!.").strip() if verb != "You kill it" else "?"
                     m.kills[(v.dlvl, *m.pending_fight)] = (name, v.status.get("turn", 0))
                     m.pending_fight = None
+                    _count(m, "kills")
+                    _count(m, "safe kills" if name in SAFE_CORPSES else f"unsafe kill: {name}")
 
     def _corpse_to_eat(self, v: View, c: dict):
         """A fresh safe kill with a corpse still on it, within a short walk."""
@@ -741,8 +847,7 @@ class Engine:
             if "corpse" not in " ".join(v.s.get("messages", [])) and (v.dlvl, *v.pos) in m.looted:
                 return None
             m.looted.add((v.dlvl, *v.pos))
-            m.eating_corpse = True
-            m.kills.pop((v.dlvl, *v.pos), None)
+            m.eating_corpse = True  # The kill record stays until the prompt is answered.
             return "e", "eat the fresh kill"
         def has_corpse(x, y):
             cell = v.cells.get((x, y))
@@ -756,7 +861,7 @@ class Engine:
         self.routine, self.args, self.acknowledged = None, {}, set()
 
     def _escalate(self, why: str):
-        return None if why in self.acknowledged else (None, why)
+        return None if _key(why) in self.acknowledged else (None, why)
 
     def _standing(self, v: View, c: dict):
         """Standing orders, most urgent first. Returns (keys, why), an
@@ -764,7 +869,7 @@ class Engine:
         o, m = self.orders, self.memory
         if c["wounded"] == "critical":
             if o["pray_when_critical"] and c["prayer_safe"]:
-                return r_pray(v, m, {})[0], f"standing order: HP {c['hp']}/{c['hpmax']}, pray"
+                return r_pray(v, m, {})[0], f"standing order: pray (HP {c['hp']}/{c['hpmax']})"
             esc = self._escalate("critical HP and prayer isn't safe")
             if esc:
                 return esc
@@ -773,6 +878,12 @@ class Engine:
             esc = self._escalate(f"badly hurt (HP {c['hp']}/{c['hpmax']}) with {names} adjacent")
             if esc:
                 return esc
+        for mon in c["visible_hostiles"]:
+            if mon["name"] in o["ranged_kill"] and throwable(v) and in_line(v.pos, (mon["x"], mon["y"])) \
+                    and mon["distance"] <= 8 and (mon["name"] != "gas spore" or mon["distance"] >= 2):
+                keys, note = r_throw(v, m, {"target": mon["name"]})
+                if keys:
+                    return keys, "standing order: " + note
         limit = o["fight_up_to"] if o["fight_up_to"] is not None else (c["xlvl"] or 1) + 2
         for mon in c["adjacent_hostiles"]:
             if mon["name"] in o["avoid"]:
@@ -793,11 +904,11 @@ class Engine:
         if eat_at in HUNGER_RANK and hunger >= HUNGER_RANK.index(eat_at) > 0:
             if c["safe_food"]:
                 m.pending_food = c["safe_food"][0]["letter"]
-                return "e", f"standing order: {c['hunger']}, eat"
+                return "e", f"standing order: eat ({c['hunger']})"
             if hunger >= HUNGER_RANK.index("Weak"):
                 # Weak from hunger is a major trouble prayer fixes; else ask.
                 if o["pray_when_critical"] and c["prayer_safe"]:
-                    return r_pray(v, m, {})[0], f"standing order: {c['hunger']} with no food, pray"
+                    return r_pray(v, m, {})[0], f"standing order: pray ({c['hunger']}, no food)"
                 esc = self._escalate(f"{c['hunger']} and no known-safe food")
                 if esc:
                     return esc
@@ -806,7 +917,7 @@ class Engine:
         if corpse:
             return corpse[0], "standing order: " + corpse[1]
         if c["hp"] < c["hpmax"] * float(o["rest_below"]) and not c["visible_hostiles"]:
-            return "20s", f"standing order: HP {c['hp']}/{c['hpmax']}, rest"
+            return "20s", f"standing order: rest (HP {c['hp']}/{c['hpmax']})"
         if o["pickup_gold"] and "$" not in str(o["loot"]) and c["gold_visible"] \
                 and not c["visible_hostiles"] and not self.routine:
             keys, note = r_pickup_gold(v, m, {})
@@ -833,7 +944,7 @@ class Engine:
         if self.orders["explore_fully"]:
             keys, note = r_search_dead_ends(v, m, {})
             if keys:
-                self.note = "search: " + note
+                self.note = "search dead ends: " + note
                 return self._stuck_guard(v, keys, note)
         if self.orders["descend"]:
             keys, note = r_go_down(v, m, {"start_dlvl": v.dlvl})
@@ -843,10 +954,20 @@ class Engine:
         if v.dlvl not in m.searched_out:
             keys, note = r_search_walls(v, m, {})
             if keys:
-                self.note = "search: " + note
+                self.note = "search walls: " + note
                 return self._stuck_guard(v, keys, note)
             m.searched_out.add(v.dlvl)
-        return None, ["no way on: explored, searched the walls, no stairs down known"]
+        # A never-melee monster parked in the way (a floating eye in a
+        # corridor, say): they do drift, so wait a while before giving up.
+        blockers = [mon["name"] for mon in self.last_checks.get("visible_hostiles", [])
+                    if mon["name"] in self.orders["avoid"] and mon["distance"] <= 2]
+        waited = m.stats.get(f"waited on dlvl {v.dlvl}", 0)
+        if blockers and waited < 60:
+            _count(m, f"waited on dlvl {v.dlvl}", 5)
+            self.note = f"wait for the {blockers[0]} to move out of the way"
+            return "5s", []
+        return None, ["no way on: explored, searched the walls, no stairs down known"
+                      + (f" ({', '.join(blockers)} in the way)" if blockers else "")]
 
     def _stuck_guard(self, v: View, keys: str, note: str):
         """The same keys five times with the turn and position unchanged
