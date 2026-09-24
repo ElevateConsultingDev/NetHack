@@ -368,8 +368,18 @@ def main() -> None:
                 if not queue:
                     return
                 g = queue.pop(0)
-            r = g.play()
-            finish(g, r)
+            try:
+                r = g.play()
+                finish(g, r)
+            except Exception:  # A crashed game is recorded, not silently lost with its worker.
+                import traceback
+                err = traceback.format_exc()
+                print(f"  {g.name}: harness error\n{err}", flush=True)
+                r = {"name": g.name, "stall": "harness error: " + err.strip().splitlines()[-1][:120],
+                     "death": "", "dlvl": None, "xlvl": None, "turn": 0, "maxlvl": "", "points": "",
+                     "stats": {}, "prayers": [], "escalations": [], "feed": [], "keys": [], "answers": [],
+                     "brain_calls": g.brain_calls, "seconds": 0, "bucket": "harness error"}
+                g.result = r
             dashboard.write_game(os.path.join(batch_dir, f"game-{g.name}.html"), g, run)
             with lock:
                 results.append(r)
