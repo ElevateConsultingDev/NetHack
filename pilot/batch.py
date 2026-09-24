@@ -137,6 +137,8 @@ class Game:
         self.channel = Channel(self.sock, self.on_state)
         self.last: dict = {}
         self.brain_calls = 0
+        self.brain_seconds = 0.0
+        self.brain_failures = 0  # calls that fell back to rules (timeout, crash)
         self.stall: str | None = None
         self.proc: subprocess.Popen | None = None
         self.result: dict | None = None  # Set when the game is over.
@@ -161,8 +163,7 @@ class Game:
             return
         if self.consult and self.engine.consults and s["context"]["kind"] == "command":
             events, self.engine.consults = self.engine.consults, []
-            self.brain_calls += 1
-            order = self.brain.decide(self.engine.last_checks, events, s, self.engine.orders)
+            order = self._decide(events, s)
             if order.orders:
                 self.engine.set_orders(order.orders)
             if order.routine in CONSULT_ROUTINES and self.engine.routine is None:  # Never cut across a routine.
@@ -175,8 +176,7 @@ class Game:
             if keys:
                 self.channel.send(keys)
                 return
-            self.brain_calls += 1
-            order = self.brain.decide(self.engine.last_checks, events, s, self.engine.orders)
+            order = self._decide(events, s)
             if order.orders:
                 self.engine.set_orders(order.orders)
             self.escalations.append((turn, "; ".join(events), order.routine))
@@ -189,6 +189,16 @@ class Game:
             self.engine.order(order.routine, order.args, handles=events)
         self.stall = f"brain loop: {'; '.join(events)} (last order: {order.routine} {order.args})"
         self._end()
+
+    def _decide(self, events: list[str], s: dict):
+        """Ask the brain, timing it: slow or failing calls skew a batch."""
+        started = time.time()
+        self.brain_calls += 1
+        order = self.brain.decide(self.engine.last_checks, events, s, self.engine.orders)
+        self.brain_seconds += time.time() - started
+        if order.say.startswith("(brain unavailable"):
+            self.brain_failures += 1
+        return order
 
     def _end(self) -> None:
         """Stop the game: save it as a scenario when it stalled (so it can
@@ -224,6 +234,8 @@ class Game:
             time.sleep(0.2)
         os.close(master)
         cleanup_game(self.name)
+        if hasattr(self.brain, "close"):
+            self.brain.close()  # Or its claude process outlives the game.
         if self.saving:
             keep_scenario(self.name, self.stall or "", self.last)
         if self.stall and self.last:  # Keep the final snapshot to see what went wrong.
@@ -233,7 +245,8 @@ class Game:
         st = self.last.get("status", {})
         return {
             "name": self.name, "seconds": round(time.time() - started, 1),
-            "brain_calls": self.brain_calls, "stall": self.stall or "",
+            "brain_calls": self.brain_calls, "brain_seconds": round(self.brain_seconds),
+            "brain_failures": self.brain_failures, "stall": self.stall or "",
             "dlvl": st.get("dlvl"), "xlvl": st.get("xlvl"), "turn": st.get("turn"),
             "hp": f"{st.get('hp')}/{st.get('hpmax')}", "gold": st.get("gold"),
             "stats": dict(self.engine.memory.stats), "deepest": self.deepest,
@@ -297,8 +310,13 @@ def main() -> None:
             dashboard.write_game(os.path.join(batch_dir, f"game-{g.name}.html"), g, run)
             with lock:
                 results.append(r)
+                save_json()  # After every game, so a batch that dies early keeps its records.
                 print(f"  {g.name}: Dlvl {r['dlvl']} XL {r['xlvl']} T{r['turn']} "
                       f"{r['death'] or r['stall']}", flush=True)
+
+    def save_json() -> None:
+        with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Everything, per game.
+            json.dump({"run": run, "brain": args.brain, "games": sorted(results, key=lambda r: r["name"])}, f)
 
     stop = threading.Event()
 
@@ -325,10 +343,8 @@ def main() -> None:
     stop.set()
 
     path = os.path.join(batch_dir, f"{run}.csv")
-    with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Everything, per game.
-        json.dump({"run": run, "brain": args.brain, "games": sorted(results, key=lambda r: r["name"])}, f)
     cols = ["name", "bucket", "death", "stall", "maxlvl", "dlvl", "xlvl", "race", "turn", "points", "gold",
-            "brain_calls", "seconds"]
+            "brain_calls", "brain_seconds", "brain_failures", "seconds"]
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
         w.writeheader()

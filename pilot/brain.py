@@ -133,8 +133,11 @@ class HaikuBrain:
     name = "haiku"
     TIMEOUT_S = 60
 
-    def __init__(self, model: str = "haiku", log_path: str | None = None) -> None:
+    def __init__(self, model: str = "haiku", log_path: str | None = None, thinking_tokens: int = 0) -> None:
         self.model = model
+        # Thinking made each call 20-50s instead of 2-3s; checkpoints ask
+        # dozens of times a game. Raise it if its decisions get worse.
+        self.thinking_tokens = thinking_tokens
         self.fallback = RuleBrain()
         self.session_id = str(uuid.uuid4())
         self.started = False
@@ -160,7 +163,8 @@ class HaikuBrain:
             "--resume" if self.started else "--session-id", self.session_id,
         ]
         self._proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                      stderr=self.log, text=True, cwd=tempfile.gettempdir())
+                                      stderr=self.log, text=True, cwd=tempfile.gettempdir(),
+                                      env=dict(os.environ, MAX_THINKING_TOKENS=str(self.thinking_tokens)))
         self._lines = queue.Queue()
         threading.Thread(target=self._pump, args=(self._proc, self._lines), daemon=True).start()
 
@@ -219,6 +223,11 @@ class HaikuBrain:
             return None
         return Order(routine, d.get("args") or {}, str(d.get("say") or ""),
                      d.get("orders") if isinstance(d.get("orders"), dict) else {})
+
+    def close(self) -> None:
+        if self._proc and self._proc.poll() is None:
+            self._proc.kill()
+        self._proc = None
 
     def decide(self, c: dict, events: list[str], s: dict, orders: dict) -> Order:
         order = self._parse(self._ask(_brief(c, events, s, None, orders)))
