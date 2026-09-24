@@ -11,6 +11,7 @@ import csv
 import glob
 import html
 import os
+import threading
 import time
 
 REFRESH_S = 3
@@ -228,7 +229,7 @@ def write(path: str, run: str, brain: str, games: list, batch_dir: str) -> None:
 <h2>Games</h2><div class="grid">{''.join(_game_card(g) for g in games)}</div>
 <h2>Past runs</h2>{_history(batch_dir)}
 </main></body></html>"""
-    tmp = path + ".tmp"
+    tmp = f"{path}.{threading.get_ident()}.tmp"  # One per writer: the refresher and a worker can collide.
     with open(tmp, "w") as f:
         f.write(page)
     os.replace(tmp, path)
@@ -308,7 +309,7 @@ def write_game(path: str, g, run: str) -> None:
 }})();
 </script>
 </main></body></html>"""
-    tmp = path + ".tmp"
+    tmp = f"{path}.{threading.get_ident()}.tmp"  # One per writer: the refresher and a worker can collide.
     with open(tmp, "w") as f:
         f.write(page)
     os.replace(tmp, path)
