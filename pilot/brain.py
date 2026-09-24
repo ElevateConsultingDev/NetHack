@@ -12,6 +12,7 @@ game's DM) and falls back to RuleBrain if the answer is missing or invalid.
 from __future__ import annotations
 
 import json
+import os
 import queue
 import subprocess
 import tempfile
@@ -60,7 +61,9 @@ An ENGINE does everything deterministic, fast, without asking you:
 - STANDING ORDERS (which you set): fight adjacent hostiles up to a difficulty, never melee the avoid list, eat known-safe food at a hunger level, rest when hurt and alone, pray on major trouble (critical HP, Weak with no food, stoning, sliming, strangling, sickness, lycanthropy) when the prayer gate is open (1000 turns apart, never after a failed prayer or a Luck penalty), pick up gold;
 - a default activity: explore the level, go down the stairs when done, search the walls if there are no stairs.
 
-You are asked only when something is outside the standing orders (an ESCALATION): a monster that's too tough or on the avoid list, hunger with no safe food, critical HP when prayer isn't safe, an unfamiliar prompt, a routine of yours that failed, no way on, or the human talking to you.
+You are asked when something is outside the standing orders (an ESCALATION): a monster that's too tough or on the avoid list, hunger with no safe food, critical HP when prayer isn't safe, an unfamiliar prompt, a routine of yours that failed, no way on, or the human talking to you.
+
+You are also CONSULTED at checkpoints: arriving on a new level, the first sight of a monster type, and every 500 turns. That is your chance to plan: set standing orders for what's ahead (avoid a monster, fight_up_to, descend, eat_at, retreat_below). Routine null means carry on; that is the usual answer. A routine you give at a checkpoint runs only if nothing else is in progress.
 
 Answer with a ROUTINE for the engine to carry out, and optionally standing-order changes. Routines:
 {routines}
@@ -90,7 +93,8 @@ def _brief(c: dict, events: list[str], s: dict, chat: str | None, orders: dict) 
     if chat is not None:
         parts.append(f"THE HUMAN SAYS: {chat}")
     parts += [
-        ("ESCALATION: " if chat is None else "EVENTS: ") + ("; ".join(events) if events else "(none)"),
+        ("EVENTS: " if chat is not None else "CONSULT: " if events and all(e.startswith("consult:") for e in events)
+         else "ESCALATION: ") + ("; ".join(events) if events else "(none)"),
         "STANDING ORDERS: " + json.dumps(orders),
         "CHECKS: " + json.dumps({k: v for k, v in c.items() if k != "food"}),
         f"STATUS: {st.get('role')} XL{st.get('xlvl')} HP {st.get('hp')}/{st.get('hpmax')} "
@@ -113,6 +117,18 @@ def _brief(c: dict, events: list[str], s: dict, chat: str | None, orders: dict) 
     return "\n".join(parts)
 
 
+JOURNAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "journal.md")
+
+
+def _journal() -> str:
+    """The versioned lessons file, read fresh for every game."""
+    try:
+        with open(JOURNAL) as f:
+            return "\n\nYOUR JOURNAL (lessons from past games; follow them):\n" + f.read()
+    except OSError:
+        return ""
+
+
 class HaikuBrain:
     name = "haiku"
     TIMEOUT_S = 60
@@ -131,11 +147,13 @@ class HaikuBrain:
 
     def _start(self) -> None:
         routines = "\n".join(f"- {n}: {d}" for n, (_, d) in ROUTINES.items())
+        if not self.started:  # A crashed first process may have claimed the id already.
+            self.session_id = str(uuid.uuid4())
         cmd = [
             "claude", "-p",
             "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             "--model", self.model,
-            "--system-prompt", SYSTEM.format(routines=routines),
+            "--system-prompt", SYSTEM.format(routines=routines) + _journal(),
             "--tools", "",                 # No built-in tools: it only answers.
             "--strict-mcp-config",         # No MCP servers.
             "--setting-sources=",          # Keep the user's CLAUDE.md, hooks, plugins out.

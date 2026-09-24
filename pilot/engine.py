@@ -812,6 +812,9 @@ class Engine:
         self.note = ""
         self._loot_args: dict = {"classes": self.orders["loot"]}
         self._acct: tuple = ("start", None)  # (activity of the last keys, turn then)
+        self.consults: list[str] = []  # checkpoints to ask the brain about; never block play
+        self._seen: set = set()        # levels and monster types already consulted on
+        self._next_checkin = 500
 
     def _activity(self) -> str:
         """Which activity the last keys belonged to, for turn accounting."""
@@ -827,6 +830,9 @@ class Engine:
         standing orders stop raising them while it runs."""
         if routine not in ROUTINES:
             raise ValueError(f"unknown routine {routine!r}")
+        if routine == "pray" and not self.last_checks.get("prayer_safe"):
+            self.note = "rejected the brain's prayer: the gate is closed"  # Would anger the god.
+            return
         # Everything the brain has answered stays answered until its routine
         # finishes, even if a later answer switches routines (badly hurt ->
         # elbereth, then too-tough monster -> fight): otherwise two alarms
@@ -875,6 +881,7 @@ class Engine:
 
         c = checks(v, self.memory)
         self.last_checks = c
+        self._checkpoints(v, c)
 
         standing = self._standing(v, c)
         if standing is not None:
@@ -963,6 +970,21 @@ class Engine:
         if path and len(path) <= 8:
             return _step(v, m, path, f"walk to the fresh kill at {path[-1]}")
         return None
+
+    def _checkpoints(self, v: View, c: dict) -> None:
+        """Moments worth a strategic look from the brain: a new level, the
+        first sight of a monster type, and a check-in every 500 turns."""
+        if ("dlvl", v.dlvl) not in self._seen:
+            self._seen.add(("dlvl", v.dlvl))
+            self.consults.append(f"consult: arrived on Dlvl {v.dlvl} ({v.status.get('dungeon', '')}) for the first time")
+        for mon in c["visible_hostiles"]:
+            if ("mon", mon["name"]) not in self._seen:
+                self._seen.add(("mon", mon["name"]))
+                self.consults.append(f"consult: first sight of a {mon['name']} "
+                                     f"(difficulty {mon['difficulty']}, {mon['distance']} away)")
+        if c["turn"] >= self._next_checkin:
+            self._next_checkin = c["turn"] - c["turn"] % 500 + 500
+            self.consults.append(f"consult: check-in at T{c['turn']}: set standing orders for what's ahead")
 
     def _end_routine(self) -> None:
         self.routine, self.args, self.acknowledged = None, {}, set()

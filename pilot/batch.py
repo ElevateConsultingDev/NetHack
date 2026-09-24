@@ -88,6 +88,11 @@ def xlog_entries() -> dict[str, dict]:
     return out
 
 
+# What a checkpoint may start. Exploring and fighting are the engine's own
+# default and standing orders; a brain ordering them only gets in the way.
+CONSULT_ROUTINES = {"throw", "step_away", "elbereth", "go_down", "use", "pick_up"}
+
+
 def bucket(r: dict) -> str:
     """One failure bucket per game, for comparing runs."""
     death, stall, during = r.get("death", ""), r.get("stall", ""), r.get("died_while", "")
@@ -122,6 +127,7 @@ class Game:
         self.out_dir = out_dir
         self.deepest = 0
         self.escalations: list = []  # (turn, events, order) for every brain call
+        self.consult = isinstance(brain, HaikuBrain)  # strategic check-ins, not just escalations
         self.save_on_stall = save_on_stall
         self.saving = False
         self.name, self.role, self.brain = name, role, brain
@@ -153,6 +159,17 @@ class Game:
             self.stall = f"turn limit {self.max_turns}"
             self._end()
             return
+        if self.consult and self.engine.consults and s["context"]["kind"] == "command":
+            events, self.engine.consults = self.engine.consults, []
+            self.brain_calls += 1
+            order = self.brain.decide(self.engine.last_checks, events, s, self.engine.orders)
+            if order.orders:
+                self.engine.set_orders(order.orders)
+            if order.routine in CONSULT_ROUTINES and self.engine.routine is None:  # Never cut across a routine.
+                self.engine.order(order.routine, order.args)
+            self.escalations.append((turn, "; ".join(events), order.routine))
+            self.feed.append((turn, "brain", f"{'; '.join(events)} -> {order.routine or 'carry on'} "
+                              f"{order.orders or ''} {order.say}"))
         for _ in range(4):
             keys, events = self.engine.step(s)
             if keys:
@@ -221,7 +238,7 @@ class Game:
             "hp": f"{st.get('hp')}/{st.get('hpmax')}", "gold": st.get("gold"),
             "stats": dict(self.engine.memory.stats), "deepest": self.deepest,
             "race": st.get("race"), "prayers": self.engine.memory.prayer_log,
-            "escalations": self.escalations,
+            "escalations": self.escalations, "feed": list(self.feed),
         }
 
     @staticmethod
