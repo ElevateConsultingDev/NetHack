@@ -1153,6 +1153,14 @@ class Engine:
         what's wanted, explore everything, search dead ends, then go down
         (searching the walls if there are no stairs)."""
         m = self.memory
+        c = self.last_checks
+        if c.get("hunger") in HUNGRY and not c.get("safe_food") and c.get("stairs_down") and self.orders["descend"]:
+            # Hungry with nothing to eat: a new level has new monsters to
+            # eat and new food; finishing this one only burns turns.
+            keys, note = r_go_down(v, m, {"start_dlvl": v.dlvl})
+            if keys:
+                self.note = "go down (hungry, no food): " + note
+                return self._stuck_guard(v, keys, note)
         burdened = v.status.get("encumbrance", "") != ""
         # Hostiles we never melee (a floating eye in the way) don't stop
         # looting, even next to us (they only hurt if hit; paths never walk
