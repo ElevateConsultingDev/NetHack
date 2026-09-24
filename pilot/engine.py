@@ -1061,6 +1061,13 @@ class Engine:
                 m.tin_smell = "spinach"
             elif msg.startswith("It contains some decaying"):
                 m.tin_smell = "decaying substance"
+            if msg.startswith("You can't go down here") and v.pos:
+                # The stairs we remembered here are gone (a mimic, or a
+                # level number shared with another branch): forget them,
+                # or '>' gets pressed here until the game ends (12 of 256).
+                m.features.pop((v.dlvl, *v.pos), None)
+                m.mines_stairs.add((v.dlvl, *v.pos))  # never a go_down target again
+                _count(m, "forgot stale stairs")
             if "You feel feverish" in msg:
                 m.feverish = True
             elif "You feel purified" in msg:
