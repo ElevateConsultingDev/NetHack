@@ -316,6 +316,13 @@ put_map()
             put(tmp);
             put_kv_str("kind", kind, TRUE);
             put_kv_str("name", desc, TRUE);
+            if (!strcmp(kind, "monster")) {
+                /* what farlook (;) would say; unreliable while hallucinating */
+                struct monst *mtmp = m_at(x, y);
+
+                if (mtmp && canspotmon(mtmp) && !Hallucination)
+                    put_kv_int("peaceful", mtmp->mpeaceful ? 1L : 0L, TRUE);
+            }
             put("}");
             first = FALSE;
         }
