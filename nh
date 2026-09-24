@@ -1,0 +1,7 @@
+#!/bin/sh
+# Start this fork's NetHack connected to the pilot (python3 -m pilot).
+# Usage: ./nh [name] [role]   e.g. ./nh Pilot Valkyrie
+cd "$(dirname "$0")" || exit 1
+NETHACK_CONTROL="${NETHACK_CONTROL:-/tmp/nhpilot.sock}" \
+NETHACKOPTIONS="${NETHACKOPTIONS:-autopickup,pickup_types:\$,time,showexp,dark_room,!legacy,!news,!autoquiver}" \
+exec ./playground/nethack -u "${1:-Pilot}" -p "${2:-Valkyrie}"
