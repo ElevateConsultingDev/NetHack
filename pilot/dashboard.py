@@ -268,7 +268,7 @@ def write_game(path: str, g, run: str) -> None:
         state, label = "done", "ended"
     inv = "".join(f"<div>{html.escape(i['letter'])} - {html.escape(i['text'])}</div>" for i in s.get("inventory", []))
     feed = "".join(f'<div class="f-{kind}"><span class="t">T{t}</span>{html.escape(text)}</div>'
-                   for t, kind, text in reversed(g.feed))
+                   for t, kind, text in g.feed)  # Oldest first; the newest is at the bottom.
     routine = g.engine.routine or "default activity"
     refresh = '<meta http-equiv="refresh" content="1">' if g.result is None else ""
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -289,9 +289,24 @@ def write_game(path: str, g, run: str) -> None:
 <div class="cols">
   <div><pre class="big">{_map_html(s)}</pre>
     <p class="sub">Highlighted @ is you · red monsters · green your pet · amber items · blue features. Hover a symbol for its name.</p></div>
-  <div><h2 style="margin-top:0">Feed</h2><div class="feed">{feed or '<span class=sub>nothing yet</span>'}</div>
+  <div><h2 style="margin-top:0">Feed</h2><div class="feed" id="feed">{feed or '<span class=sub>nothing yet</span>'}</div>
     <h2>Inventory</h2><div class="inv">{inv or '<span class=sub>empty</span>'}</div></div>
 </div>
+<script>
+// Keep the feed pinned to the newest line across refreshes, unless the
+// reader has scrolled up; then keep their place until they scroll back down.
+(() => {{
+  const feed = document.getElementById("feed");
+  let saved = null;
+  try {{ saved = JSON.parse(sessionStorage.getItem("feed-scroll") || "null"); }} catch (e) {{}}
+  if (saved && saved.pinned === false) feed.scrollTop = saved.top;
+  else feed.scrollTop = feed.scrollHeight;
+  feed.addEventListener("scroll", () => {{
+    const pinned = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 12;
+    try {{ sessionStorage.setItem("feed-scroll", JSON.stringify({{pinned, top: feed.scrollTop}})); }} catch (e) {{}}
+  }});
+}})();
+</script>
 </main></body></html>"""
     tmp = path + ".tmp"
     with open(tmp, "w") as f:

@@ -80,6 +80,7 @@ class Memory:
     corridors: set = field(default_factory=set)   # (dlvl, x, y) corridor squares seen
     kills: dict = field(default_factory=dict)     # (dlvl, x, y) -> (monster, turn) where we killed it
     eating_corpse: bool = False                   # an 'e' for a floor corpse is in progress
+    declined_corpse: bool = False                 # we said no to a floor corpse just now
     stats: dict = field(default_factory=dict)     # counters for measuring the pilot
     retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
     probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
@@ -330,6 +331,9 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
         if prompt.startswith("What do you want to eat") and memory.pending_food:
             letter, memory.pending_food = memory.pending_food, ""
             return letter, "eat it"
+        if prompt.startswith("What do you want to eat") and memory.declined_corpse:
+            memory.declined_corpse = False
+            return "\x1b", "declined the corpse; not eating from the pack either"
         if prompt.startswith("What do you want to") and memory.pending_item:
             letter, memory.pending_item = memory.pending_item, ""
             return letter, f"answer with item {letter}"
@@ -338,6 +342,7 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
             name = corpse_name(prompt)
             ok, why = corpse_safe(name, memory, v)
             memory.kills.pop((v.dlvl, *v.pos), None)
+            memory.declined_corpse = not ok  # NetHack will then ask what to eat from the pack.
             _count(memory, "corpses_eaten" if ok else "corpses_declined")
             if not ok:
                 _count(memory, f"declined: {why}")

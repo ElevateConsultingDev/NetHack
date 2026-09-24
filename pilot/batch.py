@@ -147,7 +147,7 @@ class Game:
         be replayed), otherwise kill it."""
         if self.save_on_stall and self.stall and not self.saving and self.last.get("player"):
             self.saving = True
-            self.channel.send("S")
+            self.channel.send("\x1b\x1bS")  # Close any open prompt first, then save.
             return
         if self.proc and self.proc.poll() is None:
             self.proc.kill()
