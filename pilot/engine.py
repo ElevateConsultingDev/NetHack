@@ -298,6 +298,9 @@ def checks(v: View, memory: Memory) -> dict:
         "prayer_safe": not memory.prayer_broken and turn >= memory.luck_bad_until
                        and (turn >= 300 if memory.last_pray_turn is None
                             else turn - memory.last_pray_turn >= 1000),
+        "prayer_opens_in": None if memory.prayer_broken else max(
+            0, memory.luck_bad_until - turn,
+            (300 if memory.last_pray_turn is None else memory.last_pray_turn + 1000) - turn),
         "major_trouble": trouble,
         "adjacent_hostiles": adjacent,
         "visible_hostiles": visible,
@@ -1014,8 +1017,12 @@ class Engine:
             if c["safe_food"]:
                 m.pending_food = c["safe_food"][0]["letter"]
                 return "e", f"standing order: eat ({c['hunger']})"
-            if hunger >= HUNGER_RANK.index("Weak"):
-                # Prayer (above) handles it when the gate is open; else ask.
+            opens = c["prayer_opens_in"]
+            if hunger >= HUNGER_RANK.index("Weak") and not (o["pray_when_critical"] and opens is not None
+                                                            and opens <= 300):
+                # Prayer (above) handles it once the gate opens: Weak comes
+                # ~850 turns after a prayer and starving takes ~300 more, so
+                # keep playing through a short wait; else ask.
                 esc = self._escalate(f"{c['hunger']} and no known-safe food")
                 if esc:
                     return esc
