@@ -50,22 +50,40 @@ LUCK_PENALTIES = {"You murderer!": 1200, "You cannibal!": 3000, "That's bad luck
                   "You feel guilty": 3000}
 HUNGRY = {"Hungry", "Weak", "Fainting", "Fainted"}
 
-# Corpses safe for an ordinary character when fresh (NetHack 3.6). Leaves out
-# anything poisonous, acidic-and-risky, were-, domestic (aggravate), stunning,
-# hallucinogenic, petrifying, polymorphing, teleport-granting, mimicking,
-# pre-rotted (zombies, mummies), and humanoids that are someone's kin.
-SAFE_CORPSES = {
-    "newt", "jackal", "fox", "coyote", "sewer rat", "giant rat", "rock mole", "woodchuck",
-    "gecko", "iguana", "baby crocodile", "crocodile", "lizard", "lichen", "rothe", "dingo",
-    "wolf", "giant beetle", "floating eye", "acid blob", "gnome", "gnome lord", "gnome king",
-    "hill orc", "Mordor orc", "Uruk-hai", "orc shaman", "goblin", "hobgoblin", "hill giant",
-    "pony", "horse", "warhorse", "jaguar", "lynx", "panther",
-}
+# Which corpses are food, from the game's own monster table (src/monst.c):
+# never poisonous (M1_POIS) or acidic (M1_ACID) ones, never our own race
+# (M2_HUMAN, M2_DWARF...: cannibalism), never these (stoning, sliming,
+# aggravation, stun, hallucination, polymorph, teleport, mimicry, rot).
+def _monster_table() -> tuple[set, set, dict, set]:
+    import os
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "monst.c")).read()
+    entries = [(p.split('"', 1)[0], p) for p in src.split('MON("')[1:]]
+    races = {r: {n for n, body in entries if f"M2_{r.upper()}" in body} for r in ("human", "elf", "dwarf", "gnome", "orc")}
+    return ({n for n, b in entries if "M1_POIS" in b}, {n for n, b in entries if "M1_ACID" in b}, races,
+            {n for n, _ in entries})
+
+
+POISONOUS, ACIDIC, RACE_MEMBERS, ALL_MONSTERS = _monster_table()
+NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog", "dog", "large dog",
+             "kitten", "housecat", "large cat", "bat", "giant bat", "vampire bat", "violet fungus",
+             "black light", "chameleon", "doppelganger", "sandestin", "small mimic", "large mimic",
+             "giant mimic", "disenchanter", "leprechaun", "nymph", "water nymph", "wood nymph",
+             "mountain nymph", "tengu", "mind flayer", "master mind flayer", "nurse", "lizard"}
+
+
+def species_ok(name: str, race: str) -> tuple[bool, str]:
+    """Is a corpse of this species food for us? (Freshness is separate.)"""
+    if name in POISONOUS:
+        return False, "poisonous"
+    if name in ACIDIC:
+        return False, "acidic"
+    if name in NEVER_EAT or name.endswith(("zombie", "mummy")) or name.startswith("were"):
+        return False, f"never eat {name}"
+    if name in RACE_MEMBERS.get(race, ()):
+        return False, "cannibalism"
+    return True, "ok"
 NEVER_ROTS = {"lichen", "lizard"}
 FRESH_TURNS = 30
-RACE_KIN = {"gnome": ("gnome",), "orc": ("orc", "Uruk-hai"), "dwarf": ("dwarf",),
-            "elf": ("elf",), "human": ("human",)}
-
 
 @dataclass
 class Memory:
@@ -442,10 +460,9 @@ def tin_ok(smell: str, v: "View") -> bool:
         return True
     if not smell or "Hallu" in v.status.get("conditions", []):
         return False
-    kin = RACE_KIN.get(v.status.get("race", ""), ())
     for name in (smell, smell[:-1], smell[:-2], smell[:-3] + "f", smell[:-3] + "y"):  # singular
-        if name in SAFE_CORPSES:
-            return not any(k in name for k in kin)
+        if name in ALL_MONSTERS:
+            return species_ok(name, v.status.get("race", ""))[0]
     return False
 
 
@@ -454,11 +471,9 @@ def corpse_safe(name: str, memory: "Memory", v: "View") -> tuple[bool, str]:
     same question also comes up for ordinary food lying here."""
     if is_safe_food(name):
         return True, "ordinary food"
-    if name not in SAFE_CORPSES:
-        return False, f"{name} isn't on the safe list"
-    race = v.status.get("race", "")
-    if any(k in name for k in RACE_KIN.get(race, ())):
-        return False, "cannibalism"
+    ok, why = species_ok(name, v.status.get("race", ""))
+    if not ok:
+        return False, why
     if name in NEVER_ROTS:
         return True, "never rots"
     kill = memory.kills.get((v.dlvl, *v.pos))
@@ -1010,7 +1025,7 @@ class Engine:
                     m.kills[(v.dlvl, *m.pending_fight)] = (name, v.status.get("turn", 0))
                     m.pending_fight = None
                     _count(m, "kills")
-                    _count(m, "safe kills" if name in SAFE_CORPSES else f"unsafe kill: {name}")
+                    _count(m, "safe kills" if species_ok(name, v.status.get("race", ""))[0] else f"unsafe kill: {name}")
 
     def _read_messages(self, v: View) -> None:
         """Prayer results and Luck penalties, from every snapshot's messages
@@ -1051,9 +1066,8 @@ class Engine:
             return None
         turn = c["turn"]
         spots = {(x, y) for (d, x, y), (name, when) in m.kills.items()
-                 if d == v.dlvl and name in SAFE_CORPSES
-                 and (name in NEVER_ROTS or turn - when <= FRESH_TURNS)
-                 and not any(k in name for k in RACE_KIN.get(v.status.get("race", ""), ()))}
+                 if d == v.dlvl and species_ok(name, v.status.get("race", ""))[0]
+                 and (name in NEVER_ROTS or turn - when <= FRESH_TURNS)}
         if not spots:
             return None
         if v.pos in spots:

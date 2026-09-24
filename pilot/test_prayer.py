@@ -77,3 +77,12 @@ assert armor_slot("a hard hat") == "helmet" and armor_slot("an uncursed +0 crude
 assert armor_slot("a pair of hard shoes") == "boots" and armor_slot("a plumed helmet") is None
 assert armor_slot("a pair of padded gloves") is None and armor_slot("a +3 small shield (being worn)") is None
 print("armor ok")
+
+# Corpses (plan item 11): the game's own monster flags decide.
+from pilot.engine import species_ok
+
+assert species_ok("jackal", "human")[0] and species_ok("dwarf", "human")[0]
+assert species_ok("giant beetle", "human") == (False, "poisonous") and not species_ok("acid blob", "human")[0]
+assert species_ok("dwarf", "dwarf") == (False, "cannibalism") and not species_ok("watchman", "human")[0]
+assert not species_ok("cockatrice", "human")[0] and not species_ok("kobold zombie", "human")[0]
+print("corpses ok")
