@@ -57,6 +57,24 @@ def cleanup_game(name: str) -> None:
             os.unlink(os.path.join(PLAYGROUND, f))
 
 
+SCENARIOS = os.path.join(PLAYGROUND, "scenarios")
+
+
+def keep_scenario(name: str, why: str, state: dict) -> None:
+    """Move a stalled game's save file into playground/scenarios/."""
+    save_dir = os.path.join(PLAYGROUND, "save")
+    for f in os.listdir(save_dir) if os.path.isdir(save_dir) else []:
+        if re.fullmatch(r"\d+" + re.escape(name) + r"\..*", f):  # <uid><name>.Z
+            os.makedirs(SCENARIOS, exist_ok=True)
+            os.replace(os.path.join(save_dir, f), os.path.join(SCENARIOS, f))
+            st = state.get("status", {})
+            with open(os.path.join(SCENARIOS, name + ".json"), "w") as out:
+                json.dump({"name": name, "save": f, "why": why, "dlvl": st.get("dlvl"),
+                           "turn": st.get("turn"), "hp": f"{st.get('hp')}/{st.get('hpmax')}",
+                           "saved": time.strftime("%Y-%m-%d %H:%M")}, out)
+            return
+
+
 def xlog_entries() -> dict[str, dict]:
     """name -> last xlogfile record (fields are key=value, tab separated)."""
     out = {}
@@ -73,7 +91,10 @@ def xlog_entries() -> dict[str, dict]:
 class Game:
     """One unattended game: engine + brain on the socket, NetHack in a pty."""
 
-    def __init__(self, name: str, role: str, brain, max_turns: int, max_seconds: float) -> None:
+    def __init__(self, name: str, role: str, brain, max_turns: int, max_seconds: float,
+                 save_on_stall: bool = True) -> None:
+        self.save_on_stall = save_on_stall
+        self.saving = False
         self.name, self.role, self.brain = name, role, brain
         self.max_turns, self.max_seconds = max_turns, max_seconds
         self.sock = f"/tmp/nhb-{name}.sock"
@@ -84,9 +105,20 @@ class Game:
         self.stall: str | None = None
         self.proc: subprocess.Popen | None = None
         self.result: dict | None = None  # Set when the game is over.
+        self.feed: collections.deque = collections.deque(maxlen=40)  # recent (turn, kind, text) for the live page
+        self._last_note = ""
 
     def on_state(self, s: dict) -> None:
+        if self.saving:  # Answer "Really save?" and any --More-- on the way out.
+            self.channel.send("y" if s["context"]["kind"] == "yn" else "\r")
+            return
         self.last = s
+        turn = s.get("status", {}).get("turn", 0)
+        for msg in s.get("messages", []):
+            self.feed.append((turn, "game", msg))
+        if self.engine.note and self.engine.note != self._last_note and self.engine.note != "dismiss --More--":
+            self.feed.append((turn, "pilot", self.engine.note))
+            self._last_note = self.engine.note
         if s.get("status", {}).get("turn", 0) > self.max_turns:
             self.stall = f"turn limit {self.max_turns}"
             self._end()
@@ -100,6 +132,8 @@ class Game:
             order = self.brain.decide(self.engine.last_checks, events, s, self.engine.orders)
             if order.orders:
                 self.engine.set_orders(order.orders)
+            self.feed.append((s.get("status", {}).get("turn", 0), "brain",
+                              f"{'; '.join(events)} -> {order.routine or 'wait'} {order.args or ''}"))
             if order.routine is None:
                 self.stall = "; ".join(events)
                 self._end()
@@ -109,6 +143,12 @@ class Game:
         self._end()
 
     def _end(self) -> None:
+        """Stop the game: save it as a scenario when it stalled (so it can
+        be replayed), otherwise kill it."""
+        if self.save_on_stall and self.stall and not self.saving and self.last.get("player"):
+            self.saving = True
+            self.channel.send("S")
+            return
         if self.proc and self.proc.poll() is None:
             self.proc.kill()
 
@@ -136,6 +176,8 @@ class Game:
             time.sleep(0.2)
         os.close(master)
         cleanup_game(self.name)
+        if self.saving:
+            keep_scenario(self.name, self.stall or "", self.last)
         if self.stall and self.last:  # Keep the final snapshot to see what went wrong.
             with open(os.path.join(PLAYGROUND, "batch", f"{self.name}.json"), "w") as f:
                 json.dump({"stall": self.stall, "state": self.last}, f)
@@ -165,6 +207,7 @@ def main() -> None:
     p.add_argument("--role", default="Valkyrie")
     p.add_argument("--max-turns", type=int, default=20000)
     p.add_argument("--max-seconds", type=float, default=600)
+    p.add_argument("--no-save", action="store_true", help="kill stalled games instead of saving them")
     args = p.parse_args()
 
     prepare_playground()
@@ -175,7 +218,7 @@ def main() -> None:
     games = [Game(f"B{run[-6:]}{i:02d}", args.role,
                   HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"))
                   if args.brain == "haiku" else RuleBrain(),
-                  args.max_turns, args.max_seconds) for i in range(args.games)]
+                  args.max_turns, args.max_seconds, not args.no_save) for i in range(args.games)]
     results: list[dict] = []
     lock = threading.Lock()
 
@@ -198,6 +241,7 @@ def main() -> None:
                 g = queue.pop(0)
             r = g.play()
             finish(g, r)
+            dashboard.write_game(os.path.join(batch_dir, f"game-{g.name}.html"), g, run)
             with lock:
                 results.append(r)
                 print(f"  {g.name}: Dlvl {r['dlvl']} XL {r['xlvl']} T{r['turn']} "
@@ -206,8 +250,14 @@ def main() -> None:
     stop = threading.Event()
 
     def refresh() -> None:
-        while not stop.wait(dashboard.REFRESH_S):
-            dashboard.write(board, run, args.brain, games, batch_dir)
+        tick = 0
+        while not stop.wait(1):
+            for g in games:  # Live per-game pages: every second while playing.
+                if g.last and g.result is None:
+                    dashboard.write_game(os.path.join(batch_dir, f"game-{g.name}.html"), g, run)
+            if tick % dashboard.REFRESH_S == 0:
+                dashboard.write(board, run, args.brain, games, batch_dir)
+            tick += 1
 
     queue = list(games)
     threads = [threading.Thread(target=worker, args=(queue,)) for _ in range(args.parallel)]
@@ -229,6 +279,9 @@ def main() -> None:
         w.writeheader()
         w.writerows(sorted(results, key=lambda r: r["name"]))
     dashboard.write(board, run, args.brain, games, batch_dir)
+    for g in games:
+        if g.last:
+            dashboard.write_game(os.path.join(batch_dir, f"game-{g.name}.html"), g, run)
 
     def num(v):
         try:

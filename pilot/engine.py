@@ -26,7 +26,7 @@ WALKABLE_FEATURES = {"doorway", "open door", "broken door", "staircase up", "sta
 NO_DIAGONAL = {"open door"}  # NetHack: no diagonal moves into or out of a doorway with a door.
 
 # Monsters never to melee (passive or on-death effects).
-DONT_MELEE = {"floating eye", "cockatrice", "chickatrice", "gas spore",
+DONT_MELEE = {"floating eye", "cockatrice", "chickatrice",
               "blue jelly", "spotted jelly", "ochre jelly", "green mold", "brown mold",
               "yellow mold", "red mold"}
 # Dangerous to stand next to, not just to hit: worth waking the brain for.
@@ -58,7 +58,8 @@ class Memory:
     """What the pilot remembers between states."""
     last_pray_turn: int | None = None
     searched: dict = field(default_factory=dict)  # (dlvl, x, y) -> times searched there
-    peaceful: set = field(default_factory=set)    # (dlvl, x, y) of monsters we declined to attack
+    peaceful: dict = field(default_factory=dict)  # (dlvl, x, y) -> turn we declined to attack there
+    waits: dict = field(default_factory=dict)     # (dlvl, x, y) -> turns spent waiting for it to clear
     pending_fight: tuple | None = None            # square we just tried to fight
     visited: set = field(default_factory=set)     # (dlvl, x, y) squares stood on
     kicks: dict = field(default_factory=dict)     # (dlvl, x, y) of a locked door -> kicks
@@ -150,8 +151,10 @@ class View:
     def peaceful(self, x: int, y: int) -> bool:
         """Peaceful per the game (farlook), or one we declined to attack."""
         c = self.cells.get((x, y))
-        return bool(c and c.get("peaceful")) or (
-            self.memory is not None and (self.dlvl, x, y) in self.memory.peaceful)
+        if c and "peaceful" in c:
+            return bool(c["peaceful"])  # The game's own answer (what farlook shows).
+        when = self.memory.peaceful.get((self.dlvl, x, y)) if self.memory else None
+        return when is not None and self.status.get("turn", 0) - when < 10  # Just declined one here.
 
     def monsters_visible(self) -> bool:
         return any(c["kind"] == "monster" for c in self.cells.values())
@@ -202,6 +205,12 @@ def _step(v: View, memory: Memory, path: list[tuple], note: str):
         return "F" + KEY_FOR[(nxt[0] - v.pos[0], nxt[1] - v.pos[1])], "attack the unseen thing in the way"
     if c and c["kind"] == "monster":
         if v.peaceful(*nxt):
+            spot = (v.dlvl, *nxt)
+            memory.waits[spot] = memory.waits.get(spot, 0) + 1
+            if memory.waits[spot] > 10:  # It isn't moving: go another way.
+                memory.blocked.add(spot)
+                memory.waits[spot] = 0
+                return None, f"failed: the peaceful {c['name']} won't move; routing around it"
             return "s", f"wait for the peaceful {c['name']} to move"
         return None, f"failed: a {c['name']} is in the way"
     return _toward(v, path), note
@@ -289,7 +298,10 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
             return "y", "accept the character"
         if v.kind == "key":
             return "y", "let the game pick race and alignment"
-    if v.kind == "more" or (v.kind == "menu" and v.ctx.get("how") == "none"):
+    if v.kind == "more" or (v.kind == "menu" and v.ctx.get("how") == "none") \
+            or (v.ctx.get("more") and v.kind not in ("menu",)):
+        # A --More-- can be showing while a prompt (getlin, y/n) is already
+        # pending behind it: dismiss it first, or typed answers are eaten.
         return "\r", "dismiss --More--"
     if v.kind == "menu" and v.ctx.get("how") == "any" and memory.loot_classes:
         return _pick_from_menu(v, memory), "take the wanted items"
@@ -310,7 +322,7 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
             return "n", "game over: skip the end-of-game lists"
         if prompt.startswith("Really attack"):
             if memory.pending_fight:
-                memory.peaceful.add((v.dlvl, *memory.pending_fight))
+                memory.peaceful[(v.dlvl, *memory.pending_fight)] = v.status.get("turn", 0)
             return "n", "never attack a peaceful"
         if prompt.startswith("Are you sure you want to pray") and memory.pending_pray:
             memory.pending_pray = False
@@ -383,7 +395,7 @@ def _pick_from_menu(v: View, memory: Memory) -> str:
         if not item["selectable"]:
             cls = MENU_HEADERS.get(item["text"].strip(), "")
         elif item["key"] and cls and (cls in memory.loot_classes or (
-                cls == ")" and any(r in item["text"] for r in memory.retrieve))) \
+                cls == ")" and any(t in item["text"] for t in ("dagger", "dart", "knife", "shuriken")))) \
                 and not any(w in item["text"] for w in NOT_CARRIED + ("corpse",)):
             keys += item["key"]
     memory.loot_classes = ""
@@ -643,9 +655,9 @@ def r_loot(v: View, memory: Memory, args: dict):
     def wanted(x, y):
         c = v.cells.get((x, y))
         if c is not None and c["kind"] == "object" and c.get("class") == ")" \
-                and any(r in c["name"] for r in memory.retrieve) \
+                and any(t in c["name"] for t in THROWABLE if t not in ("spear", "javelin")) \
                 and (v.dlvl, x, y) not in memory.looted:
-            return True  # Our thrown dagger.
+            return True  # Daggers, darts, knives: light, and what we throw.
         return (c is not None and c["kind"] == "object" and c.get("class", "") in classes
                 and not any(w in c["name"] for w in NOT_CARRIED + ("corpse",))
                 and (v.dlvl, x, y) not in memory.looted and (v.dlvl, x, y) not in memory.blocked)
@@ -783,10 +795,11 @@ class Engine:
         standing orders stop raising them while it runs."""
         if routine not in ROUTINES:
             raise ValueError(f"unknown routine {routine!r}")
-        keys = {_key(h) for h in handles or []}
-        # A new answer to another escalation while the same kind of routine
-        # is running (badly hurt, then critical): it handles both.
-        self.acknowledged = (self.acknowledged | keys) if routine == self.routine else keys
+        # Everything the brain has answered stays answered until its routine
+        # finishes, even if a later answer switches routines (badly hurt ->
+        # elbereth, then too-tough monster -> fight): otherwise two alarms
+        # take turns re-firing and the brain ping-pongs between them.
+        self.acknowledged |= {_key(h) for h in handles or []}
         self.routine, self.args = routine, dict(args or {})
 
     def set_orders(self, changes: dict) -> list[str]:
@@ -918,6 +931,10 @@ class Engine:
                 return esc
         for mon in c["visible_hostiles"]:
             if mon["name"] == "gas spore" and mon["distance"] <= 1:
+                if c["hp"] > 26:  # Its blast is 4d6 (max 24): take it, and it may kill neighbors.
+                    m.pending_fight = (mon["x"], mon["y"])
+                    return ("F" + KEY_FOR[(mon["x"] - v.pos[0], mon["y"] - v.pos[1])],
+                            "standing order: pop the gas spore (HP can take the blast)")
                 keys, note = r_step_away(v, m, {"target": "gas spore", "max_steps": 1})
                 if keys:
                     return keys, "standing order: back off from the gas spore before it pops"
