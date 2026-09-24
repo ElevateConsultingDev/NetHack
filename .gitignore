@@ -56,3 +56,6 @@ Makefile.gcc-orig
 # Win32-specific ignores end
 .DS_Store
 
+
+# Local source-install build (make WANT_SOURCE_INSTALL=1 all)
+playground/
