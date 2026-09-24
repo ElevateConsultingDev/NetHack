@@ -31,9 +31,13 @@ DONT_MELEE = {"floating eye", "cockatrice", "chickatrice",
               "yellow mold", "red mold"}
 # Dangerous to stand next to, not just to hit: worth waking the brain for.
 DANGEROUS_NEAR = {"cockatrice", "chickatrice"}
+# No eggs: an unknown egg can be a cockatrice egg. Tins are checked by
+# what they smell like when opened (tin_ok).
 SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "fortune cookie", "apple", "orange",
              "carrot", "melon", "banana", "pear", "slime mold", "C-ration", "K-ration",
-             "pancake", "cream pie", "candy bar", "egg")
+             "pancake", "cream pie", "candy bar", "tripe ration", "eucalyptus leaf", "clove of garlic",
+             "kelp frond", "meatball", "meat stick", "huge chunk of meat", "lump of royal jelly",
+             "lichen corpse", "tin")
 # pray.c: pleased() opens with "You feel that <god> is <mood>." (Hallu
 # moods in the second half). Anything from angrygods() or prayer_done()'s
 # failures means the god is now angry.
@@ -97,6 +101,7 @@ class Memory:
     prayer_log: list = field(default_factory=list)  # (turn prayed, "ok" | "failed")
     retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
     probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
+    tin_smell: str = ""                           # "newts", "spinach": what the tin being opened holds
     last_down: tuple | None = None                # (dlvl, x, y) of the stairs we last went down
     mines_stairs: set = field(default_factory=set)  # (dlvl, x, y) stairs down into the Gnomish Mines
 
@@ -177,7 +182,7 @@ class View:
 
     def food_letter(self) -> str | None:
         for item in self.s.get("inventory", []):
-            if item["class"] == "%" and any(f in item["text"] for f in SAFE_FOOD) \
+            if item["class"] == "%" and is_safe_food(item["text"]) \
                     and "cursed" not in item["text"].replace("uncursed", ""):
                 return item["letter"]
         return None
@@ -279,8 +284,9 @@ def checks(v: View, memory: Memory) -> dict:
                     dangerous.append(c["name"])
     food = [{"letter": i["letter"], "text": i["text"]} for i in v.s.get("inventory", [])
             if i["class"] == "%"]
-    safe_food = [f for f in food if any(k in f["text"] for k in SAFE_FOOD)
-                 and "cursed" not in f["text"].replace("uncursed", "")]
+    safe_food = sorted([f for f in food if is_safe_food(f["text"])
+                        and "cursed" not in f["text"].replace("uncursed", "")],
+                       key=lambda f: " tin" in f["text"])  # Tins last: they take turns to open.
     explored = v.pos is not None and bfs(v, _frontier(v, memory)) is None
     # Major trouble (pray.c in_trouble) is what a prayer fixes with the
     # timeout under 200. Hunger counts only when there's no food to eat.
@@ -376,6 +382,10 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
             if not ok:
                 _count(memory, f"declined: {why}")
             return ("y", f"eat the {name} corpse") if ok else ("n", f"not eating it: {why}")
+        if prompt == "Eat it?":  # An opened tin; what it smells like came as a message.
+            ok = tin_ok(memory.tin_smell, v)
+            _count(memory, "tins eaten" if ok else "tins declined")
+            return ("y", f"eat the tin ({memory.tin_smell})") if ok else ("n", f"not eating tinned {memory.tin_smell}")
         if "eat it?" in prompt and memory.pending_food:
             return "n", "not the corpse: the item from the pack"
     return None
@@ -397,10 +407,32 @@ def corpse_name(prompt: str) -> str:
     return " ".join(words)
 
 
+SAFE_FOOD_RE = re.compile(r"\b(" + "|".join(re.escape(k) for k in SAFE_FOOD) + r")(e?s)?\b")
+
+
+def is_safe_food(text: str) -> bool:
+    """Whole words only: 'tin' must not match 'floating eye corpse'."""
+    return SAFE_FOOD_RE.search(text) is not None
+
+
+def tin_ok(smell: str, v: "View") -> bool:
+    """'newts' -> a safe, non-kin species? Spinach is fine; anything while
+    hallucinating (the smell is random) is not."""
+    if smell == "spinach":
+        return True
+    if not smell or "Hallu" in v.status.get("conditions", []):
+        return False
+    kin = RACE_KIN.get(v.status.get("race", ""), ())
+    for name in (smell, smell[:-1], smell[:-2], smell[:-3] + "f", smell[:-3] + "y"):  # singular
+        if name in SAFE_CORPSES:
+            return not any(k in name for k in kin)
+    return False
+
+
 def corpse_safe(name: str, memory: "Memory", v: "View") -> tuple[bool, str]:
     """Safe species, not our own kind, and fresh (our kill, recent). The
     same question also comes up for ordinary food lying here."""
-    if any(f in name for f in SAFE_FOOD):
+    if is_safe_food(name):
         return True, "ordinary food"
     if name not in SAFE_CORPSES:
         return False, f"{name} isn't on the safe list"
@@ -942,6 +974,12 @@ class Engine:
                 if text in msg:  # Luck recovers one point per 600 turns.
                     m.luck_bad_until = max(m.luck_bad_until, turn + turns)
                     _count(m, f"luck penalty: {msg[:60]}")
+            if msg.startswith("It smells like "):
+                m.tin_smell = msg[len("It smells like "):].rstrip(".")
+            elif msg.startswith("It contains spinach"):
+                m.tin_smell = "spinach"
+            elif msg.startswith("It contains some decaying"):
+                m.tin_smell = "decaying substance"
             if "You feel feverish" in msg:
                 m.feverish = True
             elif "You feel purified" in msg:

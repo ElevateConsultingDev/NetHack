@@ -31,3 +31,21 @@ e = Engine()
 e._read_messages(View(snap(["You murderer!"], 500), e.memory))
 assert not safe(e, 1600) and safe(e, 1700)
 print("ok")
+
+# Tins (plan item 2): judged by what they smell like.
+from pilot.engine import tin_ok
+
+
+class _V:
+    status = {"race": "dwarf", "conditions": []}
+
+
+assert tin_ok("newts", _V) and tin_ok("spinach", _V)
+assert not tin_ok("dwarves", _V) and not tin_ok("cockatrices", _V)
+print("tins ok")
+
+from pilot.engine import is_safe_food
+
+assert is_safe_food("2 tins") and is_safe_food("an uncursed food ration") and is_safe_food("a tin")
+assert not is_safe_food("a floating eye corpse") and not is_safe_food("an egg")
+print("food words ok")
