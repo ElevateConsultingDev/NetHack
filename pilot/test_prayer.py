@@ -86,3 +86,12 @@ assert species_ok("giant beetle", "human") == (False, "poisonous") and not speci
 assert species_ok("dwarf", "dwarf") == (False, "cannibalism") and not species_ok("watchman", "human")[0]
 assert not species_ok("cockatrice", "human")[0] and not species_ok("kobold zombie", "human")[0]
 print("corpses ok")
+
+# Smoke: the engine steps a small real-looking snapshot without crashing.
+_snap = {"context": {"kind": "command"}, "player": {"x": 3, "y": 2}, "messages": [],
+         "status": {"turn": 10, "hp": 16, "hpmax": 16, "hunger": "", "dlvl": 1, "xlvl": 1, "conditions": [],
+                    "race": "human", "alignment": "lawful", "dungeon": "The Dungeons of Doom"},
+         "map": ["", " -----", " |...|", " |.@.|", " |...", " -----"], "cells": [], "inventory": []}
+_keys, _esc = Engine().step(_snap)
+assert _keys or _esc
+print("step ok")
