@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import concurrent.futures
 import json
 import csv
 import fcntl
@@ -287,6 +288,80 @@ class Game:
             pass
 
 
+def _finish(g: Game, r: dict) -> None:
+    """Fill in the outcome from NetHack's xlogfile as soon as a game ends."""
+    rec = xlog_entries().get(g.name)
+    if rec and not r["stall"]:
+        r.update(death=rec.get("death", ""), maxlvl=rec.get("maxlvl", ""),
+                 turn=rec.get("turns", r["turn"]), xlvl=rec.get("xplevel", r["xlvl"]),
+                 points=rec.get("points", ""), died_while=rec.get("while", ""),
+                 deathdnum=rec.get("deathdnum", ""))
+    else:
+        r.update(death="", maxlvl=r["deepest"] or r.get("dlvl", ""), points="")
+    r["bucket"] = bucket(r)
+    g.result = r
+
+
+def _error_result(name: str, why: str) -> dict:
+    return {"name": name, "stall": "harness error: " + why[:120], "death": "", "dlvl": None, "xlvl": None,
+            "turn": 0, "maxlvl": "", "points": "", "stats": {}, "prayers": [], "escalations": [], "feed": [],
+            "keys": [], "answers": [], "brain_calls": 0, "seconds": 0, "bucket": "harness error"}
+
+
+def _write_live(g: Game, path: str) -> None:
+    """What the main process's overview page needs from this game."""
+    tmp = f"{path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
+        json.dump({"last": g.last, "result": g.result, "stall": g.stall, "note": g.engine.note,
+                   "routine": g.engine.routine, "stats": g.engine.memory.stats}, f)
+    os.replace(tmp, path)
+
+
+def _live_proxy(name: str, batch_dir: str):
+    """A stand-in with the fields dashboard.write reads, from live-<name>.json."""
+    from types import SimpleNamespace as NS
+    try:
+        with open(os.path.join(batch_dir, f"live-{name}.json")) as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        d = {}
+    return NS(name=name, last=d.get("last"), result=d.get("result"), stall=d.get("stall"), feed=[],
+              engine=NS(note=d.get("note") or "", routine=d.get("routine"), memory=NS(stats=d.get("stats") or {})))
+
+
+def _play_one(spec: dict) -> dict:
+    """One game in its own process: engine, brain, and its live page."""
+    batch_dir = os.path.join(PLAYGROUND, "batch")
+    brain = (HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), journal=spec["journal"])
+             if spec["brain"] == "haiku" else RuleBrain())
+    g = Game(spec["name"], spec["role"], brain, spec["max_turns"], spec["max_seconds"], spec["save"],
+             seed=spec["seed"])
+    page, live = os.path.join(batch_dir, f"game-{g.name}.html"), os.path.join(batch_dir, f"live-{g.name}.json")
+    stop = threading.Event()
+
+    def refresh() -> None:  # Live page every second while playing.
+        while not stop.wait(1):
+            if g.last:
+                dashboard.write_game(page, g, spec["run"])
+                _write_live(g, live)
+    threading.Thread(target=refresh, daemon=True).start()
+    try:
+        r = g.play()
+        _finish(g, r)
+    except Exception:  # A crashed game is recorded, not lost.
+        import traceback
+        err = traceback.format_exc()
+        print(f"  {g.name}: harness error\n{err}", flush=True)
+        r = _error_result(g.name, err.strip().splitlines()[-1])
+        r["brain_calls"] = g.brain_calls
+        g.result = r
+    stop.set()
+    if g.last:
+        dashboard.write_game(page, g, spec["run"])
+    _write_live(g, live)
+    return r
+
+
 def replay(which: str) -> None:
     """Rerun a recorded seeded game: same seed and clock, the brain's
     recorded answers, today's engine. Same keys means the game repeated
@@ -341,79 +416,49 @@ def main() -> None:
     os.makedirs(batch_dir, exist_ok=True)
     board = os.path.join(batch_dir, "dashboard.html")
     run = time.strftime("%Y%m%d-%H%M%S")
-    games = [Game(f"B{run[-6:]}{i:02d}", args.role,
-                  HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), journal=not args.no_journal)
-                  if args.brain == "haiku" else RuleBrain(),
-                  args.max_turns, args.max_seconds, not args.no_save,
-                  seed=None if args.seed is None else args.seed + i) for i in range(args.games)]
+    specs = [{"name": f"B{run[-6:]}{i:02d}", "role": args.role, "brain": args.brain, "journal": not args.no_journal,
+              "max_turns": args.max_turns, "max_seconds": args.max_seconds, "save": not args.no_save,
+              "seed": None if args.seed is None else args.seed + i, "run": run} for i in range(args.games)]
     results: list[dict] = []
-    lock = threading.Lock()
-
-    def finish(g: Game, r: dict) -> None:
-        """Fill in the outcome from NetHack's xlogfile as soon as a game ends."""
-        rec = xlog_entries().get(g.name)
-        if rec and not r["stall"]:
-            r.update(death=rec.get("death", ""), maxlvl=rec.get("maxlvl", ""),
-                     turn=rec.get("turns", r["turn"]), xlvl=rec.get("xplevel", r["xlvl"]),
-                     points=rec.get("points", ""), died_while=rec.get("while", ""),
-                     deathdnum=rec.get("deathdnum", ""))
-        else:
-            r.update(death="", maxlvl=r["deepest"] or r.get("dlvl", ""), points="")
-        r["bucket"] = bucket(r)
-        g.result = r
-
-    def worker(queue: list[Game]) -> None:
-        while True:
-            with lock:
-                if not queue:
-                    return
-                g = queue.pop(0)
-            try:
-                r = g.play()
-                finish(g, r)
-            except Exception:  # A crashed game is recorded, not silently lost with its worker.
-                import traceback
-                err = traceback.format_exc()
-                print(f"  {g.name}: harness error\n{err}", flush=True)
-                r = {"name": g.name, "stall": "harness error: " + err.strip().splitlines()[-1][:120],
-                     "death": "", "dlvl": None, "xlvl": None, "turn": 0, "maxlvl": "", "points": "",
-                     "stats": {}, "prayers": [], "escalations": [], "feed": [], "keys": [], "answers": [],
-                     "brain_calls": g.brain_calls, "seconds": 0, "bucket": "harness error"}
-                g.result = r
-            dashboard.write_game(os.path.join(batch_dir, f"game-{g.name}.html"), g, run)
-            with lock:
-                results.append(r)
-                save_json()  # After every game, so a batch that dies early keeps its records.
-                print(f"  {g.name}: Dlvl {r['dlvl']} XL {r['xlvl']} T{r['turn']} "
-                      f"{r['death'] or r['stall']}", flush=True)
 
     def save_json() -> None:
         with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Everything, per game.
-            json.dump({"run": run, "brain": args.brain, "journal": not args.no_journal, "seed": args.seed, "games": sorted(results, key=lambda r: r["name"])}, f)
+            json.dump({"run": run, "brain": args.brain, "journal": not args.no_journal, "seed": args.seed,
+                       "games": sorted(results, key=lambda r: r["name"])}, f)
+
+    def board_games() -> list:
+        return [_live_proxy(sp["name"], batch_dir) for sp in specs]
 
     stop = threading.Event()
 
     def refresh() -> None:
-        tick = 0
-        while not stop.wait(1):
-            for g in games:  # Live per-game pages: every second while playing.
-                if g.last and g.result is None:
-                    dashboard.write_game(os.path.join(batch_dir, f"game-{g.name}.html"), g, run)
-            if tick % dashboard.REFRESH_S == 0:
-                dashboard.write(board, run, args.brain, games, batch_dir)
-            tick += 1
+        while not stop.wait(dashboard.REFRESH_S):
+            dashboard.write(board, run, args.brain, board_games(), batch_dir)
 
-    queue = list(games)
-    threads = [threading.Thread(target=worker, args=(queue,)) for _ in range(args.parallel)]
     print(f"run {run}: {args.games} games, {args.parallel} at a time, {args.brain} brain", flush=True)
     print(f"live dashboard: open {board}", flush=True)
-    dashboard.write(board, run, args.brain, games, batch_dir)
+    dashboard.write(board, run, args.brain, board_games(), batch_dir)
     threading.Thread(target=refresh, daemon=True).start()
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    # One process per game: the engines are Python, and as threads they
+    # shared one core (16 at a time ran no faster than 4).
+    with concurrent.futures.ProcessPoolExecutor(max_workers=args.parallel) as pool:
+        futures = {pool.submit(_play_one, sp): sp for sp in specs}
+        for fut in concurrent.futures.as_completed(futures):
+            try:
+                r = fut.result()
+            except Exception as e:  # The worker process itself died.
+                r = _error_result(futures[fut]["name"], f"{type(e).__name__}: {e}")
+            results.append(r)
+            save_json()  # After every game, so a batch that dies early keeps its records.
+            print(f"  {r['name']}: Dlvl {r['dlvl']} XL {r['xlvl']} T{r['turn']} "
+                  f"{r['death'] or r['stall']}", flush=True)
     stop.set()
+    games = board_games()
+    for sp in specs:
+        try:
+            os.unlink(os.path.join(batch_dir, f"live-{sp['name']}.json"))
+        except OSError:
+            pass
 
     path = os.path.join(batch_dir, f"{run}.csv")
     cols = ["name", "bucket", "death", "stall", "maxlvl", "dlvl", "xlvl", "race", "turn", "points", "gold",
@@ -423,9 +468,6 @@ def main() -> None:
         w.writeheader()
         w.writerows(sorted(results, key=lambda r: r["name"]))
     dashboard.write(board, run, args.brain, games, batch_dir)
-    for g in games:
-        if g.last:
-            dashboard.write_game(os.path.join(batch_dir, f"game-{g.name}.html"), g, run)
 
     def num(v):
         try:
