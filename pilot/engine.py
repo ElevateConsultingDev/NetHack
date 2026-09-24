@@ -26,7 +26,7 @@ WALKABLE_FEATURES = {"doorway", "open door", "broken door", "staircase up", "sta
 NO_DIAGONAL = {"open door"}  # NetHack: no diagonal moves into or out of a doorway with a door.
 
 # Monsters never to melee (passive or on-death effects).
-DONT_MELEE = {"floating eye", "cockatrice", "chickatrice", "gas spore", "acid blob",
+DONT_MELEE = {"floating eye", "cockatrice", "chickatrice", "gas spore",
               "blue jelly", "spotted jelly", "ochre jelly", "green mold", "brown mold",
               "yellow mold", "red mold"}
 # Dangerous to stand next to, not just to hit: worth waking the brain for.
@@ -81,6 +81,7 @@ class Memory:
     eating_corpse: bool = False                   # an 'e' for a floor corpse is in progress
     stats: dict = field(default_factory=dict)     # counters for measuring the pilot
     retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
+    probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
 
 
 class View:
@@ -127,6 +128,13 @@ class View:
         return self.ch(x, y) in FLOOR_CHARS
 
     def step_ok(self, a: tuple, b: tuple) -> bool:
+        c = self.cells.get(b)
+        if c and c["kind"] == "object" and c["name"] == "boulder":
+            # Walking into a boulder pushes it: fine if the square beyond is open.
+            beyond = (2 * b[0] - a[0], 2 * b[1] - a[1])
+            bc = self.cells.get(beyond)
+            return (self.ch(*beyond) in FLOOR_CHARS and not (bc and bc["kind"] in ("monster", "object"))
+                    and not (a[0] != b[0] and a[1] != b[1]))  # No pushing diagonally.
         if not self.walkable(*b):
             return False
         diagonal = a[0] != b[0] and a[1] != b[1]
@@ -189,7 +197,10 @@ def _step(v: View, memory: Memory, path: list[tuple], note: str):
     """First step along a path, minding whoever is standing in it."""
     nxt = path[0]
     c = v.cells.get(nxt)
-    if c and c["kind"] in ("monster", "invisible"):
+    if c and c["kind"] == "invisible":
+        # Hit it: that fights the unseen thing, or clears a stale marker.
+        return "F" + KEY_FOR[(nxt[0] - v.pos[0], nxt[1] - v.pos[1])], "attack the unseen thing in the way"
+    if c and c["kind"] == "monster":
         if v.peaceful(*nxt):
             return "s", f"wait for the peaceful {c['name']} to move"
         return None, f"failed: a {c['name']} is in the way"
@@ -251,8 +262,10 @@ def checks(v: View, memory: Memory) -> dict:
     return {
         "hunger": st.get("hunger", "").strip(),
         "hp": hp, "hpmax": hpmax, "wounded": wound_tier(hp, hpmax),
+        # For major trouble (Weak, critical HP) prayer works once the timeout
+        # is under 200; it starts near 300 and is usually ~350 after a prayer.
         "prayer_safe": (memory.last_pray_turn is None and turn > 300)
-                       or (memory.last_pray_turn is not None and turn - memory.last_pray_turn > 1000),
+                       or (memory.last_pray_turn is not None and turn - memory.last_pray_turn > 800),
         "adjacent_hostiles": adjacent,
         "visible_hostiles": visible,
         "dangerous_adjacent": dangerous,
@@ -388,6 +401,9 @@ DOOR_NOT_CLOSED = ("This door is broken", "This door is already open", "You see 
 def r_explore(v: View, memory: Memory, args: dict):
     if any(m.startswith(DOOR_NOT_CLOSED) for m in v.s.get("messages", [])) and memory.last_door:
         memory.features[memory.last_door] = "broken door"  # Our picture was stale.
+    if any("Closed for inventory" in m for m in v.s.get("messages", [])):
+        for dx, dy in DIRS.values():  # A shop door: kicking it angers the shopkeeper.
+            memory.dead_doors.add((v.dlvl, v.pos[0] + dx, v.pos[1] + dy))
     for dx, dy in ORTHO:
         d = (v.dlvl, v.pos[0] + dx, v.pos[1] + dy)
         if v.feature(*d[1:]) == "closed door" and d not in memory.dead_doors:
@@ -647,6 +663,25 @@ def r_loot(v: View, memory: Memory, args: dict):
 NOT_CARRIED = ("box", "chest", "boulder", "heavy iron ball", "iron chain")  # open or leave these
 
 
+def r_probe_dark(v: View, memory: Memory, args: dict):
+    """Dark caves (the Mines) show walls but not their floor: probe blank
+    squares next to places we've stood. Bumping rock costs no time."""
+    def probe_dir(x, y):
+        for dx, dy in ORTHO:
+            b = (x + dx, y + dy)
+            if v.ch(*b) == " " and not v.cells.get(b) and (v.dlvl, *b) not in memory.probed:
+                return dx, dy
+        return None
+    if (v.dlvl, *v.pos) in memory.visited and probe_dir(*v.pos):
+        dx, dy = probe_dir(*v.pos)
+        memory.probed.add((v.dlvl, v.pos[0] + dx, v.pos[1] + dy))
+        return KEY_FOR[(dx, dy)], "probe the dark"
+    path = bfs(v, lambda x, y: (v.dlvl, x, y) in memory.visited and probe_dir(x, y) is not None)
+    if path:
+        return _step(v, memory, path, f"go probe the dark near {path[-1]}")
+    return None, "done: nothing left to probe"
+
+
 def _dead_end(v: View, x: int, y: int) -> bool:
     """A corridor square with one way out: hidden passages hide past these."""
     if v.ch(x, y) != "#" and not (v.memory and (v.dlvl, x, y) in v.memory.corridors):
@@ -748,8 +783,11 @@ class Engine:
         standing orders stop raising them while it runs."""
         if routine not in ROUTINES:
             raise ValueError(f"unknown routine {routine!r}")
+        keys = {_key(h) for h in handles or []}
+        # A new answer to another escalation while the same kind of routine
+        # is running (badly hurt, then critical): it handles both.
+        self.acknowledged = (self.acknowledged | keys) if routine == self.routine else keys
         self.routine, self.args = routine, dict(args or {})
-        self.acknowledged = {_key(h) for h in handles or []}
 
     def set_orders(self, changes: dict) -> list[str]:
         """Update standing orders; returns what was rejected."""
@@ -879,6 +917,10 @@ class Engine:
             if esc:
                 return esc
         for mon in c["visible_hostiles"]:
+            if mon["name"] == "gas spore" and mon["distance"] <= 1:
+                keys, note = r_step_away(v, m, {"target": "gas spore", "max_steps": 1})
+                if keys:
+                    return keys, "standing order: back off from the gas spore before it pops"
             if mon["name"] in o["ranged_kill"] and throwable(v) and in_line(v.pos, (mon["x"], mon["y"])) \
                     and mon["distance"] <= 8 and (mon["name"] != "gas spore" or mon["distance"] >= 2):
                 keys, note = r_throw(v, m, {"target": mon["name"]})
@@ -941,7 +983,13 @@ class Engine:
         if keys:
             self.note = "explore: " + note
             return self._stuck_guard(v, keys, note)
-        if self.orders["explore_fully"]:
+        stairs_known = self.last_checks.get("stairs_down") is not None
+        if not stairs_known:  # No way down in sight: feel around dark areas first.
+            keys, note = r_probe_dark(v, m, {})
+            if keys:
+                self.note = "probe: " + note
+                return self._stuck_guard(v, keys, note)
+        if self.orders["explore_fully"] and not stairs_known:
             keys, note = r_search_dead_ends(v, m, {})
             if keys:
                 self.note = "search dead ends: " + note
