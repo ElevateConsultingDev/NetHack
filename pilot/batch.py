@@ -310,7 +310,7 @@ def _error_result(name: str, why: str) -> dict:
 
 def _write_live(g: Game, path: str) -> None:
     """What the main process's overview page needs from this game."""
-    tmp = f"{path}.{os.getpid()}.tmp"
+    tmp = f"{path}.{os.getpid()}.{threading.get_ident()}.tmp"  # Per thread: the refresher and the game share a pid.
     with open(tmp, "w") as f:
         json.dump({"last": g.last, "result": g.result, "stall": g.stall, "note": g.engine.note,
                    "routine": g.engine.routine, "stats": g.engine.memory.stats}, f)
