@@ -14,4 +14,4 @@ Two loops improve the pilot. Both leave everything in git, so any step can be re
 6. **Keep or drop.** Keep (commit, with the before and after numbers in the message) if the target bucket shrank and the average deepest level did not fall by more than 0.5. Otherwise drop the engine change (`git checkout -- pilot/engine.py` and whatever else changed), and add a note to the journal's engine section saying what was tried and what happened.
 7. **Record.** Mark finished plan items done in `docs/pilot-plan.md` with the batch numbers. The new batch is the next baseline.
 
-Guardrails: work on the `ai-player` branch only; never push; never edit hooks or settings; hard safety rules stay in the engine, never in the journal alone. 16 games is noisy: a change that only moves one or two games is not evidence.
+Guardrails: work on the `ai-player` branch only; after each kept fix, push `ai-player` to the `elevate` remote (ElevateConsultingDev/NetHack; Dave, 2026-09-24), never anything else; never edit hooks or settings; hard safety rules stay in the engine, never in the journal alone. 16 games is noisy: a change that only moves one or two games is not evidence.
