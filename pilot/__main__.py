@@ -86,7 +86,9 @@ class Pilot:
                      + (f"-> {order.routine} {order.args or ''}" if order.routine else "-> waiting on you"))
             if order.routine is None:
                 return
-            self.engine.order(order.routine, order.args, handles=events)
+            if not self.engine.order(order.routine, order.args, handles=events):
+                self.say("pilot", f"refused {order.routine}: {self.engine.note}; waiting on you")
+                return
         self.say("pilot", "the brain keeps picking routines that finish at once; waiting on you")
 
     def apply_orders(self, changes: dict) -> None:

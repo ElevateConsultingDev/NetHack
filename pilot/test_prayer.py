@@ -49,3 +49,14 @@ from pilot.engine import is_safe_food
 assert is_safe_food("2 tins") and is_safe_food("an uncursed food ration") and is_safe_food("a tin")
 assert not is_safe_food("a floating eye corpse") and not is_safe_food("an egg")
 print("food words ok")
+assert is_safe_food("2 lumps of royal jelly") and is_safe_food("3 cloves of garlic") \
+    and is_safe_food("2 huge chunks of meat") and is_safe_food("4 eucalyptus leaves")
+
+# A brain prayer while the gate is closed is refused and says so (review finding).
+from pilot.engine import Engine as _E
+_e = _E()
+_e.last_checks = {"prayer_safe": False}
+assert _e.order("pray") is False and _e.routine is None
+_e.last_checks = {"prayer_safe": True}
+assert _e.order("pray") is True and _e.routine == "pray"
+print("review fixes ok")

@@ -198,7 +198,13 @@ class Game:
                 self.stall = "; ".join(events)
                 self._end()
                 return
-            self.engine.order(order.routine, order.args, handles=events)
+            if not self.engine.order(order.routine, order.args, handles=events):
+                # A hard rule refused it (a prayer with the gate closed): the rules answer instead.
+                fb = RuleBrain().decide(self.engine.last_checks, events, s, self.engine.orders)
+                if fb.routine is None or not self.engine.order(fb.routine, fb.args, handles=events):
+                    self.stall = f"{'; '.join(events)} (the brain's {order.routine} was refused)"
+                    self._end()
+                    return
         self.stall = f"brain loop: {'; '.join(events)} (last order: {order.routine} {order.args})"
         self._end()
 
@@ -269,6 +275,7 @@ class Game:
             "race": st.get("race"), "prayers": self.engine.memory.prayer_log,
             "escalations": self.escalations, "feed": list(self.feed),
             "seed": self.seed, "keys": self.keys, "answers": self.answers, "brain": self.brain.name,
+            "role": self.role,
         }
 
     @staticmethod
@@ -291,7 +298,7 @@ def replay(which: str) -> None:
         raise SystemExit(f"{name} wasn't seeded; only games from a --seed batch replay exactly")
     prepare_playground()
     brain = ReplayBrain(rec["answers"]) if rec.get("brain") == "haiku" else RuleBrain()
-    g = Game(f"R{name[1:]}", "Valkyrie", brain, 10 ** 9, 3600, save_on_stall=False,
+    g = Game(f"R{name[1:]}", rec.get("role", "Valkyrie"), brain, 10 ** 9, 3600, save_on_stall=False,
              out_dir=os.path.join(PLAYGROUND, "replays"), seed=rec["seed"])
     r = g.play()
     old, new = [tuple(k) for k in rec["keys"]], [tuple(k) for k in r["keys"]]

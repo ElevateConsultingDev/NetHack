@@ -37,6 +37,7 @@ SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "fortune cookie", "ap
              "carrot", "melon", "banana", "pear", "slime mold", "C-ration", "K-ration",
              "pancake", "cream pie", "candy bar", "tripe ration", "eucalyptus leaf", "clove of garlic",
              "kelp frond", "meatball", "meat stick", "huge chunk of meat", "lump of royal jelly",
+             "huge chunks of meat", "lumps of royal jelly", "cloves of garlic", "eucalyptus leaves",
              "lichen corpse", "tin")
 # pray.c: pleased() opens with "You feel that <god> is <mood>." (Hallu
 # moods in the second half). Anything from angrygods() or prayer_done()'s
@@ -872,20 +873,22 @@ class Engine:
             return note[16:].split(":")[0].split(",")[0].split(" the ")[0].split(" (")[0].strip()
         return note.split(":")[0] if ":" in note else note.split(" ")[0]
 
-    def order(self, routine: str, args: dict | None = None, handles: list[str] | None = None) -> None:
+    def order(self, routine: str, args: dict | None = None, handles: list[str] | None = None) -> bool:
         """Run `routine` next. `handles`: the escalations it answers, so the
-        standing orders stop raising them while it runs."""
+        standing orders stop raising them while it runs. False: rejected
+        by a hard rule, and nothing changed (the caller must answer again)."""
         if routine not in ROUTINES:
             raise ValueError(f"unknown routine {routine!r}")
         if routine == "pray" and not self.last_checks.get("prayer_safe"):
             self.note = "rejected the brain's prayer: the gate is closed"  # Would anger the god.
-            return
+            return False
         # Everything the brain has answered stays answered until its routine
         # finishes, even if a later answer switches routines (badly hurt ->
         # elbereth, then too-tough monster -> fight): otherwise two alarms
         # take turns re-firing and the brain ping-pongs between them.
         self.acknowledged |= {_key(h) for h in handles or []}
         self.routine, self.args = routine, dict(args or {})
+        return True
 
     def set_orders(self, changes: dict) -> list[str]:
         """Update standing orders; returns what was rejected."""
