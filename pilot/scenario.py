@@ -68,6 +68,9 @@ def main() -> None:
         total = sum(turns.values())
         print("turns: " + ", ".join(f"{k} {v} ({100 * v // total}%)" for k, v in
                                    sorted(turns.items(), key=lambda kv: -kv[1])[:8]))
+    other = {k: v for k, v in r.get("stats", {}).items() if not k.startswith("turns: ")}
+    if other:
+        print("stats: " + ", ".join(f"{k} {v}" for k, v in sorted(other.items())))
     # A replay that ends normally leaves no save; one that stalls was killed,
     # so its partial save (if any) is left alone and the original stays put.
 
