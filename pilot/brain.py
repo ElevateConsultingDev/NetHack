@@ -48,6 +48,8 @@ class RuleBrain:
         if "adjacent, difficulty" in ev:
             name = ev.split(" adjacent")[0]
             return Order("fight", {"target": name}, say=f"the {name} is tough, but it's on me: fighting")
+        if " failed:" in ev:
+            return Order("explore", say="that didn't work; back to clearing the level")
         return Order(None, say=f"{ev}; your call")
 
     def chat(self, text: str, c: dict, s: dict, orders: dict) -> Order:

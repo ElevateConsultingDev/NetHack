@@ -177,6 +177,11 @@ class Game:
                 self.channel.send(keys)
                 return
             order = self._decide(events, s)
+            if order.routine is None and isinstance(self.brain, HaikuBrain):
+                # Unattended: no human to wait for, so null ends the game. Try the rules first.
+                fb = self.brain.fallback.decide(self.engine.last_checks, events, s, self.engine.orders)
+                if fb.routine is not None:
+                    order.routine, order.args, order.say = fb.routine, fb.args, f"(rules) {fb.say}"
             if order.orders:
                 self.engine.set_orders(order.orders)
             self.escalations.append((turn, "; ".join(events), order.routine))
