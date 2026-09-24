@@ -21,11 +21,12 @@ import os
 import re
 import struct
 import subprocess
+import sys
 import termios
 import threading
 import time
 
-from .brain import HaikuBrain, RuleBrain
+from .brain import HaikuBrain, ReplayBrain, RuleBrain
 from .channel import Channel
 from . import dashboard
 from .engine import Engine
@@ -33,6 +34,7 @@ from .engine import Engine
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLAYGROUND = os.path.join(HERE, "playground")
 OPTIONS = "autopickup,pickup_types:$,time,showexp,dark_room,!legacy,!news,!autoquiver"
+NOW = 1790000000  # The fixed clock for seeded games (a weekday, not a full or new moon).
 
 
 def prepare_playground() -> None:
@@ -123,8 +125,12 @@ class Game:
     """One unattended game: engine + brain on the socket, NetHack in a pty."""
 
     def __init__(self, name: str, role: str, brain, max_turns: int, max_seconds: float,
-                 save_on_stall: bool = True, out_dir: str = os.path.join(PLAYGROUND, "batch")) -> None:
+                 save_on_stall: bool = True, out_dir: str = os.path.join(PLAYGROUND, "batch"),
+                 seed: int | None = None) -> None:
         self.out_dir = out_dir
+        self.seed = seed      # Set: the game is reproducible (fixed RNG seed and clock, no bones).
+        self.keys: list = []  # (turn, keys) for every key the pilot sent
+        self.answers: list = []  # the brain's raw answer to every call, for replays
         self.deepest = 0
         self.escalations: list = []  # (turn, events, order) for every brain call
         self.consult = isinstance(brain, HaikuBrain)  # strategic check-ins, not just escalations
@@ -174,6 +180,7 @@ class Game:
         for _ in range(4):
             keys, events = self.engine.step(s)
             if keys:
+                self.keys.append((turn, keys))
                 self.channel.send(keys)
                 return
             order = self._decide(events, s)
@@ -201,6 +208,8 @@ class Game:
         self.brain_calls += 1
         order = self.brain.decide(self.engine.last_checks, events, s, self.engine.orders)
         self.brain_seconds += time.time() - started
+        self.answers.append({"routine": order.routine, "args": order.args, "orders": order.orders,
+                             "say": order.say})
         if order.say.startswith("(brain unavailable"):
             self.brain_failures += 1
         return order
@@ -225,6 +234,8 @@ class Game:
         master, slave = os.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
         env = dict(os.environ, NETHACK_CONTROL=self.sock, NETHACKOPTIONS=OPTIONS, TERM="xterm-256color")
+        if self.seed is not None:
+            env.update(NETHACK_SEED=str(self.seed), NETHACK_NOW=str(NOW), NETHACKOPTIONS=OPTIONS + ",!bones")
         started = time.time()
         self.proc = subprocess.Popen(
             [os.path.join(PLAYGROUND, "nethack"), "-u", self.name, "-p", self.role],
@@ -257,6 +268,7 @@ class Game:
             "stats": dict(self.engine.memory.stats), "deepest": self.deepest,
             "race": st.get("race"), "prayers": self.engine.memory.prayer_log,
             "escalations": self.escalations, "feed": list(self.feed),
+            "seed": self.seed, "keys": self.keys, "answers": self.answers, "brain": self.brain.name,
         }
 
     @staticmethod
@@ -268,6 +280,34 @@ class Game:
             pass
 
 
+def replay(which: str) -> None:
+    """Rerun a recorded seeded game: same seed and clock, the brain's
+    recorded answers, today's engine. Same keys means the game repeated
+    exactly; otherwise print where it first went another way."""
+    run, name = which.split("/")
+    with open(os.path.join(PLAYGROUND, "batch", f"{run}.json")) as f:
+        rec = next(g for g in json.load(f)["games"] if g["name"] == name)
+    if rec.get("seed") is None:
+        raise SystemExit(f"{name} wasn't seeded; only games from a --seed batch replay exactly")
+    prepare_playground()
+    brain = ReplayBrain(rec["answers"]) if rec.get("brain") == "haiku" else RuleBrain()
+    g = Game(f"R{name[1:]}", "Valkyrie", brain, 10 ** 9, 3600, save_on_stall=False,
+             out_dir=os.path.join(PLAYGROUND, "replays"), seed=rec["seed"])
+    r = g.play()
+    old, new = [tuple(k) for k in rec["keys"]], [tuple(k) for k in r["keys"]]
+    same = next((i for i, (a, b) in enumerate(zip(old, new)) if a != b), min(len(old), len(new)))
+    print(f"recorded: T{rec['turn']} {rec.get('death') or rec.get('stall')}")
+    print(f"replayed: T{r['turn']} {r['stall'] or 'ended'}")
+    if old == new:
+        print(f"identical: all {len(old)} key sends match")
+    elif new[:len(old)] == old:
+        print(f"identical for all {len(old)} recorded key sends; the replay then kept going (no turn cap)")
+    else:
+        at = old[same] if same < len(old) else new[same]
+        print(f"diverged at key send {same} of {len(old)} (turn {at[0]}): recorded "
+              f"{old[same] if same < len(old) else '(end)'}, replayed {new[same] if same < len(new) else '(end)'}")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Run unattended NetHack games with the pilot")
     p.add_argument("--games", type=int, default=8)
@@ -277,7 +317,16 @@ def main() -> None:
     p.add_argument("--max-turns", type=int, default=20000)
     p.add_argument("--max-seconds", type=float, default=600)
     p.add_argument("--no-save", action="store_true", help="kill stalled games instead of saving them")
+    p.add_argument("--seed", type=int, help="reproducible games: game i gets seed SEED+i (same SEED = same dungeons)")
+    p.add_argument("--replay", metavar="RUN/NAME", help="rerun one recorded seeded game with its brain answers")
     args = p.parse_args()
+    if (args.seed is not None or args.replay) and os.environ.get("PYTHONHASHSEED") != "0":
+        # Set iteration order must not vary between runs either.
+        os.execvpe(sys.executable, [sys.executable, "-m", "pilot.batch", *sys.argv[1:]],
+                   dict(os.environ, PYTHONHASHSEED="0"))
+    if args.replay:
+        replay(args.replay)
+        return
 
     prepare_playground()
     batch_dir = os.path.join(PLAYGROUND, "batch")
@@ -287,7 +336,8 @@ def main() -> None:
     games = [Game(f"B{run[-6:]}{i:02d}", args.role,
                   HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"))
                   if args.brain == "haiku" else RuleBrain(),
-                  args.max_turns, args.max_seconds, not args.no_save) for i in range(args.games)]
+                  args.max_turns, args.max_seconds, not args.no_save,
+                  seed=None if args.seed is None else args.seed + i) for i in range(args.games)]
     results: list[dict] = []
     lock = threading.Lock()
 

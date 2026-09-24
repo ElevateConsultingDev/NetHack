@@ -131,7 +131,7 @@ def _journal() -> str:
         return ""
 
 
-class HaikuBrain:
+class HaikuBrain:  # (ReplayBrain below stands in for it when rerunning a recorded game)
     name = "haiku"
     TIMEOUT_S = 60
 
@@ -242,3 +242,18 @@ class HaikuBrain:
     def chat(self, text: str, c: dict, s: dict, orders: dict) -> Order:
         order = self._parse(self._ask(_brief(c, ["the human is talking to you"], s, text, orders)))
         return order or Order(None, say=f"(no answer from the brain{': ' + self.last_error if self.last_error else ''})")
+
+
+class ReplayBrain(HaikuBrain):
+    """Plays back a recorded game's brain answers in order, so a seeded
+    game reruns exactly without calling the model."""
+
+    def __init__(self, answers: list[dict]) -> None:
+        super().__init__()
+        self.answers = list(answers)
+
+    def decide(self, c: dict, events: list[str], s: dict, orders: dict) -> Order:
+        if not self.answers:
+            return Order(None, say="(replay: no more recorded answers)")
+        a = self.answers.pop(0)
+        return Order(a["routine"], a["args"] or {}, a["say"], a["orders"] or {})

@@ -907,6 +907,15 @@ void
 init_random(fn)
 int FDECL((*fn), (int));
 {
+    char *seed = nh_getenv("NETHACK_SEED");
+
+    /* aipipe: a reproducible game. Fixed seed, and has_strong_rngseed
+       stays FALSE so reseed_random() never pulls in fresh entropy. */
+    if (seed && *seed) {
+        set_random(strtoul(seed, (char **) 0, 10)
+                       + (fn == rn2_on_display_rng ? 1UL : 0UL), fn);
+        return;
+    }
     set_random(sys_random_seed(), fn);
 }
 
@@ -925,6 +934,10 @@ time_t
 getnow()
 {
     time_t datetime = 0;
+    char *now = nh_getenv("NETHACK_NOW");
+
+    if (now && *now) /* aipipe: a fixed clock (moon phase, night, Friday 13th) */
+        return (time_t) strtol(now, (char **) 0, 10);
 
     (void) time((TIME_type) &datetime);
     return datetime;
