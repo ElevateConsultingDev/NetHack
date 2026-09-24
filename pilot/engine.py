@@ -34,6 +34,15 @@ DANGEROUS_NEAR = {"cockatrice", "chickatrice"}
 SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "fortune cookie", "apple", "orange",
              "carrot", "melon", "banana", "pear", "slime mold", "C-ration", "K-ration",
              "pancake", "cream pie", "candy bar", "egg")
+# pray.c: pleased() opens with "You feel that <god> is <mood>." (Hallu
+# moods in the second half). Anything from angrygods() or prayer_done()'s
+# failures means the god is now angry.
+PRAYER_OK = re.compile(r"You feel that .* is (well-pleased|pleased|satisfied|pleased as punch|ticklish|full)\.")
+PRAYER_FAILED = ("You feel that", "The voice of", "Thou ", '"Thou', "You feel like you are falling apart",
+                 "Since you are in Gehennom")
+# Messages that mean Luck dropped, and turns until it decays back to 0.
+LUCK_PENALTIES = {"You murderer!": 1200, "You cannibal!": 3000, "That's bad luck!": 1200,
+                  "You feel guilty": 3000}
 HUNGRY = {"Hungry", "Weak", "Fainting", "Fainted"}
 
 # Corpses safe for an ordinary character when fresh (NetHack 3.6). Leaves out
@@ -57,6 +66,9 @@ RACE_KIN = {"gnome": ("gnome",), "orc": ("orc", "Uruk-hai"), "dwarf": ("dwarf",)
 class Memory:
     """What the pilot remembers between states."""
     last_pray_turn: int | None = None
+    prayer_broken: bool = False                   # a prayer failed: the god is angry, never pray again
+    luck_bad_until: int = 0                       # turn a known Luck penalty has decayed by
+    feverish: bool = False                        # lycanthropy (a major trouble prayer cures)
     searched: dict = field(default_factory=dict)  # (dlvl, x, y) -> times searched there
     peaceful: dict = field(default_factory=dict)  # (dlvl, x, y) -> turn we declined to attack there
     waits: dict = field(default_factory=dict)     # (dlvl, x, y) -> turns spent waiting for it to clear
@@ -234,7 +246,7 @@ WALL = set("|-")
 
 
 def wound_tier(hp: int, hpmax: int) -> str:
-    if hp < max(6, hpmax // 7):
+    if hp <= 5 or hp * 7 <= hpmax:  # pray.c critically_low_hp: major trouble
         return "critical"
     if hp * 3 < hpmax:
         return "badly hurt"
@@ -267,15 +279,26 @@ def checks(v: View, memory: Memory) -> dict:
     safe_food = [f for f in food if any(k in f["text"] for k in SAFE_FOOD)
                  and "cursed" not in f["text"].replace("uncursed", "")]
     explored = v.pos is not None and bfs(v, _frontier(v, memory)) is None
+    # Major trouble (pray.c in_trouble) is what a prayer fixes with the
+    # timeout under 200. Hunger counts only when there's no food to eat.
+    conds = set(st.get("conditions", []))
+    trouble = ([c for c in ("Stone", "Slime", "Strngl", "Sick") if c in conds]
+               + (["critical HP"] if wound_tier(hp, hpmax) == "critical" else [])
+               + ([st.get("hunger", "").strip()] if st.get("hunger", "").strip() in ("Weak", "Fainting", "Fainted")
+                  and not safe_food else [])
+               + (["lycanthropy"] if memory.feverish else []))
     stairs = [xy for xy in ((x, y) for (d, x, y), n in memory.features.items()
                             if d == v.dlvl and n == "staircase down")]
     return {
         "hunger": st.get("hunger", "").strip(),
         "hp": hp, "hpmax": hpmax, "wounded": wound_tier(hp, hpmax),
-        # For major trouble (Weak, critical HP) prayer works once the timeout
-        # is under 200; it starts near 300 and is usually ~350 after a prayer.
-        "prayer_safe": (memory.last_pray_turn is None and turn > 300)
-                       or (memory.last_pray_turn is not None and turn - memory.last_pray_turn > 800),
+        # Major trouble needs the prayer timeout at 200 or less. It starts at
+        # 300 and is rnz(350) after a prayer, over 1000 about 8% of the time.
+        # A failed prayer angers the god for good; bad Luck fails it too.
+        "prayer_safe": not memory.prayer_broken and turn >= memory.luck_bad_until
+                       and (turn >= 300 if memory.last_pray_turn is None
+                            else turn - memory.last_pray_turn >= 1000),
+        "major_trouble": trouble,
         "adjacent_hostiles": adjacent,
         "visible_hostiles": visible,
         "dangerous_adjacent": dangerous,
@@ -829,6 +852,7 @@ class Engine:
             self.memory.visited.add((v.dlvl, *v.pos))
 
         self._record_kills(v)
+        self._read_messages(v)
         turn = v.status.get("turn")
         if turn is not None and self._acct[1] is not None and turn > self._acct[1]:
             _count(self.memory, f"turns: {self._acct[0]}", turn - self._acct[1])
@@ -884,6 +908,27 @@ class Engine:
                     _count(m, "kills")
                     _count(m, "safe kills" if name in SAFE_CORPSES else f"unsafe kill: {name}")
 
+    def _read_messages(self, v: View) -> None:
+        """Prayer results and Luck penalties, from every snapshot's messages
+        (--More-- ones too: that's where a prayer's result shows)."""
+        m, turn = self.memory, v.status.get("turn", 0)
+        for msg in v.s.get("messages", []):
+            undecided = m.stats.get("prayers ok", 0) + m.stats.get("prayers failed", 0) < m.stats.get("prayers", 0)
+            if undecided and m.last_pray_turn is not None and turn - m.last_pray_turn <= 10:
+                if PRAYER_OK.match(msg) or msg.startswith("You are surrounded by a shimmering light"):
+                    _count(m, "prayers ok")
+                elif msg.startswith(PRAYER_FAILED):
+                    m.prayer_broken = True
+                    _count(m, "prayers failed")
+            for text, turns in LUCK_PENALTIES.items():
+                if text in msg:  # Luck recovers one point per 600 turns.
+                    m.luck_bad_until = max(m.luck_bad_until, turn + turns)
+                    _count(m, "luck penalties")
+            if "You feel feverish" in msg:
+                m.feverish = True
+            elif "You feel purified" in msg:
+                m.feverish = False
+
     def _corpse_to_eat(self, v: View, c: dict):
         """A fresh safe kill with a corpse still on it, within a short walk."""
         o, m = self.orders, self.memory
@@ -923,9 +968,9 @@ class Engine:
         """Standing orders, most urgent first. Returns (keys, why), an
         escalation (None, why), or None when no order applies."""
         o, m = self.orders, self.memory
+        if c["major_trouble"] and o["pray_when_critical"] and c["prayer_safe"]:
+            return r_pray(v, m, {})[0], f"standing order: pray ({', '.join(c['major_trouble'])})"
         if c["wounded"] == "critical":
-            if o["pray_when_critical"] and c["prayer_safe"]:
-                return r_pray(v, m, {})[0], f"standing order: pray (HP {c['hp']}/{c['hpmax']})"
             esc = self._escalate("critical HP and prayer isn't safe")
             if esc:
                 return esc
@@ -970,9 +1015,7 @@ class Engine:
                 m.pending_food = c["safe_food"][0]["letter"]
                 return "e", f"standing order: eat ({c['hunger']})"
             if hunger >= HUNGER_RANK.index("Weak"):
-                # Weak from hunger is a major trouble prayer fixes; else ask.
-                if o["pray_when_critical"] and c["prayer_safe"]:
-                    return r_pray(v, m, {})[0], f"standing order: pray ({c['hunger']}, no food)"
+                # Prayer (above) handles it when the gate is open; else ask.
                 esc = self._escalate(f"{c['hunger']} and no known-safe food")
                 if esc:
                     return esc
