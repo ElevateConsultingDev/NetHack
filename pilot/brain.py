@@ -86,6 +86,8 @@ Reply with exactly ONE line of JSON and nothing else:
 {{"routine": "<name or null>", "args": {{...}}, "say": "<one short sentence to the human>"}}
 - routine null means: when asked for a decision, wait for the human; when the human is only chatting, keep the current routine.
 - To answer a game prompt, use routine "keys" with the exact keys (e.g. "y", "n", an inventory letter, "\\u001b" for Escape).
+- Prefer the big routines: explore until it says done, then search_walls if there are no stairs down, then go_down. Use go_to only for a specific named thing, and if the same go_to fails twice, drop it.
+- NOTABLE lists everything named on the map with coordinates. Map symbols like ? ! % [ ) = are just items on the floor (scroll, potion, food, armor, weapon, ring); they are never required to find stairs.
 - Play solid, conservative NetHack: don't melee floating eyes or cockatrices, eat when Hungry, pray when HP is critically low and prayer is safe (about once per 1000 turns), rest when hurt and alone, explore before descending, don't eat unknown or old corpses, keep your pet alive.
 - When the human gives an order, follow it unless it's clearly suicidal, and say so if you refuse.
 """
@@ -111,6 +113,13 @@ def _brief(c: dict, events: list[str], s: dict, chat: str | None) -> str:
     if ctx.get("kind") not in ("command", None):
         parts.append(f"PROMPT: {ctx.get('kind')} {ctx.get('prompt') or ''!r} choices={ctx.get('choices') or ''!r}"
                      + (f" items={[(i['key'], i['text']) for i in ctx.get('items', [])]}" if ctx.get("items") else ""))
+    notable = []
+    for cell in s.get("cells", []):
+        if cell["kind"] == "you":
+            continue
+        tag = cell["kind"] + (" (peaceful)" if cell.get("peaceful") else "")
+        notable.append(f"{tag}: {cell['name']} at ({cell['x']},{cell['y']})")
+    parts.append("NOTABLE: " + ("; ".join(notable) or "(nothing)"))
     parts.append("MAP:\n" + "\n".join(rows))
     return "\n".join(parts)
 

@@ -50,6 +50,7 @@ class Memory:
     stuck: int = 0                                # repeats of a move that changed nothing
     pending_food: str = ""                        # letter to answer an eat prompt with
     pending_pray: bool = False                    # a prayer confirmation is expected
+    last_door: tuple | None = None                # (dlvl, x, y) of the door we last tried to open
 
 
 class View:
@@ -73,11 +74,13 @@ class View:
 
     def feature(self, x: int, y: int) -> str:
         """The terrain feature here, remembered if something (like you)
-        is standing on it."""
+        is standing on it. A correction learned from a message (a 'closed
+        door' that turned out broken) wins over the displayed glyph."""
+        remembered = self.memory.features.get((self.dlvl, x, y), "") if self.memory else ""
         c = self.cells.get((x, y))
-        if c and c["kind"] == "feature":
+        if c and c["kind"] == "feature" and remembered != "broken door":
             return c["name"]
-        return self.memory.features.get((self.dlvl, x, y), "") if self.memory else ""
+        return remembered
 
     def walkable(self, x: int, y: int) -> bool:
         c = self.cells.get((x, y))
@@ -263,7 +266,13 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
 # Each step returns (keys, note) to keep going, or (None, "done: ...") /
 # (None, "failed: ...") when it's finished.
 
+DOOR_NOT_CLOSED = ("This door is broken", "This door is already open", "You see no door there",
+                   "This doorway has no door")
+
+
 def r_explore(v: View, memory: Memory, args: dict):
+    if any(m.startswith(DOOR_NOT_CLOSED) for m in v.s.get("messages", [])) and memory.last_door:
+        memory.features[memory.last_door] = "broken door"  # Our picture was stale.
     for dx, dy in ORTHO:
         d = (v.dlvl, v.pos[0] + dx, v.pos[1] + dy)
         if v.feature(*d[1:]) == "closed door" and d not in memory.dead_doors:
@@ -273,6 +282,7 @@ def r_explore(v: View, memory: Memory, args: dict):
                     memory.dead_doors.add(d)
                     continue
                 return "\x04" + KEY_FOR[(dx, dy)], "kick the locked door"
+            memory.last_door = d
             return "o" + KEY_FOR[(dx, dy)], "open the door"
     path = bfs(v, _frontier(v, memory))
     if path:
@@ -375,6 +385,17 @@ def r_pickup_gold(v: View, memory: Memory, args: dict):
     return _step(v, memory, path, "walk to the gold") if path else (None, "done: no gold in view")
 
 
+def r_pick_up(v: View, memory: Memory, args: dict):
+    goal = (int(args["x"]), int(args["y"])) if "x" in args else v.pos
+    if args.get("sent"):
+        return None, "done: picked up"
+    if v.pos == goal:
+        args["sent"] = True
+        return ",", "pick it up"
+    path = bfs(v, lambda x, y: (x, y) == goal)
+    return _step(v, memory, path, f"walk to the item at {goal}") if path else (None, f"failed: no path to {goal}")
+
+
 def r_keys(v: View, memory: Memory, args: dict):
     if args.get("sent"):
         return None, "done: sent"
@@ -392,6 +413,7 @@ ROUTINES = {
     "rest": (r_rest, "search in place to heal; {until_hp: optional}"),
     "pray": (r_pray, "pray to your god (only safe about once per 1000 turns)"),
     "pickup_gold": (r_pickup_gold, "walk onto visible gold (autopickup takes it)"),
+    "pick_up": (r_pick_up, "walk to an item and pick it up; {x, y} (default: here). A menu comes back to you as a prompt"),
     "keys": (r_keys, "send raw keys once, e.g. to answer a prompt; {keys}"),
 }
 
@@ -450,16 +472,21 @@ class Engine:
         return self._stuck_guard(v, keys, note)
 
     def _stuck_guard(self, v: View, keys: str, note: str):
-        if keys in DIRS:
-            here = (keys, v.status.get("turn"), v.pos)
-            m = self.memory
-            m.stuck = m.stuck + 1 if here == m.last_move else 0
-            m.last_move = here
-            if m.stuck >= 5:
-                dx, dy = DIRS[keys]
-                m.blocked.add((v.dlvl, v.pos[0] + dx, v.pos[1] + dy))
-                m.stuck = 0
-                return None, [f"{self.routine} stuck: a move there changes nothing; marked blocked"]
+        """The same keys five times with the turn and position unchanged
+        means they do nothing here: block the target and tell the brain."""
+        here = (keys, v.status.get("turn"), v.pos)
+        m = self.memory
+        m.stuck = m.stuck + 1 if here == m.last_move else 0
+        m.last_move = here
+        if m.stuck >= 5:
+            m.stuck = 0
+            d = DIRS.get(keys[-1:]) if keys else None
+            if d:
+                m.blocked.add((v.dlvl, v.pos[0] + d[0], v.pos[1] + d[1]))
+                if keys[0] in "o\x04":
+                    m.dead_doors.add((v.dlvl, v.pos[0] + d[0], v.pos[1] + d[1]))
+            routine, self.routine = self.routine, None
+            return None, [f"{routine} stuck: {keys!r} changes nothing here"]
         return keys, []
 
     @staticmethod

@@ -41,6 +41,7 @@ class Pilot:
         self.channel = Channel(sock, self.on_state)
         self._lock = threading.Lock()
         self._said = ""
+        self._last_msg = ""
 
     def say(self, who: str, text: str) -> None:
         if text and text != self._said:
@@ -55,7 +56,9 @@ class Pilot:
             with open(os.path.join(RUNTIME, "pilot-last.json"), "w") as f:
                 json.dump(s, f)  # The latest snapshot, for debugging.
             for m in s.get("messages", []):
-                print(f"\r  | {m}", flush=True)
+                if m != self._last_msg:  # Collapse repeats.
+                    print(f"\r  | {m}", flush=True)
+                self._last_msg = m
             if self.mode == "auto" and s.get("last_input") == "terminal":
                 self.mode = "manual"
                 self.say("pilot", "you took the controls (/auto to hand them back)")
