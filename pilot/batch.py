@@ -141,7 +141,7 @@ class Game:
         self.max_turns, self.max_seconds = max_turns, max_seconds
         self.sock = f"/tmp/nhb-{name}.sock"
         self.engine = Engine()
-        self.channel = Channel(self.sock, self.on_state)
+        self.channel = Channel(self.sock, self._on_state_safe)
         self.last: dict = {}
         self.brain_calls = 0
         self.brain_seconds = 0.0
@@ -151,6 +151,19 @@ class Game:
         self.result: dict | None = None  # Set when the game is over.
         self.feed: collections.deque = collections.deque(maxlen=100)  # recent (turn, kind, text) for the live page
         self._last_note = ""
+
+    def _on_state_safe(self, s: dict) -> None:
+        """An engine error ends the game as a harness error at once; it used
+        to kill the channel thread and leave the game hanging to its time limit."""
+        try:
+            self.on_state(s)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.stall = self.stall or f"harness error: {type(e).__name__}: {e}"[:160]
+            self.saving = True  # Don't try to save through a broken engine; just stop.
+            if self.proc and self.proc.poll() is None:
+                self.proc.kill()
 
     def on_state(self, s: dict) -> None:
         if self.saving:  # Answer "Really save?" and any --More-- on the way out.
