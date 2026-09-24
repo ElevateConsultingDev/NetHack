@@ -148,7 +148,11 @@ class View:
                 # in the way. Except ones we must never bump into.
                 return not (self.memory and c["name"] in self.memory.avoid)
             return False  # traps
-        return self.ch(x, y) in FLOOR_CHARS
+        if self.ch(x, y) in FLOOR_CHARS:
+            return True
+        # Dark floor we've stood on is drawn blank once we walk away (the
+        # Mines): it's still floor. Otherwise stairs in sight have no path.
+        return self.ch(x, y) == " " and self.memory is not None and (self.dlvl, x, y) in self.memory.visited
 
     def step_ok(self, a: tuple, b: tuple) -> bool:
         c = self.cells.get(b)

@@ -75,6 +75,7 @@ This is one ranked plan built from all three inputs, with duplicates combined. 8
 
 ### 10. Remember walked floor so dark areas are walkable; probe dark areas in 8 directions
 
+- **Status (2026-09-24): first half done (loop iteration 15).** Squares we have stood on count as walkable when drawn blank. Rules pair (seed 1000) 20260924-102621 -> 20260924-104730: avg deepest 4.44 -> 4.81, XL 4.31 -> 4.31; a dwarf crossed a dark Mines level (Dlvl 3 -> 7). Not done: squares seen as floor but never stood on, and 8-direction probing when stairs are unreachable.
 - **Layer:** engine · **Effort:** small
 - **Why:** B19571504, B20061113 and B20313006 show the stairs down on screen but no floor path to them, because dark floor already walked is drawn blank and View.walkable (lines 118-130) trusts only what is on screen. 12 of the 46 no-way-on snapshots are in the Mines. r_probe_dark runs only when stairs are unknown and probes only orthogonally (lines 686-691, 1008-1013).
 - **Change:** Keep a per-level remembered_floor set: memory.visited, plus every square ever drawn as FLOOR_CHARS, a door, a corridor or stairs. walkable() returns True for those unless a boulder or monster is there now. Trigger r_probe_dark when no path exists to any known stairs down, not only when stairs are unknown, and probe all 8 neighbours.
