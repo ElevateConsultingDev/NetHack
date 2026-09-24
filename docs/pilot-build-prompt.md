@@ -97,6 +97,7 @@ Each of these cost at least one batch to learn. Build them in from the start.
 
 **Maps and movement**
 - `dark_room` must be on or dark rooms erase themselves from the map. Solid rock stays blank forever: the exploration frontier is unvisited walkable squares next to blank.
+- Being swallowed (fog cloud, dust vortex, lurker above) draws a `/-\ |@| \-/` box around you. Read as a 1x1 room it looks like a level with no way on: 43 of 245 saved stalls were this. Detect it and attack any direction.
 - An item lying on the stairs hides the `>`; remember stairs in memory, not only on screen.
 - Dark cave floor (Gnomish Mines) is not drawn, so stairs can be visible with no drawn path. NetHack's own travel command (`_`, then `>` to put the cursor on the stairs, then `.`) knows the way, but each command moves only one step and it can bounce forever: cap it per level. Plan item: remember floor you have walked.
 - Memory keyed by level number collides between the Mines and the main dungeon (both have a "Dlvl 3"); key by branch too, or forget a level when leaving it.

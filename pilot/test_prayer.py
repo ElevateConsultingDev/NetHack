@@ -60,3 +60,14 @@ assert _e.order("pray") is False and _e.routine is None
 _e.last_checks = {"prayer_safe": True}
 assert _e.order("pray") is True and _e.routine == "pray"
 print("review fixes ok")
+
+# Engulfed: NetHack draws the engulfer around you as a 3x3 box.
+from pilot.engine import View as _View
+
+_row = " " * 10
+_box = {"context": {"kind": "command"}, "player": {"x": 5, "y": 2},
+        "map": [_row, "   /-\\    ", "   |@|    ", "   \\-/    ", _row]}
+_room = {"context": {"kind": "command"}, "player": {"x": 5, "y": 2},
+         "map": [_row, "   ---    ", "   |@|    ", "   ---    ", _row]}
+assert _View(_box).engulfed and not _View(_room).engulfed
+print("engulf ok")

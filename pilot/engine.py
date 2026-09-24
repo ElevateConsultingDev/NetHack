@@ -170,6 +170,15 @@ class View:
                     and not self.peaceful(cx, cy):
                 yield (cx, cy), c["name"]
 
+    @property
+    def engulfed(self) -> bool:
+        """Swallowed: NetHack draws the engulfer as /-\\ |@| \\-/ around you."""
+        if not self.pos:
+            return False
+        x, y = self.pos
+        row = lambda r: self.map[r][x - 2:x + 1] if 0 <= r < len(self.map) else ""
+        return row(y - 1) == "/-\\" and row(y + 1) == "\\-/"
+
     def peaceful_near(self, xy: tuple, radius: int) -> bool:
         """A peaceful (shopkeeper, watchman, pet...) within radius of xy."""
         return any(c["kind"] == "monster" and (self.peaceful(x, y) or c.get("tame"))
@@ -1082,6 +1091,10 @@ class Engine:
             esc = self._escalate("critical HP and prayer isn't safe")
             if esc:
                 return esc
+        if v.engulfed:
+            # Inside a fog cloud, dust vortex, lurker...: any direction hits
+            # it. Read as a 1x1 room it was 'no way on' (43 of 245 stalls).
+            return "Fk", "standing order: fight out of whatever swallowed us"
         mines = self._leave_mines(v, c)
         if mines:
             return mines
