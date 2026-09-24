@@ -175,6 +175,7 @@ This is one ranked plan built from all three inputs, with duplicates combined. 8
 
 ### 24. Altar BUC testing before wearing found gear
 
+- **Status (2026-09-24): partial substitute (loop iteration 19).** Instead of BUC testing, the pilot now wears only armor whose name hides nothing (fixed appearances: body armor up to chain mail, orcish/dwarvish/elven/dented-pot helmets, low/high boots, iron shoes); gloves, random helmets and boots and cloaks are skipped. Rules seed 1000 (64 games) 20260924-115129 -> 20260924-121902: deepest 4.11 -> 4.52, XL 4.02 -> 4.19; held-out seed 5000 4.45 -> 4.25.
 - **Layer:** engine · **Effort:** medium
 - **Why:** Wearing unknown armor or rings is risky: cursed gear, teleportitis, strangulation. Altars are common. Sources: nethackwiki Altar and Standard_strategy.
 - **Change:** When standing on any altar that is not in a temple with a hostile priest, drop all items of unknown BUC, then pick them back up. Record black flash as cursed, amber flash as blessed and no flash as uncursed. Wear only armor tested uncursed or blessed, and never put on untested rings or amulets. Offering sacrifices at a co-aligned altar is left for later.

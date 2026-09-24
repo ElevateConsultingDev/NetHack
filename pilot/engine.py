@@ -102,6 +102,7 @@ class Memory:
     prayer_log: list = field(default_factory=list)  # (turn prayed, "ok" | "failed")
     retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
     probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
+    tried_wear: set = field(default_factory=set)  # inventory texts we've tried to put on
     tin_smell: str = ""                           # "newts", "spinach": what the tin being opened holds
     last_down: tuple | None = None                # (dlvl, x, y) of the stairs we last went down
     mines_stairs: set = field(default_factory=set)  # (dlvl, x, y) stairs down into the Gnomish Mines
@@ -480,7 +481,8 @@ def _pick_from_menu(v: View, memory: Memory) -> str:
         if not item["selectable"]:
             cls = MENU_HEADERS.get(item["text"].strip(), "")
         elif item["key"] and cls and (cls in memory.loot_classes or (
-                cls == ")" and any(t in item["text"] for t in ("dagger", "dart", "knife", "shuriken")))) \
+                cls == ")" and any(t in item["text"] for t in ("dagger", "dart", "knife", "shuriken"))) or (
+                cls == "[" and armor_slot(item["text"]))) \
                 and not any(w in item["text"] for w in NOT_CARRIED + ("corpse",)):
             keys += item["key"]
     memory.loot_classes = ""
@@ -751,6 +753,9 @@ def r_loot(v: View, memory: Memory, args: dict):
                 and any(t in c["name"] for t in THROWABLE if t not in ("spear", "javelin")) \
                 and (v.dlvl, x, y) not in memory.looted:
             return True  # Daggers, darts, knives: light, and what we throw.
+        if c is not None and c["kind"] == "object" and c.get("class") == "[" and armor_slot(c["name"]) \
+                and (v.dlvl, x, y) not in memory.looted and (v.dlvl, x, y) not in memory.blocked:
+            return True  # Safe armor (see SAFE_ARMOR).
         return (c is not None and c["kind"] == "object" and c.get("class", "") in classes
                 and not any(w in c["name"] for w in NOT_CARRIED + ("corpse",))
                 and (v.dlvl, x, y) not in memory.looted and (v.dlvl, x, y) not in memory.blocked)
@@ -763,6 +768,31 @@ def r_loot(v: View, memory: Memory, args: dict):
         args["target"] = path[-1]
         return _step(v, memory, path, f"walk to loot at {path[-1]}")
     return None, "done: no wanted items in view"
+
+
+# Armor worth wearing unidentified: names that are the same before and after
+# identification, so nothing nasty hides behind them (the worst is a cursed
+# piece stuck on). Skipped: gloves (fumbling), random helmets (opposite
+# alignment), random boots (levitation, fumbling), cloaks (for now).
+# Appearance or name -> slot. Body armor up to chain mail's weight.
+SAFE_ARMOR = {
+    "leather jacket": "body", "leather armor": "body", "studded leather armor": "body",
+    "ring mail": "body", "crude ring mail": "body", "orcish ring mail": "body", "scale mail": "body",
+    "chain mail": "body", "crude chain mail": "body", "orcish chain mail": "body", "mithril-coat": "body",
+    "orcish helm": "helmet", "iron skull cap": "helmet", "dwarvish iron helm": "helmet", "hard hat": "helmet",
+    "elven leather helm": "helmet", "leather hat": "helmet", "dented pot": "helmet",
+    "low boots": "boots", "walking shoes": "boots", "high boots": "boots", "jackboots": "boots",
+    "iron shoes": "boots", "hard shoes": "boots",
+}
+
+
+def armor_slot(text: str) -> str | None:
+    """'an uncursed +0 hard hat (being worn)' -> 'helmet'. Longest name wins
+    ('crude chain mail' over 'chain mail')."""
+    for name in sorted(SAFE_ARMOR, key=len, reverse=True):
+        if name in text:
+            return SAFE_ARMOR[name]
+    return None
 
 
 NOT_CARRIED = ("box", "chest", "boulder", "heavy iron ball", "iron chain")  # open or leave these
@@ -1055,6 +1085,26 @@ class Engine:
             self._next_checkin = c["turn"] - c["turn"] % 500 + 500
             self.consults.append(f"consult: check-in at T{c['turn']}: set standing orders for what's ahead")
 
+    def _wear_armor(self, v: View, c: dict):
+        """Put on safe armor for an empty slot (AC is the wiki's first
+        priority; the Valkyrie starts at AC 6 with no body armor)."""
+        m = self.memory
+        if c.get("visible_hostiles"):
+            return None
+        inv = v.s.get("inventory", [])
+        filled = {armor_slot(i["text"]) for i in inv if i.get("worn")}
+        cloak = any(i.get("worn") and "cloak" in i["text"] for i in inv)
+        for i in inv:
+            slot = armor_slot(i["text"])
+            if i["class"] != "[" or i.get("worn") or not slot or slot in filled or i["text"] in m.tried_wear \
+                    or "cursed" in i["text"].replace("uncursed", "") or (slot == "body" and cloak):
+                continue
+            m.tried_wear.add(i["text"])  # Once per item: a refusal must not loop.
+            m.pending_item = i["letter"]
+            _count(m, f"wore {slot}")
+            return "W", f"wear the {i['text']}"
+        return None
+
     def _leave_mines(self, v: View, c: dict):
         """The Mines' gnomes and dwarves are peaceful only to dwarves and
         gnomes; anyone else under XL 8 dies there (5 of 16 seeded games).
@@ -1178,6 +1228,9 @@ class Engine:
             if keys:
                 self.note = "go down (hungry, no food): " + note
                 return self._stuck_guard(v, keys, note)
+        wear = self._wear_armor(v, c)
+        if wear:
+            return self._stuck_guard(v, wear[0], wear[1])
         burdened = v.status.get("encumbrance", "") != ""
         # Hostiles we never melee (a floating eye in the way) don't stop
         # looting, even next to us (they only hurt if hit; paths never walk
