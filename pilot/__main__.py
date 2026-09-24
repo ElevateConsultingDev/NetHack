@@ -10,6 +10,7 @@ Chat commands:
     /manual        take them back (typing in the game window also does this)
     /speed <sec>   delay between pilot keys
     /why           the current routine and the engine's last step
+    /orders [k=v]  show (or change) the standing orders
     /status        a one-line summary of the game
     /quit          stop the pilot (the game keeps running, stock)
 Anything else goes to the brain; it answers, and may change what it's doing.
@@ -74,17 +75,29 @@ class Pilot:
                 return  # Manual: the engine keeps its checks current, nothing is sent.
             if keys:
                 if self.engine.note != "dismiss --More--":
-                    self.say("engine", f"{self.engine.routine or 'mechanics'}: {self.engine.note}")
+                    self.say("engine", (f"{self.engine.routine}: " if self.engine.routine else "") + self.engine.note)
                 time.sleep(self.speed)
                 self.channel.send(keys)
                 return
-            order = self.brain.decide(self.engine.last_checks or self._checks(s), events, s)
+            order = self.brain.decide(self.engine.last_checks or self._checks(s), events, s,
+                                      self.engine.orders)
+            self.apply_orders(order.orders)
             self.say(self.brain.name, (order.say + " " if order.say else "")
                      + (f"-> {order.routine} {order.args or ''}" if order.routine else "-> waiting on you"))
             if order.routine is None:
                 return
-            self.engine.order(order.routine, order.args)
+            self.engine.order(order.routine, order.args, handles=events)
         self.say("pilot", "the brain keeps picking routines that finish at once; waiting on you")
+
+    def apply_orders(self, changes: dict) -> None:
+        if not changes:
+            return
+        bad = self.engine.set_orders(changes)
+        good = {k: v for k, v in changes.items() if k not in bad}
+        if good:
+            self.say("orders", ", ".join(f"{k}={v}" for k, v in good.items()))
+        if bad:
+            self.say("orders", "unknown: " + ", ".join(bad))
 
     def _checks(self, s: dict) -> dict:
         return checks(View(s, self.engine.memory), self.engine.memory) if "player" in s else {}
@@ -123,13 +136,25 @@ class Pilot:
         elif cmd == "/why":
             self.say("pilot", f"routine {self.engine.routine or 'none'} {self.engine.args or ''}: "
                               f"{self.engine.note or '(nothing yet)'}")
+        elif cmd == "/orders":
+            if arg:  # /orders fight_up_to=5 eat_at="Weak"
+                changes = {}
+                for pair in arg.split():
+                    k, _, val = pair.partition("=")
+                    try:
+                        changes[k] = json.loads(val)
+                    except json.JSONDecodeError:
+                        changes[k] = val
+                self.apply_orders(changes)
+            self.say("orders", json.dumps(self.engine.orders))
         elif cmd == "/status":
             self.say("pilot", self.status_line())
         elif line.strip():
             with self._lock:
                 s = self.state or {}
-                order = self.brain.chat(line.strip(), self._checks(s) if s else {}, s)
+                order = self.brain.chat(line.strip(), self._checks(s) if s else {}, s, self.engine.orders)
                 self.say(self.brain.name, order.say or "(no reply)")
+                self.apply_orders(order.orders)
                 if order.routine:
                     self.engine.order(order.routine, order.args)
                     self.say("pilot", f"-> {order.routine} {order.args or ''}")
@@ -153,7 +178,7 @@ def main() -> None:
     pilot = Pilot(args.sock, brain, args.auto, args.speed)
     threading.Thread(target=pilot.channel.serve, daemon=True).start()
     pilot.say("pilot", f"listening on {args.sock}; start the game in another pane with ./nh")
-    pilot.say("pilot", f"{pilot.mode} mode, {brain.name} brain. /auto /manual /speed /why /status /quit")
+    pilot.say("pilot", f"{pilot.mode} mode, {brain.name} brain. /auto /manual /speed /why /orders /status /quit")
     try:
         while pilot.command(input()):
             pass

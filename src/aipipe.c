@@ -214,8 +214,7 @@ put_status()
     put_kv_int("wis", ACURR(A_WIS), TRUE);
     put_kv_int("cha", ACURR(A_CHA), TRUE);
     Strcpy(tmp, hu_stat[u.uhs]);
-    (void) trimspaces(tmp);
-    put_kv_str("hunger", tmp, TRUE);
+    put_kv_str("hunger", trimspaces(tmp), TRUE);
     put_kv_str("encumbrance", cap > 0 ? enc_stat[cap] : "", TRUE);
     put_kv_str("alignment",
                u.ualign.type == A_CHAOTIC ? "chaotic"
@@ -316,6 +315,19 @@ put_map()
             put(tmp);
             put_kv_str("kind", kind, TRUE);
             put_kv_str("name", desc, TRUE);
+            if (!strcmp(kind, "object")) {
+                char cls[2];
+                int g = glyph_at(x, y);
+
+                cls[0] = def_oc_syms[(int) objects[glyph_to_obj(g)].oc_class].sym;
+                cls[1] = '\0';
+                put_kv_str("class", cls, TRUE);
+            }
+            if (!strcmp(kind, "monster") || !strcmp(kind, "pet")) {
+                /* species toughness: public knowledge about the species */
+                put_kv_int("difficulty",
+                           (long) mons[glyph_to_mon(glyph_at(x, y))].difficulty, TRUE);
+            }
             if (!strcmp(kind, "monster")) {
                 /* what farlook (;) would say; unreliable while hallucinating */
                 struct monst *mtmp = m_at(x, y);

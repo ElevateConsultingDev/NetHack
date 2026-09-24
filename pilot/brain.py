@@ -28,72 +28,60 @@ class Order:
     routine: str | None  # None: no change (chat) / wait for the human (decision)
     args: dict = field(default_factory=dict)
     say: str = ""
+    orders: dict = field(default_factory=dict)  # standing-order changes
 
 
 class RuleBrain:
-    """Fixed priorities; the stand-in until (or when) Haiku isn't available."""
+    """Handles escalations with fixed rules; the stand-in for Haiku."""
 
     name = "rules"
 
-    def decide(self, c: dict, events: list[str], s: dict) -> Order:
-        if any(e.startswith("prompt:") for e in events):
-            return Order(None, say="unfamiliar prompt; over to you")
-        failed = {e.split()[0] for e in events if " failed:" in e or " stuck:" in e}
-        order = self._pick(c, events)
-        if order.routine in failed:
-            return Order(None, say=f"{order.routine} just failed ({'; '.join(events)}); your call")
-        return order
+    def decide(self, c: dict, events: list[str], s: dict, orders: dict | None = None) -> Order:
+        ev = "; ".join(events)
+        if ev.startswith("prompt:"):
+            return Order("keys", {"keys": "\x1b"}, say="unfamiliar prompt: escape out of it")
+        if ev.startswith("badly hurt") or ev.startswith("critical HP"):
+            return Order("elbereth", say="hurt and in trouble: engraving Elbereth")
+        if "(dangerous to be near)" in ev:
+            return Order("step_away", say="backing away from something I shouldn't touch")
+        if "adjacent, difficulty" in ev:
+            name = ev.split(" adjacent")[0]
+            return Order("fight", {"target": name}, say=f"the {name} is tough, but it's on me: fighting")
+        return Order(None, say=f"{ev}; your call")
 
-    def _pick(self, c: dict, events: list[str]) -> Order:
-        if c["wounded"] == "critical":
-            if c["prayer_safe"]:
-                return Order("pray", say="nearly dead and prayer should be safe")
-            return Order(None, say="nearly dead and prayer isn't safe; your call")
-        if c["dangerous_adjacent"]:
-            return Order(None, say=f"{', '.join(c['dangerous_adjacent'])} next to me; not touching it")
-        if c["adjacent_hostiles"]:
-            return Order("fight", say=f"fighting the {c['adjacent_hostiles'][0]['name']}")
-        if c["hunger"] in ("Hungry", "Weak", "Fainting"):
-            if c["safe_food"]:
-                return Order("eat", {"letter": c["safe_food"][0]["letter"]}, say=f"{c['hunger']}: eating")
-            return Order(None, say=f"{c['hunger']} and no safe food; your call")
-        if c["wounded"] in ("hurt", "badly hurt") and not c["visible_hostiles"]:
-            return Order("rest", say="resting up")
-        if c["gold_visible"] and not c["visible_hostiles"]:
-            return Order("pickup_gold")
-        if not c["level_explored"]:
-            return Order("explore")
-        if c["stairs_down"]:
-            return Order("go_down", say="level done, heading down")
-        if not any(e.startswith("search_walls failed") for e in events):
-            return Order("search_walls", say="no way on; searching for hidden doors")
-        return Order(None, say="explored, searched, no stairs; your call")
-
-    def chat(self, text: str, c: dict, s: dict) -> Order:
+    def chat(self, text: str, c: dict, s: dict, orders: dict) -> Order:
         return Order(None, say="(rule brain: I can't chat; start with --brain haiku)")
 
 
-SYSTEM = """You are the brain of a NetHack 3.6 autopilot, playing for a human who watches and chats with you.
+SYSTEM = """You are the brain of a NetHack 3.6 autopilot, playing to win (retrieve the Amulet of Yendor and ascend) for a human who watches and chats with you.
 
-An engine does everything deterministic. You never press movement keys yourself: you pick a ROUTINE and the engine carries it out step by step until it's done, fails, or something changes, then asks you again. The engine also handles --More--, pre-game screens, prayer confirmation, and never attacks peacefuls.
+An ENGINE does everything deterministic, fast, without asking you:
+- mechanics: --More--, pre-game screens, prayer confirmation, never attacking peacefuls;
+- STANDING ORDERS (which you set): fight adjacent hostiles up to a difficulty, never melee the avoid list, eat known-safe food at a hunger level, rest when hurt and alone, pray when HP is critical and prayer is safe, pick up gold;
+- a default activity: explore the level, go down the stairs when done, search the walls if there are no stairs.
 
-Routines (name: what it does; args):
+You are asked only when something is outside the standing orders (an ESCALATION): a monster that's too tough or on the avoid list, hunger with no safe food, critical HP when prayer isn't safe, an unfamiliar prompt, a routine of yours that failed, no way on, or the human talking to you.
+
+Answer with a ROUTINE for the engine to carry out, and optionally standing-order changes. Routines:
 {routines}
 
-Each time you're asked you get EVENTS (why you're being asked), CHECKS (hunger, wounds, threats, food, exploration, stairs), STATUS, recent MESSAGES, INVENTORY, the PROMPT if the game is asking something, and the MAP (x = column + 1 of each row, y = row index; @ is you).
+Standing-order keys: fight_up_to (int or null = your level + 2), avoid (list of monster names), eat_at ("Hungry", "Weak", or "never"), rest_below (fraction of max HP), pray_when_critical (bool), pickup_gold (bool), descend (bool), loot (string of item class symbols to pick up while clearing a level), explore_fully (bool: search dead ends before going down), retreat_below (fraction of max HP: below it, with a hostile adjacent, you're asked what to do).
+
+The default activity clears each level: loot wanted items, explore everything, search dead ends, then go down. The goal is to get strong (experience, gear), not to dive.
+
+You get ESCALATION or EVENTS, STANDING ORDERS, CHECKS, STATUS, MESSAGES, INVENTORY, PROMPT (if any), NOTABLE (named map cells with x,y) and the MAP (row index = y, column + 1 = x; @ is you).
 
 Reply with exactly ONE line of JSON and nothing else:
-{{"routine": "<name or null>", "args": {{...}}, "say": "<one short sentence to the human>"}}
-- routine null means: when asked for a decision, wait for the human; when the human is only chatting, keep the current routine.
-- To answer a game prompt, use routine "keys" with the exact keys (e.g. "y", "n", an inventory letter, "\\u001b" for Escape).
-- Prefer the big routines: explore until it says done, then search_walls if there are no stairs down, then go_down. Use go_to only for a specific named thing, and if the same go_to fails twice, drop it.
-- NOTABLE lists everything named on the map with coordinates. Map symbols like ? ! % [ ) = are just items on the floor (scroll, potion, food, armor, weapon, ring); they are never required to find stairs.
-- Play solid, conservative NetHack: don't melee floating eyes or cockatrices, eat when Hungry, pray when HP is critically low and prayer is safe (about once per 1000 turns), rest when hurt and alone, explore before descending, don't eat unknown or old corpses, keep your pet alive.
-- When the human gives an order, follow it unless it's clearly suicidal, and say so if you refuse.
+{{"routine": "<name or null>", "args": {{...}}, "orders": {{...changes, or empty}}, "say": "<one short sentence to the human>"}}
+- routine null: for an escalation, wait for the human; for chat, keep going as you were.
+- "keys" is only for answering a game prompt (e.g. "y", "n", an inventory letter, "\\u001b" for Escape). Never walk with keys: the engine walks.
+- Items: use routine "use" (quaff, read, wear, wield, zap...) or "pick_up". Map symbols ? ! % [ ) = are items, never required to find stairs.
+- Play solid NetHack: Elbereth and retreat beat dying; don't melee floating eyes or cockatrices; don't eat unknown or old corpses; keep your pet; identify before relying on unknown items; Sokoban and the Mines' end are worth it once strong enough.
+- Follow the human's orders unless clearly suicidal; say so if you refuse.
 """
 
 
-def _brief(c: dict, events: list[str], s: dict, chat: str | None) -> str:
+def _brief(c: dict, events: list[str], s: dict, chat: str | None, orders: dict) -> str:
     st = s.get("status", {})
     ctx = s.get("context", {})
     rows = [f"{y:2d} {row.rstrip()}" for y, row in enumerate(s.get("map", [])) if row.strip()]
@@ -102,7 +90,8 @@ def _brief(c: dict, events: list[str], s: dict, chat: str | None) -> str:
     if chat is not None:
         parts.append(f"THE HUMAN SAYS: {chat}")
     parts += [
-        "EVENTS: " + ("; ".join(events) if events else "(none)"),
+        ("ESCALATION: " if chat is None else "EVENTS: ") + ("; ".join(events) if events else "(none)"),
+        "STANDING ORDERS: " + json.dumps(orders),
         "CHECKS: " + json.dumps({k: v for k, v in c.items() if k != "food"}),
         f"STATUS: {st.get('role')} XL{st.get('xlvl')} HP {st.get('hp')}/{st.get('hpmax')} "
         f"Pw {st.get('pw')}/{st.get('pwmax')} AC {st.get('ac')} Dlvl {st.get('dlvl')} T{st.get('turn')} "
@@ -210,16 +199,17 @@ class HaikuBrain:
         routine = d.get("routine")
         if routine is not None and routine not in ROUTINES:
             return None
-        return Order(routine, d.get("args") or {}, str(d.get("say") or ""))
+        return Order(routine, d.get("args") or {}, str(d.get("say") or ""),
+                     d.get("orders") if isinstance(d.get("orders"), dict) else {})
 
-    def decide(self, c: dict, events: list[str], s: dict) -> Order:
-        order = self._parse(self._ask(_brief(c, events, s, None)))
+    def decide(self, c: dict, events: list[str], s: dict, orders: dict) -> Order:
+        order = self._parse(self._ask(_brief(c, events, s, None, orders)))
         if order is None:
-            fb = self.fallback.decide(c, events, s)
+            fb = self.fallback.decide(c, events, s, orders)
             fb.say = f"(brain unavailable{': ' + self.last_error if self.last_error else ''}; rules) {fb.say}"
             return fb
         return order
 
-    def chat(self, text: str, c: dict, s: dict) -> Order:
-        order = self._parse(self._ask(_brief(c, ["the human is talking to you"], s, text)))
+    def chat(self, text: str, c: dict, s: dict, orders: dict) -> Order:
+        order = self._parse(self._ask(_brief(c, ["the human is talking to you"], s, text, orders)))
         return order or Order(None, say=f"(no answer from the brain{': ' + self.last_error if self.last_error else ''})")
