@@ -822,7 +822,11 @@ def r_probe_dark(v: View, memory: Memory, args: dict):
     def probe_dir(x, y):
         for dx, dy in ORTHO:
             b = (x + dx, y + dy)
-            if v.ch(*b) == " " and not v.cells.get(b) and (v.dlvl, *b) not in memory.probed:
+            # Blank, never probed, and never stood on: dark floor we've
+            # walked is drawn blank again once we leave, and treating it as
+            # unknown made two neighbours point probes at each other forever.
+            if v.ch(*b) == " " and not v.cells.get(b) and (v.dlvl, *b) not in memory.probed \
+                    and (v.dlvl, *b) not in memory.visited:
                 return dx, dy
         return None
     if (v.dlvl, *v.pos) in memory.visited and probe_dir(*v.pos):

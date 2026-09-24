@@ -359,6 +359,8 @@ def _play_one(spec: dict) -> dict:
     brain = (HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), journal=spec["journal"])
              if spec["brain"] == "haiku" else QwenBrain(journal=spec["journal"]) if spec["brain"] == "qwen"
              else RuleBrain())
+    if spec.get("model") and hasattr(brain, "model"):
+        brain.model = spec["model"]
     g = Game(spec["name"], spec["role"], brain, spec["max_turns"], spec["max_seconds"], spec["save"],
              seed=spec["seed"])
     page, live = os.path.join(batch_dir, f"game-{g.name}.html"), os.path.join(batch_dir, f"live-{g.name}.json")
@@ -420,6 +422,7 @@ def main() -> None:
     p.add_argument("--games", type=int, default=8)
     p.add_argument("--parallel", type=int, default=4)
     p.add_argument("--brain", choices=("rules", "haiku", "qwen"), default="rules")
+    p.add_argument("--model", help="model for the brain (haiku alias, or an Ollama tag such as qwen3.5:9b)")
     p.add_argument("--role", default="Valkyrie")
     p.add_argument("--max-turns", type=int, default=20000)
     p.add_argument("--max-seconds", type=float, default=600)
@@ -442,13 +445,14 @@ def main() -> None:
     board = os.path.join(batch_dir, "dashboard.html")
     run = time.strftime("%Y%m%d-%H%M%S")
     specs = [{"name": f"B{run[-6:]}{i:02d}", "role": args.role, "brain": args.brain, "journal": not args.no_journal,
+              "model": args.model,
               "max_turns": args.max_turns, "max_seconds": args.max_seconds, "save": not args.no_save,
               "seed": None if args.seed is None else args.seed + i, "run": run} for i in range(args.games)]
     results: list[dict] = []
 
     def save_json() -> None:
         with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Everything, per game.
-            json.dump({"run": run, "brain": args.brain, "journal": not args.no_journal, "seed": args.seed,
+            json.dump({"run": run, "brain": args.brain, "model": args.model, "journal": not args.no_journal, "seed": args.seed,
                        "games": sorted(results, key=lambda r: r["name"])}, f)
 
     def board_games() -> list:
