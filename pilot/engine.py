@@ -1102,7 +1102,11 @@ class Engine:
         (searching the walls if there are no stairs)."""
         m = self.memory
         burdened = v.status.get("encumbrance", "") != ""
-        if self.orders["loot"] and not burdened and not self.last_checks.get("visible_hostiles"):
+        # Hostiles we never melee (a floating eye in the way) and that are
+        # at least 2 away don't stop looting: that's how thrown daggers come back.
+        threats = [h for h in self.last_checks.get("visible_hostiles", [])
+                   if h["name"] not in self.orders["avoid"] or h["distance"] < 2]
+        if self.orders["loot"] and not burdened and not threats:
             keys, note = r_loot(v, m, self._loot_args)
             if keys:
                 self.note = "loot: " + note
