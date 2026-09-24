@@ -1140,10 +1140,11 @@ class Engine:
         (searching the walls if there are no stairs)."""
         m = self.memory
         burdened = v.status.get("encumbrance", "") != ""
-        # Hostiles we never melee (a floating eye in the way) and that are
-        # at least 2 away don't stop looting: that's how thrown daggers come back.
+        # Hostiles we never melee (a floating eye in the way) don't stop
+        # looting, even next to us (they only hurt if hit; paths never walk
+        # into them): that's how thrown daggers come back. Cockatrices do.
         threats = [h for h in self.last_checks.get("visible_hostiles", [])
-                   if h["name"] not in self.orders["avoid"] or h["distance"] < 2]
+                   if h["name"] not in self.orders["avoid"] or h["name"] in DANGEROUS_NEAR]
         if self.orders["loot"] and not burdened and not threats:
             keys, note = r_loot(v, m, self._loot_args)
             if keys:
