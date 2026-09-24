@@ -132,6 +132,8 @@ class Game:
         self.seed = seed      # Set: the game is reproducible (fixed RNG seed and clock, no bones).
         self.keys: list = []  # (turn, keys) for every key the pilot sent
         self.answers: list = []  # the brain's raw answer to every call, for replays
+        self.trace: list = []    # (turn, dlvl, xlvl, hp, hunger, known map squares, activity) every 50 turns
+        self._next_trace = 0
         self.deepest = 0
         self.escalations: list = []  # (turn, events, order) for every brain call
         self.consult = isinstance(brain, HaikuBrain)  # strategic check-ins, not just escalations
@@ -172,6 +174,14 @@ class Game:
         self.last = s
         turn = s.get("status", {}).get("turn", 0)
         self.deepest = max(self.deepest, s.get("status", {}).get("dlvl") or 0)
+        if turn >= self._next_trace and s["context"]["kind"] == "command":
+            # Progress trace every 50 turns: what the autopsy looks at for
+            # effort without progress (turns passing, nothing changing).
+            self._next_trace = turn - turn % 50 + 50
+            st = s.get("status", {})
+            known = sum(ch != " " for row in s.get("map", [])[1:22] for ch in row)
+            self.trace.append((turn, st.get("dlvl"), st.get("xlvl"), st.get("hp"), st.get("hunger", ""),
+                               known, self.engine._activity()))
         for msg in s.get("messages", []):
             self.feed.append((turn, "game", msg))
         if self.engine.note and self.engine.note != self._last_note and self.engine.note != "dismiss --More--":
@@ -289,6 +299,7 @@ class Game:
             "race": st.get("race"), "prayers": self.engine.memory.prayer_log,
             "escalations": self.escalations, "feed": list(self.feed),
             "seed": self.seed, "keys": self.keys, "answers": self.answers, "brain": self.brain.name,
+            "trace": self.trace,
             "role": self.role,
         }
 
