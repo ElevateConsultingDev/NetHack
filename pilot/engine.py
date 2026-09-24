@@ -169,6 +169,11 @@ class View:
                     and not self.peaceful(cx, cy):
                 yield (cx, cy), c["name"]
 
+    def peaceful_near(self, xy: tuple, radius: int) -> bool:
+        """A peaceful (shopkeeper, watchman, pet...) within radius of xy."""
+        return any(c["kind"] == "monster" and (self.peaceful(x, y) or c.get("tame"))
+                   and max(abs(x - xy[0]), abs(y - xy[1])) <= radius for (x, y), c in self.cells.items())
+
     def peaceful(self, x: int, y: int) -> bool:
         """Peaceful per the game (farlook), or one we declined to attack."""
         c = self.cells.get((x, y))
@@ -690,7 +695,12 @@ def r_throw(v: View, memory: Memory, args: dict):
     for (x, y), c in v.cells.items():
         if c["kind"] == "monster" and (not target or target in c["name"]):
             step = in_line(v.pos, (x, y))
-            if step and max(abs(x - v.pos[0]), abs(y - v.pos[1])) <= 8:
+            # A miss flies on past the target: nothing peaceful anywhere on
+            # the line (a dagger in a shopkeeper's back ends the game), and
+            # no peaceful in a gas spore's blast.
+            if step and max(abs(x - v.pos[0]), abs(y - v.pos[1])) <= 8 and not any(
+                    v.peaceful_near((v.pos[0] + step[0] * i, v.pos[1] + step[1] * i), 0) for i in range(1, 11)) \
+                    and not (c["name"] == "gas spore" and v.peaceful_near((x, y), 1)):
                 args["sent"] = True
                 memory.retrieve.add(next(t for t in THROWABLE if t in item["text"]))
                 _count(memory, f"throws at {c['name']}")
@@ -1079,7 +1089,8 @@ class Engine:
                 return esc
         for mon in c["visible_hostiles"]:
             if mon["name"] == "gas spore" and mon["distance"] <= 1:
-                if c["hp"] > 26:  # Its blast is 4d6 (max 24): take it, and it may kill neighbors.
+                # Its blast angers a shopkeeper or watchman caught in it.
+                if c["hp"] > 26 and not v.peaceful_near((mon["x"], mon["y"]), 1):  # Its blast is 4d6 (max 24): take it, and it may kill neighbors.
                     m.pending_fight = (mon["x"], mon["y"])
                     return ("F" + KEY_FOR[(mon["x"] - v.pos[0], mon["y"] - v.pos[1])],
                             "standing order: pop the gas spore (HP can take the blast)")
