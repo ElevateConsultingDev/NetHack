@@ -268,6 +268,7 @@ class QwenBrain(HaikuBrain):
     off (it answered in about a second with it off, empty with it on)."""
     name = "qwen"
     URL = "http://127.0.0.1:11434/api/chat"
+    TIMEOUT_S = 180  # Ollama serves one request at a time per model: parallel games queue.
 
     def __init__(self, model: str = "qwen3.5:9b", log_path: str | None = None, journal: bool = True) -> None:
         super().__init__(model, log_path, journal=journal)
