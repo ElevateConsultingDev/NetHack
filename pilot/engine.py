@@ -97,6 +97,8 @@ class Memory:
     prayer_log: list = field(default_factory=list)  # (turn prayed, "ok" | "failed")
     retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
     probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
+    last_down: tuple | None = None                # (dlvl, x, y) of the stairs we last went down
+    mines_stairs: set = field(default_factory=set)  # (dlvl, x, y) stairs down into the Gnomish Mines
 
 
 class View:
@@ -289,7 +291,7 @@ def checks(v: View, memory: Memory) -> dict:
                   and not safe_food else [])
                + (["lycanthropy"] if memory.feverish else []))
     stairs = [xy for xy in ((x, y) for (d, x, y), n in memory.features.items()
-                            if d == v.dlvl and n == "staircase down")]
+                            if d == v.dlvl and n == "staircase down" and (d, x, y) not in memory.mines_stairs)]
     return {
         "hunger": st.get("hunger", "").strip(),
         "hp": hp, "hpmax": hpmax, "wounded": wound_tier(hp, hpmax),
@@ -499,9 +501,12 @@ def r_search_walls(v: View, memory: Memory, args: dict):
 def r_go_down(v: View, memory: Memory, args: dict):
     if args.setdefault("start_dlvl", v.dlvl) != v.dlvl:
         return None, "done: went down"
-    if v.feature(*v.pos) == "staircase down":
+    def ok(x, y):
+        return v.feature(x, y) == "staircase down" and (v.dlvl, x, y) not in memory.mines_stairs
+    if ok(*v.pos):
+        memory.last_down = (v.dlvl, *v.pos)
         return ">", "take the stairs down"
-    path = bfs(v, lambda x, y: v.feature(x, y) == "staircase down")
+    path = bfs(v, ok)
     if path:
         return _step(v, memory, path, "head for the stairs down")
     return None, "failed: no known way down"
@@ -986,6 +991,30 @@ class Engine:
             self._next_checkin = c["turn"] - c["turn"] % 500 + 500
             self.consults.append(f"consult: check-in at T{c['turn']}: set standing orders for what's ahead")
 
+    def _leave_mines(self, v: View, c: dict):
+        """The Mines' gnomes and dwarves are peaceful only to dwarves and
+        gnomes; anyone else under XL 8 dies there (5 of 16 seeded games).
+        Go back up, and never take that staircase down again."""
+        if v.status.get("dungeon") != "The Gnomish Mines" or v.status.get("race") in ("dwarf", "gnome") \
+                or (c["xlvl"] or 0) >= 8:
+            return None
+        m = self.memory
+        if m.last_down and m.last_down[0] == v.dlvl - 1:
+            m.mines_stairs.add(m.last_down)
+        if v.feature(*v.pos) == "staircase up":
+            # Memory is keyed by level number, which the Mines share with
+            # the main dungeon: forget this level before it misleads us.
+            for store in (m.features, m.searched, m.kills):
+                for k in [k for k in store if k[0] == v.dlvl]:
+                    del store[k]
+            m.visited = {k for k in m.visited if k[0] != v.dlvl}
+            m.corridors = {k for k in m.corridors if k[0] != v.dlvl}
+            _count(m, "left the Mines")
+            return "<", "standing order: leave the Gnomish Mines (not safe for a non-dwarf yet)"
+        path = bfs(v, lambda x, y: v.feature(x, y) == "staircase up")
+        keys = _step(v, m, path, "")[0] if path else None
+        return (keys, "standing order: head back up out of the Mines") if keys else None
+
     def _end_routine(self) -> None:
         self.routine, self.args, self.acknowledged = None, {}, set()
 
@@ -1002,6 +1031,9 @@ class Engine:
             esc = self._escalate("critical HP and prayer isn't safe")
             if esc:
                 return esc
+        mines = self._leave_mines(v, c)
+        if mines:
+            return mines
         if c["adjacent_hostiles"] and c["hp"] < c["hpmax"] * float(o["retreat_below"]):
             names = ", ".join(sorted({m["name"] for m in c["adjacent_hostiles"]}))
             esc = self._escalate(f"badly hurt (HP {c['hp']}/{c['hpmax']}) with {names} adjacent")

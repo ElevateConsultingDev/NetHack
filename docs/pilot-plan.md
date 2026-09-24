@@ -123,6 +123,7 @@ This is one ranked plan built from all three inputs, with duplicates combined. 8
 
 ### 17. Gnomish Mines policy: record the branch and stay out until strong enough
 
+- **Status (2026-09-24): core done (loop iteration 2).** Non-dwarf, non-gnome under XL 8 leaves the Mines on arrival and never takes that staircase again. Paired batches (seed 1000) 20260924-073249 -> 20260924-074325: Mines deaths 5 -> 1, avg deepest 3.88 -> 4.50. Not done: the full stair graph and a brain-ordered Minetown visit at XL 8.
 - **Layer:** engine · **Effort:** medium
 - **Why:** 12 of 44 xlogfile deaths were in the Mines (deathdnum=2), and 19 of 135 stall snapshots are Mines levels, 12 of them no way on. r_go_down takes the first '>' it finds (lines 472-480). Gnome lords and dwarves with wands and mattocks are hostile to a human Valkyrie. Sources: nethackwiki Gnomish_Mines and Standard_strategy; AutoAscend and Saiph stair graph.
 - **Change:** Keep a per-level stair graph: each staircase and the level it leads to. On arriving in a level where status.dungeon is 'The Gnomish Mines' while XL is under 8 (a knob the brain can tune), go back up, mark that '>' as mines_branch, and choose the other '>'. Later, the brain can order a Minetown visit (Mines levels 3-4, for the altar and temple) once XL is 8 or more, with the Minetown rules on (no kicks, no fountains, never attack peacefuls).
