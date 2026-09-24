@@ -325,6 +325,7 @@ def main() -> None:
     p.add_argument("--max-seconds", type=float, default=600)
     p.add_argument("--no-save", action="store_true", help="kill stalled games instead of saving them")
     p.add_argument("--seed", type=int, help="reproducible games: game i gets seed SEED+i (same SEED = same dungeons)")
+    p.add_argument("--no-journal", action="store_true", help="Haiku plays without pilot/journal.md (A/B check)")
     p.add_argument("--replay", metavar="RUN/NAME", help="rerun one recorded seeded game with its brain answers")
     args = p.parse_args()
     if (args.seed is not None or args.replay) and os.environ.get("PYTHONHASHSEED") != "0":
@@ -341,7 +342,7 @@ def main() -> None:
     board = os.path.join(batch_dir, "dashboard.html")
     run = time.strftime("%Y%m%d-%H%M%S")
     games = [Game(f"B{run[-6:]}{i:02d}", args.role,
-                  HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"))
+                  HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), journal=not args.no_journal)
                   if args.brain == "haiku" else RuleBrain(),
                   args.max_turns, args.max_seconds, not args.no_save,
                   seed=None if args.seed is None else args.seed + i) for i in range(args.games)]
@@ -378,7 +379,7 @@ def main() -> None:
 
     def save_json() -> None:
         with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Everything, per game.
-            json.dump({"run": run, "brain": args.brain, "games": sorted(results, key=lambda r: r["name"])}, f)
+            json.dump({"run": run, "brain": args.brain, "journal": not args.no_journal, "seed": args.seed, "games": sorted(results, key=lambda r: r["name"])}, f)
 
     stop = threading.Event()
 

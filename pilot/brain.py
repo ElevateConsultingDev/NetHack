@@ -135,8 +135,10 @@ class HaikuBrain:  # (ReplayBrain below stands in for it when rerunning a record
     name = "haiku"
     TIMEOUT_S = 60
 
-    def __init__(self, model: str = "haiku", log_path: str | None = None, thinking_tokens: int = 0) -> None:
+    def __init__(self, model: str = "haiku", log_path: str | None = None, thinking_tokens: int = 0,
+                 journal: bool = True) -> None:
         self.model = model
+        self.journal = journal  # False: play without pilot/journal.md (the journal A/B check)
         # Thinking made each call 20-50s instead of 2-3s; checkpoints ask
         # dozens of times a game. Raise it if its decisions get worse.
         self.thinking_tokens = thinking_tokens
@@ -158,7 +160,7 @@ class HaikuBrain:  # (ReplayBrain below stands in for it when rerunning a record
             "claude", "-p",
             "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             "--model", self.model,
-            "--system-prompt", SYSTEM.format(routines=routines) + _journal(),
+            "--system-prompt", SYSTEM.format(routines=routines) + (_journal() if self.journal else ""),
             "--tools", "",                 # No built-in tools: it only answers.
             "--strict-mcp-config",         # No MCP servers.
             "--setting-sources=",          # Keep the user's CLAUDE.md, hooks, plugins out.
