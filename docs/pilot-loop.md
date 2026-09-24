@@ -22,3 +22,4 @@ Guardrails: work on the `ai-player` branch only; after each kept fix, push `ai-p
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
+- 2026-09-24, after iteration 11. Journal A/B (Haiku, seed 3000, 32 games each): with 20260924-095054 deepest 4.56 / XL 3.84, without 20260924-100351 deepest 4.25 / XL 3.44; paired difference +0.31 +/- 0.35 levels (10 better, 8 worse, 14 tied): leans to the journal, not conclusive; journal kept. Held-out (rules, seed 5000): 20260924-094705 deepest 4.1 / XL 4.2 (first held-out run; seed 1000 at the time: 4.44 / 4.12). Game 10 of the held-out run is missing from its records (a worker error; not yet found).
