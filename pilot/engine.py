@@ -35,6 +35,22 @@ SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "fortune cookie", "ap
              "pancake", "cream pie", "candy bar", "egg")
 HUNGRY = {"Hungry", "Weak", "Fainting", "Fainted"}
 
+# Corpses safe for an ordinary character when fresh (NetHack 3.6). Leaves out
+# anything poisonous, acidic-and-risky, were-, domestic (aggravate), stunning,
+# hallucinogenic, petrifying, polymorphing, teleport-granting, mimicking,
+# pre-rotted (zombies, mummies), and humanoids that are someone's kin.
+SAFE_CORPSES = {
+    "newt", "jackal", "fox", "coyote", "sewer rat", "giant rat", "rock mole", "woodchuck",
+    "gecko", "iguana", "baby crocodile", "crocodile", "lizard", "lichen", "rothe", "dingo",
+    "wolf", "giant beetle", "floating eye", "acid blob", "gnome", "gnome lord", "gnome king",
+    "hill orc", "Mordor orc", "Uruk-hai", "orc shaman", "goblin", "hobgoblin", "hill giant",
+    "pony", "horse", "warhorse", "jaguar", "lynx", "panther",
+}
+NEVER_ROTS = {"lichen", "lizard"}
+FRESH_TURNS = 30
+RACE_KIN = {"gnome": ("gnome",), "orc": ("orc", "Uruk-hai"), "dwarf": ("dwarf",),
+            "elf": ("elf",), "human": ("human",)}
+
 
 @dataclass
 class Memory:
@@ -60,6 +76,8 @@ class Memory:
     avoid: set = field(default_factory=set)       # monster names never to melee (from the orders)
     engraving: bool = False                       # an Elbereth engraving is in progress
     corridors: set = field(default_factory=set)   # (dlvl, x, y) corridor squares seen
+    kills: dict = field(default_factory=dict)     # (dlvl, x, y) -> (monster, turn) where we killed it
+    eating_corpse: bool = False                   # an 'e' for a floor corpse is in progress
 
 
 class View:
@@ -272,6 +290,8 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
         prompt = v.ctx.get("prompt", "")
         if "trouble lifting" in prompt or "Continue?" in prompt and memory.loot_classes:
             return "n", "too heavy: leave it"
+        if prompt.startswith(("Do you want your possessions identified", "Do you want to see")):
+            return "n", "game over: skip the end-of-game lists"
         if prompt.startswith("Really attack"):
             if memory.pending_fight:
                 memory.peaceful.add((v.dlvl, *memory.pending_fight))
@@ -285,9 +305,42 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
         if prompt.startswith("What do you want to") and memory.pending_item:
             letter, memory.pending_item = memory.pending_item, ""
             return letter, f"answer with item {letter}"
+        if ("eat it?" in prompt or "eat one?" in prompt) and memory.eating_corpse:
+            memory.eating_corpse = False
+            name = corpse_name(prompt)
+            ok, why = corpse_safe(name, memory, v)
+            return ("y", f"eat the {name} corpse") if ok else ("n", f"not eating it: {why}")
         if "eat it?" in prompt and memory.pending_food:
             return "n", "not the corpse: the item from the pack"
     return None
+
+
+def corpse_name(prompt: str) -> str:
+    """'There is a partly eaten jackal corpse here; eat it?' -> 'jackal'."""
+    text = prompt.split(" corpse")[0]
+    for lead in ("There is an ", "There is a ", "There are "):
+        if text.startswith(lead):
+            text = text[len(lead):]
+    words = text.split()
+    while words and (words[0].isdigit() or words[0] in ("partly", "eaten")):
+        words.pop(0)
+    return " ".join(words)
+
+
+def corpse_safe(name: str, memory: "Memory", v: "View") -> tuple[bool, str]:
+    """Safe species, not our own kind, and fresh (our kill, recent)."""
+    if name not in SAFE_CORPSES:
+        return False, f"{name} isn't on the safe list"
+    race = v.status.get("race", "")
+    if any(k in name for k in RACE_KIN.get(race, ())):
+        return False, "cannibalism"
+    if name in NEVER_ROTS:
+        return True, "never rots"
+    kill = memory.kills.get((v.dlvl, *v.pos))
+    if not kill or kill[0] != name:
+        return False, "don't know how old it is"
+    age = v.status.get("turn", 0) - kill[1]
+    return (age <= FRESH_TURNS, f"{age} turns old")
 
 
 MENU_HEADERS = {"Coins": "$", "Weapons": ")", "Armor": "[", "Rings": "=", "Amulets": '"',
@@ -568,6 +621,7 @@ DEFAULT_ORDERS = {
     "descend": True,            # default activity ends by taking the stairs down
     "loot": "$?!/=\"+(",         # item classes to pick up ($ gold ? scroll ! potion / wand = ring " amulet + book ( tool)
     "explore_fully": True,      # search dead ends for hidden passages before going down
+    "eat_corpses": "unless_satiated",  # fresh safe kills: "unless_satiated", "hungry" or "never"
     "retreat_below": 0.35,      # badly hurt with a hostile adjacent: ask the brain before it's critical
 }
 
@@ -618,6 +672,7 @@ class Engine:
         if v.pos:
             self.memory.visited.add((v.dlvl, *v.pos))
 
+        self._record_kills(v)
         mech = mechanics(v, self.memory)
         if mech:
             self.note = mech[1]
@@ -656,6 +711,47 @@ class Engine:
                 return None, [finished]  # The brain's plan didn't work: its call.
         return self._default_activity(v)
 
+    def _record_kills(self, v: View) -> None:
+        """'You kill the jackal!' after we attacked a square: remember what
+        died there and when, so its corpse can be judged."""
+        m = self.memory
+        for msg in v.s.get("messages", []):
+            for verb in ("You kill the ", "You destroy the ", "You kill it"):
+                if msg.startswith(verb) and m.pending_fight:
+                    name = msg[len(verb):].rstrip("!.").strip() if verb != "You kill it" else "?"
+                    m.kills[(v.dlvl, *m.pending_fight)] = (name, v.status.get("turn", 0))
+                    m.pending_fight = None
+
+    def _corpse_to_eat(self, v: View, c: dict):
+        """A fresh safe kill with a corpse still on it, within a short walk."""
+        o, m = self.orders, self.memory
+        policy = o["eat_corpses"]
+        if policy == "never" or c["hunger"] == "Satiated" or c["visible_hostiles"]:
+            return None
+        if policy == "hungry" and c["hunger"] not in HUNGRY:
+            return None
+        turn = c["turn"]
+        spots = {(x, y) for (d, x, y), (name, when) in m.kills.items()
+                 if d == v.dlvl and name in SAFE_CORPSES
+                 and (name in NEVER_ROTS or turn - when <= FRESH_TURNS)
+                 and not any(k in name for k in RACE_KIN.get(v.status.get("race", ""), ()))}
+        if not spots:
+            return None
+        if v.pos in spots:
+            if "corpse" not in " ".join(v.s.get("messages", [])) and (v.dlvl, *v.pos) in m.looted:
+                return None
+            m.looted.add((v.dlvl, *v.pos))
+            m.eating_corpse = True
+            m.kills.pop((v.dlvl, *v.pos), None)
+            return "e", "eat the fresh kill"
+        def has_corpse(x, y):
+            cell = v.cells.get((x, y))
+            return (x, y) in spots and cell is not None and cell["name"] == "corpse"
+        path = bfs(v, has_corpse)
+        if path and len(path) <= 8:
+            return _step(v, m, path, f"walk to the fresh kill at {path[-1]}")
+        return None
+
     def _end_routine(self) -> None:
         self.routine, self.args, self.acknowledged = None, {}, set()
 
@@ -693,13 +789,22 @@ class Engine:
             if esc:
                 return esc
         eat_at = o["eat_at"]
-        if eat_at in HUNGER_RANK and HUNGER_RANK.index(c["hunger"]) >= HUNGER_RANK.index(eat_at) > 0:
+        hunger = HUNGER_RANK.index(c["hunger"]) if c["hunger"] in HUNGER_RANK else 0  # Satiated: 0
+        if eat_at in HUNGER_RANK and hunger >= HUNGER_RANK.index(eat_at) > 0:
             if c["safe_food"]:
                 m.pending_food = c["safe_food"][0]["letter"]
                 return "e", f"standing order: {c['hunger']}, eat"
-            esc = self._escalate(f"{c['hunger']} and no known-safe food")
-            if esc:
-                return esc
+            if hunger >= HUNGER_RANK.index("Weak"):
+                # Weak from hunger is a major trouble prayer fixes; else ask.
+                if o["pray_when_critical"] and c["prayer_safe"]:
+                    return r_pray(v, m, {})[0], f"standing order: {c['hunger']} with no food, pray"
+                esc = self._escalate(f"{c['hunger']} and no known-safe food")
+                if esc:
+                    return esc
+            # Merely Hungry: keep going; the next safe kill is a meal.
+        corpse = self._corpse_to_eat(v, c)
+        if corpse:
+            return corpse[0], "standing order: " + corpse[1]
         if c["hp"] < c["hpmax"] * float(o["rest_below"]) and not c["visible_hostiles"]:
             return "20s", f"standing order: HP {c['hp']}/{c['hpmax']}, rest"
         if o["pickup_gold"] and "$" not in str(o["loot"]) and c["gold_visible"] \
