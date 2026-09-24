@@ -88,11 +88,40 @@ def xlog_entries() -> dict[str, dict]:
     return out
 
 
+def bucket(r: dict) -> str:
+    """One failure bucket per game, for comparing runs."""
+    death, stall, during = r.get("death", ""), r.get("stall", ""), r.get("died_while", "")
+    if death:
+        if "praying" in during:
+            return "died praying"
+        if "starvation" in death or "fainted" in during:
+            return "died fainted/starving"
+        if str(r.get("deathdnum")) == "2":
+            return "died in the Mines"
+        if re.search(r"wand|bolt|magic missile|death ray|ray of", death):
+            return "died to a wand or bolt"
+        if "invisible" in death:
+            return "died to an invisible monster"
+        return "died in melee/other"
+    if stall.startswith(("Weak", "Fainting", "Fainted")):
+        return "stall: Weak, no food"
+    if stall.startswith("no way on"):
+        return "stall: no way on" + (" (blocker)" if "in the way" in stall else "")
+    if stall.startswith("brain loop"):
+        return "stall: brain loop"
+    if stall.startswith(("turn limit", "time limit")):
+        return "stall: limit"
+    return "stall: other"
+
+
 class Game:
     """One unattended game: engine + brain on the socket, NetHack in a pty."""
 
     def __init__(self, name: str, role: str, brain, max_turns: int, max_seconds: float,
-                 save_on_stall: bool = True) -> None:
+                 save_on_stall: bool = True, out_dir: str = os.path.join(PLAYGROUND, "batch")) -> None:
+        self.out_dir = out_dir
+        self.deepest = 0
+        self.escalations: list = []  # (turn, events, order) for every brain call
         self.save_on_stall = save_on_stall
         self.saving = False
         self.name, self.role, self.brain = name, role, brain
@@ -114,6 +143,7 @@ class Game:
             return
         self.last = s
         turn = s.get("status", {}).get("turn", 0)
+        self.deepest = max(self.deepest, s.get("status", {}).get("dlvl") or 0)
         for msg in s.get("messages", []):
             self.feed.append((turn, "game", msg))
         if self.engine.note and self.engine.note != self._last_note and self.engine.note != "dismiss --More--":
@@ -132,6 +162,7 @@ class Game:
             order = self.brain.decide(self.engine.last_checks, events, s, self.engine.orders)
             if order.orders:
                 self.engine.set_orders(order.orders)
+            self.escalations.append((turn, "; ".join(events), order.routine))
             self.feed.append((s.get("status", {}).get("turn", 0), "brain",
                               f"{'; '.join(events)} -> {order.routine or 'wait'} {order.args or ''}"))
             if order.routine is None:
@@ -179,7 +210,8 @@ class Game:
         if self.saving:
             keep_scenario(self.name, self.stall or "", self.last)
         if self.stall and self.last:  # Keep the final snapshot to see what went wrong.
-            with open(os.path.join(PLAYGROUND, "batch", f"{self.name}.json"), "w") as f:
+            os.makedirs(self.out_dir, exist_ok=True)
+            with open(os.path.join(self.out_dir, f"{self.name}.json"), "w") as f:
                 json.dump({"stall": self.stall, "state": self.last}, f)
         st = self.last.get("status", {})
         return {
@@ -187,7 +219,9 @@ class Game:
             "brain_calls": self.brain_calls, "stall": self.stall or "",
             "dlvl": st.get("dlvl"), "xlvl": st.get("xlvl"), "turn": st.get("turn"),
             "hp": f"{st.get('hp')}/{st.get('hpmax')}", "gold": st.get("gold"),
-            "stats": dict(self.engine.memory.stats),
+            "stats": dict(self.engine.memory.stats), "deepest": self.deepest,
+            "race": st.get("race"), "prayers": self.engine.memory.prayer_log,
+            "escalations": self.escalations,
         }
 
     @staticmethod
@@ -228,9 +262,11 @@ def main() -> None:
         if rec and not r["stall"]:
             r.update(death=rec.get("death", ""), maxlvl=rec.get("maxlvl", ""),
                      turn=rec.get("turns", r["turn"]), xlvl=rec.get("xplevel", r["xlvl"]),
-                     points=rec.get("points", ""))
+                     points=rec.get("points", ""), died_while=rec.get("while", ""),
+                     deathdnum=rec.get("deathdnum", ""))
         else:
-            r.update(death="", maxlvl=r.get("dlvl", ""), points="")
+            r.update(death="", maxlvl=r["deepest"] or r.get("dlvl", ""), points="")
+        r["bucket"] = bucket(r)
         g.result = r
 
     def worker(queue: list[Game]) -> None:
@@ -272,7 +308,9 @@ def main() -> None:
     stop.set()
 
     path = os.path.join(batch_dir, f"{run}.csv")
-    cols = ["name", "death", "stall", "maxlvl", "dlvl", "xlvl", "turn", "points", "gold",
+    with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Everything, per game.
+        json.dump({"run": run, "brain": args.brain, "games": sorted(results, key=lambda r: r["name"])}, f)
+    cols = ["name", "bucket", "death", "stall", "maxlvl", "dlvl", "xlvl", "race", "turn", "points", "gold",
             "brain_calls", "seconds"]
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
@@ -304,6 +342,8 @@ def main() -> None:
     ends = collections.Counter((r["death"] or ("stalled: " + r["stall"]))[:70] for r in results)
     for why, count in ends.most_common():
         print(f"  {count} x {why}")
+    print("  by bucket: " + ", ".join(f"{k} {v}" for k, v in
+                                     collections.Counter(r["bucket"] for r in results).most_common()))
     print(f"details: {path}")
 
 

@@ -94,6 +94,7 @@ class Memory:
     eating_corpse: bool = False                   # an 'e' for a floor corpse is in progress
     declined_corpse: bool = False                 # we said no to a floor corpse just now
     stats: dict = field(default_factory=dict)     # counters for measuring the pilot
+    prayer_log: list = field(default_factory=list)  # (turn prayed, "ok" | "failed")
     retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
     probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
 
@@ -920,13 +921,15 @@ class Engine:
             if undecided and m.last_pray_turn is not None and turn - m.last_pray_turn <= 10:
                 if PRAYER_OK.match(msg) or msg.startswith("You are surrounded by a shimmering light"):
                     _count(m, "prayers ok")
+                    m.prayer_log.append((m.last_pray_turn, "ok"))
                 elif msg.startswith(PRAYER_FAILED):
                     m.prayer_broken = True
                     _count(m, "prayers failed")
+                    m.prayer_log.append((m.last_pray_turn, "failed"))
             for text, turns in LUCK_PENALTIES.items():
                 if text in msg:  # Luck recovers one point per 600 turns.
                     m.luck_bad_until = max(m.luck_bad_until, turn + turns)
-                    _count(m, "luck penalties")
+                    _count(m, f"luck penalty: {msg[:60]}")
             if "You feel feverish" in msg:
                 m.feverish = True
             elif "You feel purified" in msg:

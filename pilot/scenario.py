@@ -57,7 +57,8 @@ def main() -> None:
     meta = load(args.name)
     restore(args.name)
     brain = HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log")) if args.brain == "haiku" else RuleBrain()
-    g = Game(args.name, "Valkyrie", brain, int(meta["turn"] or 0) + args.max_turns, 600, save_on_stall=False)
+    g = Game(args.name, "Valkyrie", brain, int(meta["turn"] or 0) + args.max_turns, 600, save_on_stall=False,
+             out_dir=os.path.join(PLAYGROUND, "replays"))
     r = g.play()
     rec = xlog_entries().get(args.name) if not r["stall"] else None
     print(f"was: {meta['why']}")
