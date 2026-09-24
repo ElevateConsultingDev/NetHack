@@ -121,6 +121,7 @@ class Memory:
     retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
     probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
     tried_wear: set = field(default_factory=set)  # inventory texts we've tried to put on
+    shop_items: set = field(default_factory=set)  # (dlvl, x, y) objects seen near a shopkeeper: never loot
     tin_smell: str = ""                           # "newts", "spinach": what the tin being opened holds
     last_down: tuple | None = None                # (dlvl, x, y) of the stairs we last went down
     mines_stairs: set = field(default_factory=set)  # (dlvl, x, y) stairs down into the Gnomish Mines
@@ -764,6 +765,8 @@ def r_loot(v: View, memory: Memory, args: dict):
 
     def wanted(x, y):
         c = v.cells.get((x, y))
+        if (v.dlvl, x, y) in memory.shop_items:
+            return False
         if c is not None and c["kind"] == "object" and c.get("class") == ")" \
                 and any(t in c["name"] for t in THROWABLE if t not in ("spear", "javelin")) \
                 and (v.dlvl, x, y) not in memory.looted:
@@ -968,6 +971,13 @@ class Engine:
                     self.memory.corridors.add((v.dlvl, x, y))
         if v.pos:
             self.memory.visited.add((v.dlvl, *v.pos))
+        # Shop stock: objects near a shopkeeper. Looting toward them while
+        # the shopkeeper drifts in and out of view ping-ponged with explore
+        # for thousands of turns (7 of 64 games).
+        for (sx, sy), sc in v.cells.items():
+            if sc["kind"] == "monster" and sc["name"] == "shopkeeper":
+                self.memory.shop_items |= {(v.dlvl, x, y) for (x, y), c in v.cells.items()
+                                           if c["kind"] == "object" and max(abs(x - sx), abs(y - sy)) <= 7}
 
         self._record_kills(v)
         self._read_messages(v)

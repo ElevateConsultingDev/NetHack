@@ -84,7 +84,7 @@ Each of these cost at least one batch to learn. Build them in from the start.
 **Safety and the game's rules**
 - `F`+direction attacks skip NetHack's "Really attack?" prompt, so the snapshot must carry the peaceful flag and the engine must check it. Remember peacefulness by the game's flag, not by square.
 - Never fight shopkeepers, watchmen, priests or guards whatever the difficulty says. Most wand deaths were shopkeepers the pilot angered itself: a thrown dagger that missed its target flew on into the shopkeeper, and a popped gas spore caught one in the blast. Never throw along a line with any peaceful (pets included) on it out to about 10 squares; never pop or throw at a gas spore with a peaceful within 1 of it.
-- Shops: never loot with a shopkeeper in view; never kick a "Closed for inventory" door.
+- Shops: never treat shop stock as loot (objects near a shopkeeper), not just "never loot with a shopkeeper in view": the shopkeeper drifts in and out of view in the doorway and loot and explore ping-pong for thousands of turns. Fixing this was the largest single gain (+0.98 levels on held-out seeds). Never kick a "Closed for inventory" door.
 - The prayer gate: first prayer from turn 300; then at least 1000 turns apart (the timeout after a prayer is rnz(350), which exceeds 1000 about 8% of the time). Parse the result from the messages: "You feel that <god> is well-pleased/pleased/satisfied" (or "You are surrounded by a shimmering light") is success; "displeased", "The voice of ...", "Thou ..." is failure, and in 3.6 a failed prayer raises god anger, so close the gate for good. "You murderer!", "You cannibal!", "That's bad luck!" and "You feel guilty" mean Luck fell; close the gate until it decays (one point per 600 turns). Major trouble (what prayer fixes) is exactly: HP at most 5 or at most max/7, Weak or worse hunger (only when there is no food), Stone, Slime, Strngl, Sick, lycanthropy. A prayer only restores nutrition if hunger was the trouble it fixed.
 - Weak returns about 850 turns after a prayer, before the 1000-turn gate reopens; starvation takes about 300 more turns past Weak. Keep playing while the gate is within 300 turns of opening instead of stopping.
 - Living on prayer alone eventually fails (one game lived 10,000 turns on 8 prayers; the 9th was refused).
@@ -112,6 +112,8 @@ Each of these cost at least one batch to learn. Build them in from the start.
 - Prompts stack; cap every wait; don't let an unanswered prompt stall a game.
 - Measure with batches, never single games; 8 games is noise, 16 is the minimum, and paired seeds beat bigger unpaired batches.
 - The end-of-game prompts ("Do you want an account of creatures vanquished?") must be mechanics, or they wake the brain and crowd the feed that explains the death.
+
+**How to find bugs like these.** Don't pick fixes from failure-bucket names. Look for effort without progress: games whose turns keep passing while the known map, depth and XL stop changing, then read their final map and the engine's last notes. That found the engulf stalls (43 of 245) and the shop ping-pong.
 
 ## 5. What is not done yet (good places to beat the reference)
 
