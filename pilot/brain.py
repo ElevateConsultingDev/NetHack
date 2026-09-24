@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.request
 import queue
 import subprocess
 import tempfile
@@ -259,3 +260,43 @@ class ReplayBrain(HaikuBrain):
             return Order(None, say="(replay: no more recorded answers)")
         a = self.answers.pop(0)
         return Order(a["routine"], a["args"] or {}, a["say"], a["orders"] or {})
+
+
+class QwenBrain(HaikuBrain):
+    """The same brain on a local Ollama model (Qwen). One chat per game,
+    history kept so context accumulates like Haiku's session; thinking
+    off (it answered in about a second with it off, empty with it on)."""
+    name = "qwen"
+    URL = "http://127.0.0.1:11434/api/chat"
+
+    def __init__(self, model: str = "qwen3.5:9b", log_path: str | None = None, journal: bool = True) -> None:
+        super().__init__(model, log_path, journal=journal)
+        self._messages: list[dict] = []
+
+    def _start(self) -> None:
+        routines = "\n".join(f"- {n}: {d}" for n, (_, d) in ROUTINES.items())
+        self._messages = [{"role": "system",
+                           "content": SYSTEM.format(routines=routines) + (_journal() if self.journal else "")}]
+        self.started = True
+
+    def _ask(self, text: str) -> str | None:
+        if not self._messages:
+            self._start()
+        self._messages.append({"role": "user", "content": text})
+        body = {"model": self.model, "messages": self._messages[-41:] if len(self._messages) > 41 else self._messages,
+                "stream": False, "think": False, "options": {"num_predict": 200, "temperature": 0.3}}
+        if len(self._messages) > 41:  # Keep the system prompt when trimming old turns.
+            body["messages"] = [self._messages[0]] + self._messages[-40:]
+        req = urllib.request.Request(self.URL, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=self.TIMEOUT_S) as r:
+                out = json.load(r)["message"].get("content", "")
+        except Exception as e:  # timeout, server down, bad JSON: the rules answer instead
+            self.last_error = f"{type(e).__name__}: {e}"[:80]
+            self._messages.pop()
+            return None
+        self._messages.append({"role": "assistant", "content": out})
+        return out
+
+    def close(self) -> None:
+        self._messages = []

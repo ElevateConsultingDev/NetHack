@@ -27,7 +27,7 @@ import termios
 import threading
 import time
 
-from .brain import HaikuBrain, ReplayBrain, RuleBrain
+from .brain import HaikuBrain, QwenBrain, ReplayBrain, RuleBrain
 from .channel import Channel
 from . import dashboard
 from .engine import Engine
@@ -357,7 +357,8 @@ def _play_one(spec: dict) -> dict:
     """One game in its own process: engine, brain, and its live page."""
     batch_dir = os.path.join(PLAYGROUND, "batch")
     brain = (HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), journal=spec["journal"])
-             if spec["brain"] == "haiku" else RuleBrain())
+             if spec["brain"] == "haiku" else QwenBrain(journal=spec["journal"]) if spec["brain"] == "qwen"
+             else RuleBrain())
     g = Game(spec["name"], spec["role"], brain, spec["max_turns"], spec["max_seconds"], spec["save"],
              seed=spec["seed"])
     page, live = os.path.join(batch_dir, f"game-{g.name}.html"), os.path.join(batch_dir, f"live-{g.name}.json")
@@ -418,7 +419,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Run unattended NetHack games with the pilot")
     p.add_argument("--games", type=int, default=8)
     p.add_argument("--parallel", type=int, default=4)
-    p.add_argument("--brain", choices=("rules", "haiku"), default="rules")
+    p.add_argument("--brain", choices=("rules", "haiku", "qwen"), default="rules")
     p.add_argument("--role", default="Valkyrie")
     p.add_argument("--max-turns", type=int, default=20000)
     p.add_argument("--max-seconds", type=float, default=600)
