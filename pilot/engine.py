@@ -348,7 +348,7 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
         prompt = v.ctx.get("prompt", "")
         if "trouble lifting" in prompt or "Continue?" in prompt and memory.loot_classes:
             return "n", "too heavy: leave it"
-        if prompt.startswith(("Do you want your possessions identified", "Do you want to see")):
+        if prompt.startswith(("Do you want your possessions identified", "Do you want to see", "Do you want an account")):
             return "n", "game over: skip the end-of-game lists"
         if prompt.startswith("Really attack"):
             if memory.pending_fight:

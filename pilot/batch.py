@@ -148,7 +148,7 @@ class Game:
         self.stall: str | None = None
         self.proc: subprocess.Popen | None = None
         self.result: dict | None = None  # Set when the game is over.
-        self.feed: collections.deque = collections.deque(maxlen=40)  # recent (turn, kind, text) for the live page
+        self.feed: collections.deque = collections.deque(maxlen=100)  # recent (turn, kind, text) for the live page
         self._last_note = ""
 
     def on_state(self, s: dict) -> None:
