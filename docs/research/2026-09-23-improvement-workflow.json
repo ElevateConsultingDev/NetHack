@@ -1,0 +1,943 @@
+{
+ "plan": {
+  "summary": "This is one ranked plan built from all three inputs, with duplicates combined. 81% of games end in a stall and 19% in death. Three stalls cover most of the losses: hunger (42% of games), no way on (23%) and shop traps (27 of 135 snapshots). A sound prayer gate and a wider food list come first, because hunger alone ends 42% of games. They need a gap of 1000 or more turns and must parse the prayer result. Next come fixes that stop the pilot from angering shopkeepers and from stepping into invisible or blind-shop traps. Those account for most wand and bolt deaths, 14 of 42. A small engine ordering bug also stops Elbereth from ever running. After that come floating-eye and passive-blocker handling, remembered dark floor for the Mines, and a search overhaul modeled on AutoAscend, BotHack and Saiph for no way on. Then come the brain fallbacks, a Mines branch policy, and better combat positioning. Harness diagnostics come earlier than their direct effect would place them, because they are needed to measure every other item. Longer-term items that help growth come last: Excalibur, altar BUC testing and XL-gated descent. Items 1 to 8 are mostly small changes in engine.py and brain.py. Together they target the causes behind about 60% of current game endings. Nothing here has been implemented or run yet. The ranking is a judgment from the failure data, and the expected effects are estimates.",
+  "items": [
+   {
+    "rank": 1,
+    "title": "Prayer gate you can trust: 1000-turn gap, parse the result, and track Luck",
+    "layer": "engine",
+    "why": "The Weak stall is the most common ending: 80 of 217 games, all 'Weak and no known-safe food'. Prayer restores nutrition to 900, but prayer_safe (engine.py:277-278) uses an 800-turn gap. Timeout after a successful prayer is rnz(350), which is over 1000 about 8% of the time, and major trouble needs a timeout of 200 or less (pray.c:1821). B20313002 got 'You feel that Tyr is displeased' and then stalled. 3 deaths happened while praying. B20323701 prayed after 'You murderer!'. Sources: nethackwiki Prayer_timeout; BotHack game.clj (1300); Saiph Health.cpp.",
+    "change": "prayer_safe = not prayer_broken and not luck_bad and ((never prayed and turn>=300) or turn-last_prayer>=1000). Parse the prayer result from the accumulated messages (see item 3). 'You feel a hopeful feeling', 'You feel much better' or the trouble being fixed counts as success and sets last_prayer=turn. 'displeased' still sets last_prayer=turn (the prayer clock reset) and blocks prayer for another 1000 turns. 'is angry', 'smit', 'You feel guilty' or 'black glow' sets prayer_broken. 'You murderer!', 'You hear the shrieks', killing a peaceful or breaking a mirror sets luck_bad for about 3000 turns. Define major trouble as exactly: HP<6 or HP<=maxHP/7, hunger Weak or Fainting, or conditions Stone, Slime, Strngl or FoodPois/Ill (Sick), or 'You feel feverish'. Add a top-priority standing order: if major trouble and prayer_safe, then #pray. That makes Weak with no food pray first and stall only when the gate is closed. Record 'prayed_at' and the result in stats.",
+    "expected_effect": "Removes most of the 80 Weak stalls, since the first prayer opens at turn 300 and Weak snapshots average about 4500 turns. It also saves low-HP games and stops the 'killed while praying' deaths.",
+    "effort": "small"
+   },
+   {
+    "rank": 2,
+    "title": "Complete SAFE_FOOD, handle tins, and drop eggs",
+    "layer": "engine",
+    "why": "24 of 64 Weak-stall snapshots carried edible food missing from SAFE_FOOD (engine.py:34-36): tripe in B19492901, eucalyptus in B19551803, wolfsbane in B19470904, and a tin, tripe and garlic in B19535706. 'egg' is listed even though an unknown egg can be a cockatrice egg. The tin prompt 'Eat it?' does not match mechanics' lowercase 'eat it?' check (line 340). Sources: nethackwiki Tin and Nutrition; AutoAscend agent.py.",
+    "change": "Add tripe ration, tin, eucalyptus leaf, clove of garlic, kelp frond, meatball, meat stick, huge chunk of meat, lump of royal jelly, fortune cookie, pancake, cram and lembas. Keep sprig of wolfsbane and lizard corpse as reserve food: eat them only when Weak and prayer is closed. Remove 'egg'. Make the prompt match case-insensitive. For 'It smells like X. Eat it?' answer y if X passes the corpse blacklist (item 11) and n otherwise. Open tins only when no hostile is visible and not Hallu. Eating order: fresh corpse, then the lowest-value permanent food, starting at Hungry, never while Satiated. Stop eating on 'You're having a hard time getting all of it down'.",
+    "expected_effect": "Removes about a third of the remaining Weak stalls outright, and stretches the food supply between prayers.",
+    "effort": "small"
+   },
+   {
+    "rank": 3,
+    "title": "Accumulate messages across --More-- snapshots",
+    "layer": "engine",
+    "why": "aipipe clears its message buffer on every snapshot (aipipe.c emit_state, nmsgs=0), and mechanics() returns early on 'more' snapshots. Routines therefore miss messages. In B20313001 'Closed for inventory' was on screen and the door was kicked anyway. The elbereth-stuck snapshots end in 'Never mind.' with no handler seeing why. The prayer-result parsing (item 1) and the shop-door guard (item 5) depend on this fix.",
+    "change": "In Engine.step, append every snapshot's messages to memory.recent_msgs, including 'more' snapshots. Clear the list only after the first command snapshot's routines have consumed it. Point every message check at recent_msgs: doors, shop sign, engraving, corpse, prayer, 'It hits', 'Welcome to', 'for sale'. Run the door and shop checks before r_loot in _default_activity.",
+    "expected_effect": "This is the prerequisite that makes items 1, 5, 6 and 8 reliable. On its own it fixes the missed shop signs and the engravings whose failure went unnoticed.",
+    "effort": "small"
+   },
+   {
+    "rank": 4,
+    "title": "Standing orders must not pre-empt a danger routine (the Elbereth bug)",
+    "layer": "engine",
+    "why": "_standing() runs before self.routine. When the brain answers 'badly hurt' with elbereth, the fight standing order (engine.py:951-961) still sends F. Replaying B19470908, B19504802 and B19551810 shows the next key is 'Fk'. The B20313003 and B20313007 feeds show 'badly hurt -> elbereth' followed by 'standing order: fight the kitten' or 'little dog', then death. There were 7 'badly hurt (last order: elbereth)' loops. In 3.6, attacking also erases the engraving (nethackwiki Elbereth).",
+    "change": "In _standing, after the critical-HP, prayer and retreat block, return None when self.routine is in {'elbereth','step_away','rest','pray'}, so the routine runs next. While standing on Elbereth, allow only search or rest and never F, throw or zap. After engraving, read the engraving back (':' look) and re-engrave, at most 3 times, if the text is not exactly 'Elbereth'. Handle 'Never mind.' by retrying with explicit answers to the E prompts.",
+    "expected_effect": "Elbereth actually runs. This saves most low-HP melee deaths, including the 4 deaths to domestic animals, and ends the 7 elbereth loops and 5 elbereth-stuck stalls.",
+    "effort": "small"
+   },
+   {
+    "rank": 5,
+    "title": "Stop angering shopkeepers and the Watch: door kicking rules",
+    "layer": "engine",
+    "why": "In the B20313001 feed the pilot read 'Closed for inventory', found the door locked, kicked it, got 'How dare you break my door?', and was killed by a lightning bolt from the shopkeeper's wand. 14 wand or bolt deaths, and 13 of those had 0 gold, which is the case where paying for the door is impossible (shk.c pay_for_damage). That cause is proven for 2 of them and inferred for the rest. r_explore (lines 419-434) kicks any locked door. The shop guard also marks the wrong squares. Sources: nethackwiki Shopkeeper and Watchman; AutoAscend global_logic.py.",
+    "change": "Keep a per-level set of 'Closed for inventory' engraving squares. Mark every door orthogonally next to one as dead, rather than the hero's neighbours. Never kick a door when: the dungeon is the Gnomish Mines, a shopkeeper, watchman or priest has been seen on this level, a door is next to a known shop wall, or gold is under 500. Otherwise open up to 6 times, then kick. Drop a door as a target after 4 failed opens when kicking is not allowed. In mechanics, answer y to 'pay for the door?'. Also add the Minetown fountain rule: never #dip or quaff from a fountain in Minetown.",
+    "expected_effect": "Removes the main wand and bolt death path, most of the 14 deaths (19% of deaths are wand or bolt).",
+    "effort": "small"
+   },
+   {
+    "rank": 6,
+    "title": "No shoplifting: skip loot in shops, and pay for or drop unpaid items",
+    "layer": "engine",
+    "why": "27 of 135 stall snapshots carry '(unpaid, N zorkmids)' goods. B19455905 has 17, B19504800 has 20 tools including pick-axes, B19470910 has 8 spellbooks. The shopkeeper blocks the door and the pilot wanders inside until it goes Weak. r_loot (lines 657-658) stops only when a shopkeeper is visible at that moment. In B20313004 the pilot looted while blind. Sources: nethackwiki Shopkeeper; BotHack pathing.clj; NetPlay, arXiv 2403.00690.",
+    "change": "Set in_shop when recent_msgs contain 'Welcome to', 'for sale' or 'Closed for inventory', or when the hero is inside a room whose door has a shopkeeper next to it. Clear it after leaving the room. While in_shop, or while Blind or Hallu, skip r_loot and corpse eating. Add a standing order ahead of explore: if any inventory line contains 'unpaid', send 'p' and answer y when gold covers the total, otherwise drop each unpaid letter (D, or d per item) before moving. Never carry a pick-axe into a shop. Remove '+' from the default loot classes and narrow '(' to useful tools only: pick-axe, unicorn horn, blindfold, towel, bags.",
+    "expected_effect": "Removes the shop-trap stalls, about 20% of stall snapshots, which mostly show up as Weak stalls. It also removes a common path to an angry shopkeeper.",
+    "effort": "small"
+   },
+   {
+    "rank": 7,
+    "title": "Act on status conditions and invisible attackers",
+    "layer": "engine",
+    "why": "checks() copies status.conditions (line 289), but nothing reads them. In B20313004 the pilot went blind, kept looting and exploring in a shop, F-attacked an 'I' ('It gets angry!') and was killed by a wand of striking. 4 deaths are 'killed by an invisible X'. checks() counts only kind=='monster', so the rest order sends '20s' while 'It hits!' messages scroll past. Hallu also removes the peaceful flag (aipipe.c:335). Sources: AutoAscend global_logic.py; Saiph Health.cpp and Explore.cpp; nethackwiki Invisible.",
+    "change": "(a) If Stone, Slime, Strngl or Sick: eat a carried lizard or acidic corpse when stoning, else pray if the gate is open, else escalate. This is covered by item 1's major-trouble list. (b) If Blind, Conf, Stun or Hallu with no adjacent hostile: send '5s' in place, with no explore, loot, travel or stairs. Apply a non-cursed unicorn horn if carried. (c) Count adjacent 'invisible' cells as hostiles in the fight and retreat checks, and attack them with F+dir, except when in_shop or when a peaceful was last seen on that square. (d) If a recent message matches 'It hits|It bites|You are hit' or HP dropped with nothing visible, block rest and search orders and send one 's' to mark the attacker. Clear the 'I' after the kill.",
+    "expected_effect": "Removes the invisible-monster deaths (4) and the blind-in-shop wand death, and stops confused or stunned moves into danger.",
+    "effort": "medium"
+   },
+   {
+    "rank": 8,
+    "title": "RuleBrain: never fight shopkeepers, watchmen, priests or guards",
+    "layer": "brain",
+    "why": "7 brain loops read 'shopkeeper adjacent, difficulty 15 > N (last order: fight shopkeeper)'. Replaying B20234314, B20015104 and B20061114 attacks the shopkeeper at 7/37, 14/43 and 15/56 HP. brain.py:47-49 turns any over-difficulty adjacent monster into a fight order. Elbereth does not work on @-humans, shopkeepers or guards (nethackwiki Elbereth). BotHack pathing.clj has the same hard rule.",
+    "change": "In decide(): never target a monster named shopkeeper, watchman, watch captain, priest or guard. For an angry shopkeeper: send 'p' if gold is above 0 and there are unpaid items or a door debt, otherwise head for the nearest known stairs, or pray if HP is critical and the gate is open. For over-difficulty monsters that are not @: step_away toward a corridor, then elbereth (with the respect check from item 13). Also in the engine: always answer n to 'Really attack?' and mark that monster peaceful. Give a peaceful's square a path cost of about 50 instead of bumping into it.",
+    "expected_effect": "Ends the 7 shopkeeper loops and a class of deaths from angry shopkeepers or the Watch. It also protects Luck, which keeps prayer working.",
+    "effort": "small"
+   },
+   {
+    "rank": 9,
+    "title": "Passive blockers (floating eye, gas spore, acid blob, molds): throw, retrieve, line up, and use role-aware avoid",
+    "layer": "engine",
+    "why": "Floating eye appears in 10 no-way-on reasons, gas spore in 6, acid blob in 5 and yellow mold in 2. 8 snapshots have the stairs down reachable only through a floating eye, and most have no dagger left. memory.retrieve (line 631) is filled but never read. Loot is skipped while any hostile is visible (line 998). ranged_kill never moves into line. DONT_MELEE lists brown mold, which is harmless to a cold-resistant Valkyrie. Sources: nethackwiki Floating_eye; AutoAscend monster_utils.py and fight_heur.py (brown mold and blue jelly melee at full HP); BotHack mainbot.clj.",
+    "change": "(a) Let loot run when every visible hostile is on the avoid list and at distance 2 or more, and always pick up squares in memory.retrieve. (b) Add a line-up step: bfs to a square 2-8 tiles away on a straight line with a clear path, no pet or peaceful on the line and no wall, then throw. (c) Throw order: dagger, then spare weapons (orcish dagger, darts, spears), then rocks, gems or junk. Pick up and keep a stack of about 10 rocks when one is seen. (d) Give the blocker's square a high path cost rather than making it impassable, and wait or search in bursts because floating eyes move at speed 1. (e) Build the avoid list from role and intrinsics: melee brown mold and blue jelly at full HP as a Valkyrie, melee yellow mold at HP 20 or more, never melee a floating eye unless Blind, and for a gas spore stay 3 or more tiles away and throw. (f) Once a floating eye is killed, eat its corpse (telepathy), subject to the freshness rule.",
+    "expected_effect": "Clears about 18 named-blocker stalls, and the floating eye's slowness no longer ends games.",
+    "effort": "medium"
+   },
+   {
+    "rank": 10,
+    "title": "Remember walked floor so dark areas are walkable; probe dark areas in 8 directions",
+    "layer": "engine",
+    "why": "B19571504, B20061113 and B20313006 show the stairs down on screen but no floor path to them, because dark floor already walked is drawn blank and View.walkable (lines 118-130) trusts only what is on screen. 12 of the 46 no-way-on snapshots are in the Mines. r_probe_dark runs only when stairs are unknown and probes only orthogonally (lines 686-691, 1008-1013).",
+    "change": "Keep a per-level remembered_floor set: memory.visited, plus every square ever drawn as FLOOR_CHARS, a door, a corridor or stairs. walkable() returns True for those unless a boulder or monster is there now. Trigger r_probe_dark when no path exists to any known stairs down, not only when stairs are unknown, and probe all 8 neighbours.",
+    "expected_effect": "Fixes the Mines no-way-on stalls where the stairs are visible, and makes backtracking in dark rooms reliable everywhere.",
+    "effort": "small"
+   },
+   {
+    "rank": 11,
+    "title": "Corpse diet: kill tracking, a race-aware blacklist, lichen and lizard, eat whenever not Satiated",
+    "layer": "engine",
+    "why": "80 games reach Weak with nothing to eat. SAFE_CORPSES (lines 43-49) leaves out hobbit, dwarf, gnome, the elves (for a human), giant ant, garter snake and grid bug. _record_kills (lines 874-885) credits a kill only when pending_fight is set, so throw kills are lost. Sources: nethackwiki Corpse; BotHack tracker.clj (30 turns); AutoAscend agent.py (50 turns); the arXiv 2203.11889 winner's food triad.",
+    "change": "Replace the whitelist with a blacklist over all monster types. Never eat: cockatrice, chickatrice, Medusa, any were*, human or elf (own race for a human Valkyrie) and dwarf only if a dwarf, dog, cat, green slime, bat, giant bat, yellow mold, violet fungus, black light, poisonous corpses unless poison resistant, nurse, chameleon, doppelganger, sandestin, zombie, mummy, mimic, disenchanter, abbot. On 'You kill/destroy the X' or 'You kill it' after a throw, record (square, type, turn), including throw kills at the targeted square. Eat only a corpse matching a recorded kill 40 turns old or less, and no other death recorded on that square. Lichen and lizard corpses are fine from anywhere: pick them up and keep a lizard for stoning. Eat a safe fresh corpse whenever status is not Satiated and the square is not in a shop. Fix the 'eat the fresh kill' bug: send 'e' only when a corpse was seen on the square, and if the 'What do you want to eat' pack prompt appears with eating_corpse set, send ESC, clear the flag and pop the kill (fixes B20323702).",
+    "expected_effect": "Keeps nutrition up with little inventory food, cuts the Hungry and Weak stalls further, and removes a prompt-loop stall.",
+    "effort": "medium"
+   },
+   {
+    "rank": 12,
+    "title": "Harness diagnostics: per-game stats, deepest dlvl, failure buckets, separate replays",
+    "layer": "harness",
+    "why": "Engine stats (turns per activity, corpses eaten and declined, throws, prayers, waits) go only to stdout, and the CSV drops them (batch.py:490-491). finish() records the current dlvl as maxlvl for stalls. Scenario replays overwrite batch/<name>.json: B20234307.json says 'Weak' at T1463, while the CSV says 'brain loop: small mimic' at T1165. arXiv 2203.11889 recommends 'fainted' and 'killed while praying' as separate buckets.",
+    "change": "Write a stats JSON column, or a per-game stats file: turns per routine, prayers with results, corpses eaten and declined, throws, retrieves, searches, kicks, in_shop turns, and the reason for each escalation. Track the deepest dlvl in the Game object. Have scenario.run write to playground/replays/. Have batch print a summary by ending bucket: Weak stall, no way on (with blocker), brain loop, wand death, while praying, fainted, Mines death.",
+    "expected_effect": "Lets every other item be checked against its bucket on the next 16-game run. No direct effect on scores, but it is needed to know whether items 1 to 11 worked.",
+    "effort": "small"
+   },
+   {
+    "rank": 13,
+    "title": "Elbereth respect list and the emergency ladder",
+    "layer": "engine",
+    "why": "Werejackals in @ form, shopkeepers, guards and peacefuls ignore Elbereth. 3 lycanthrope deaths. BotHack and AutoAscend use a fixed emergency ladder. Sources: nethackwiki Elbereth; BotHack mainbot.clj; AutoAscend agent.py (quaff at HP below 1/3 or below 8); Saiph Health.cpp.",
+    "change": "Emergency order when HP is under retreat_below: (1) quaff a known healing, extra healing or full healing potion if HP is below 1/3 or below 8; (2) pray if the gate is open and HP counts as major trouble; (3) engrave Elbereth only if every adjacent hostile respects it (not @, A, minotaur, shopkeeper, guard, priest, peaceful, blinded monster), and the threat is not a wand user; (4) if on or within a few steps of stairs, take them, since only adjacent monsters follow; (5) step to a non-exposed square (2 or fewer walkable neighbours) with no threat next to it. Kill order among adjacent hostiles: were*, @, then 'I', then the hardest hitters. On 'You feel feverish', set lycanthropy as major trouble: eat wolfsbane if carried, else pray when the gate is open.",
+    "expected_effect": "Fewer melee and werecreature deaths, the other 18+3 deaths, and less HP spent on monsters that ignore Elbereth.",
+    "effort": "medium"
+   },
+   {
+    "rank": 14,
+    "title": "Search overhaul: per-tile counts, scored targets, blank-column test, escalating budgets",
+    "layer": "engine",
+    "why": "About 10 no-way-on snapshots in the main dungeon have no stairs down known (B19470913, B19492911, B19535704, B19584102). r_search_dead_ends does 10 searches per dead end once, which misses a hidden spot about 21% of the time at Luck 0, and r_search_walls stops after 2 rounds. Sources: AutoAscend exploration_logic.py; BotHack pathing.clj; Saiph Explore.cpp.",
+    "change": "Keep search_count per square. Once nothing is left to explore, score each reachable walkable square that touches stone or wall: -1 - 2*count^2, +250 for a dead end, +250 for a door with more than 3 stone neighbours, +bonus if the square faces a blank screen column (x in {17,20,40,60,63} with no known feature in rows 2-18; not in the Mines), minus 4*path distance. Walk to the best square, send '10s', then rescore. Run 3 rounds with budget multipliers 1, 2 and 3: dead ends up to min(30*mul,50), blank-facing squares up to 20*mul, then from round 2 corridors and doors up to 5*mul, then walls up to 15*mul, skipping shop walls and the screen edge.",
+    "expected_effect": "Finds hidden stairs and corridors on most main-dungeon no-way-on levels.",
+    "effort": "medium"
+   },
+   {
+    "rank": 15,
+    "title": "Stuck ladder: expiring blocks, trap doors, walkable minor traps, and a progress watchdog",
+    "layer": "engine",
+    "why": "memory.blocked is permanent (lines 211-214, 1053). In B20313006 one peaceful gnome split the level. View.walkable treats every trap as a wall (line 129), which seals corridors in B19492907, B19584112 and B20313006. B20313002 looped on Dlvl2 until T10509 with two stairs down known, and 3 games hit the 20000-turn limit on Dlvl2. Sources: AutoAscend (relax constraints as search counts grow); BotHack (unstuck); NetPlay loop analysis, arXiv 2403.00690.",
+    "change": "(a) Store blocked squares as (square, turn), expire them after 50 turns, and never block a square next to the target stairs. (b) Make squeaky board, arrow, dart, rust and rolling boulder traps walkable at a path cost of about 20. Treat a known trap door or hole as a go_down target when no stairs are reachable. (c) Detect loops by (position, action, top message) over the last 50 keys, and blacklist a failing target for 100 turns. (d) Add a watchdog: after 1500 turns with no new dlvl and no new explored square, force go_down if stairs are known (fight or throw past blockers); if no stairs are known, climb up and come back down once; then escalate with the loop as the reason.",
+    "expected_effect": "Removes the turn-limit stalls and the ping-pong loops, and turns part of the remaining no-way-on stalls into descents.",
+    "effort": "medium"
+   },
+   {
+    "rank": 16,
+    "title": "RuleBrain fallbacks for Weak and no way on",
+    "layer": "brain",
+    "why": "decide() returns Order(None) for everything except prompts, badly hurt, dangerous-adjacent and difficulty (brain.py:39-50), so 65% of games end on escalations the rule brain never tries. After items 1, 2, 14 and 15 these reach the brain less often, but they still need answers.",
+    "change": "Weak: eat any food with the fallback tier allowed. If there is none and the gate is closed, take known stairs down (a new level means fresh kills), otherwise hunt nearby weak monsters for corpses. No way on: order another search round with doubled budgets, then order a fight or throw past the avoid-list blocker, then go back up and return, then take any trap door. Return None only after every step has been tried and logged.",
+    "expected_effect": "Converts most remaining terminal escalations into more play time.",
+    "effort": "small"
+   },
+   {
+    "rank": 17,
+    "title": "Gnomish Mines policy: record the branch and stay out until strong enough",
+    "layer": "engine",
+    "why": "12 of 44 xlogfile deaths were in the Mines (deathdnum=2), and 19 of 135 stall snapshots are Mines levels, 12 of them no way on. r_go_down takes the first '>' it finds (lines 472-480). Gnome lords and dwarves with wands and mattocks are hostile to a human Valkyrie. Sources: nethackwiki Gnomish_Mines and Standard_strategy; AutoAscend and Saiph stair graph.",
+    "change": "Keep a per-level stair graph: each staircase and the level it leads to. On arriving in a level where status.dungeon is 'The Gnomish Mines' while XL is under 8 (a knob the brain can tune), go back up, mark that '>' as mines_branch, and choose the other '>'. Later, the brain can order a Minetown visit (Mines levels 3-4, for the altar and temple) once XL is 8 or more, with the Minetown rules on (no kicks, no fountains, never attack peacefuls).",
+    "expected_effect": "Removes about a quarter of deaths and many dark-map stalls, and pushes descent down the main dungeon where depth counts.",
+    "effort": "medium"
+   },
+   {
+    "rank": 18,
+    "title": "Fight from corridors: positioning, first hit, and stairs as an escape hatch",
+    "layer": "engine",
+    "why": "18 melee deaths (giant bat 3, dwarf, gnome and others), plus crowd deaths such as soldier ants. Sources: BotHack mainbot.clj (exposed = more than 2 walkable neighbours; wait when the monster is 2 away 90% of the time); AutoAscend movement_priority.py; nethackwiki Soldier_ant.",
+    "change": "If exposed and more than one mobile hostile is adjacent, move at most 2 steps to a non-exposed square without fighting on the way. If already non-exposed with 2 or more threats near, search and let them come one at a time. When a non-trivial, non-passive hostile is exactly 2 away, send one 's' so it steps into range. If HP is under retreat_below and stairs are within about 5 steps, take them. Before resting, move up to 8 steps to a non-exposed square. Rest from HP below 4/7 to HP above 6/7 (Saiph).",
+    "expected_effect": "Fewer melee deaths and more XP per fight, raising the XL average.",
+    "effort": "medium"
+   },
+   {
+    "rank": 19,
+    "title": "Stay off wand lines and kill wand users first",
+    "layer": "engine",
+    "why": "8 wand deaths, 4 magic missile and 2 fire or lightning bolt deaths. Some are not from shopkeepers. Elbereth does not stop ranged attacks. Sources: nethackwiki Standard_strategy; AutoAscend movement_priority.py (-1 on the lines of hostiles).",
+    "change": "On 'zaps a wand', 'The bolt of', 'The magic missile' or a monster seen picking up a wand, flag that monster as a wand user. If you can close to melee in 1 move, do it and target it first. Otherwise move to a square off its row, column and diagonals, or break line of sight around a corner. Loot its wand after the kill. Add a -1 path cost to squares on hostile lines within range 7 when you have no ranged option.",
+    "expected_effect": "Cuts the non-shop wand and bolt deaths.",
+    "effort": "medium"
+   },
+   {
+    "rank": 20,
+    "title": "Throw safety: no pets or peacefuls in the line of fire",
+    "layer": "engine",
+    "why": "r_throw (lines 626-633) picks any matching monster cell, including peacefuls, and never checks the line. Hitting the pet makes it hostile, which may explain the 4 domestic-animal deaths (an inference). Sources: BotHack pathing.clj; AutoAscend fight_heur.py.",
+    "change": "Take targets only from visible_hostiles. Walk the line square by square and refuse the throw if a pet, peaceful, wall or door frame comes before the target. Apply the same check to zapped wands.",
+    "expected_effect": "Avoids turning the pet hostile and avoids Luck and alignment hits. It also makes item 9's throwing safe to use widely.",
+    "effort": "small"
+   },
+   {
+    "rank": 21,
+    "title": "Brain sets the descent pace by XL, HP and food",
+    "layer": "brain",
+    "why": "The deepest-level average is under 3, so depth is the north-star metric. Diving without XP kills early characters, and camping on Dlvl 1-2 starves them (AutoAscend and NetPlay both saw starvation from over-camping). Sources: nethackwiki Standard_strategy; AutoAscend global_logic.py; arXiv 2403.00690 and 2203.11889.",
+    "change": "The brain sets the 'descend' standing order from max_depth = XL+1, requiring HP at 70% or more. Fully explore Dlvl 1-4 for items and XP. The engine enforces a food override: descend anyway when carried nutrition is under 1000 and prayer is on cooldown. Log the gate decision in stats.",
+    "expected_effect": "Steadier descent with fewer out-of-depth deaths, and a direct push on deepest-level and XL.",
+    "effort": "small"
+   },
+   {
+    "rank": 22,
+    "title": "Excalibur: dip the long sword at XL5 outside Minetown",
+    "layer": "engine",
+    "why": "A lawful Valkyrie gets Excalibur at a 1/6 chance per #dip from XL5. It is the largest single melee upgrade for this role and supports survival past Dlvl 5-10. The best run so far reached XL 8. Sources: nethackwiki Excalibur and Valkyrie.",
+    "change": "When XL is 5 or more, the long sword is not already Excalibur, a fountain is known and the level is not Minetown, and HP is 80% or more with no hostile visible: walk to the fountain and #dip the long sword. Repeat while HP stays above 60%. Handle water moccasins, water demons and nymphs with normal combat. Stop when the fountain dries up or 'From the murky depths, a hand reaches up' appears.",
+    "expected_effect": "A large boost to melee damage and to-hit, lifting XL and depth for runs that already reach XL5.",
+    "effort": "medium"
+   },
+   {
+    "rank": 23,
+    "title": "Nymph and leprechaun keep-away",
+    "layer": "engine",
+    "why": "Nymphs steal the main weapon, and leprechauns take gold, which then makes shopkeeper debts unpayable (linked to the 0-gold wand deaths). Sources: nethackwiki Wood_nymph; AutoAscend movement_priority.py; BotHack mainbot.clj.",
+    "change": "Leave sleeping nymphs alone and route around them. Kill awake nymphs at range, or engrave Elbereth when one is within 3 squares (they respect it). After 'stole', re-wield the best remaining weapon, and chase only if the main weapon was taken. Drop gold before a leprechaun reaches you, and pick it up after the kill.",
+    "expected_effect": "Fewer weapon losses and fewer games that die of weakness afterward. A small but steady survival gain.",
+    "effort": "small"
+   },
+   {
+    "rank": 24,
+    "title": "Altar BUC testing before wearing found gear",
+    "layer": "engine",
+    "why": "Wearing unknown armor or rings is risky: cursed gear, teleportitis, strangulation. Altars are common. Sources: nethackwiki Altar and Standard_strategy.",
+    "change": "When standing on any altar that is not in a temple with a hostile priest, drop all items of unknown BUC, then pick them back up. Record black flash as cursed, amber flash as blessed and no flash as uncursed. Wear only armor tested uncursed or blessed, and never put on untested rings or amulets. Offering sacrifices at a co-aligned altar is left for later.",
+    "expected_effect": "Better AC from found armor with no cursed-item disasters, supporting deeper runs.",
+    "effort": "medium"
+   },
+   {
+    "rank": 25,
+    "title": "Keep all safety rules in the engine and give the Haiku brain events",
+    "layer": "brain",
+    "why": "BALROG (arXiv 2411.13543) found a knowing-doing gap: models say rotten food is dangerous and then eat it. NetPlay's LLM failed at menus and had to use a scripted explorer. Our loops came from brain orders that override engine safety, such as the fight-shopkeeper order.",
+    "change": "Validate every brain order in the engine against hard rules before it runs: no fight on a peaceful, shopkeeper or watchman, no eating a blacklisted corpse, no prayer with the gate closed, no kicking in the Mines or next to a shop. Give the brain a short event log and the failure reason for the last routine, and let it choose only skills, never raw keys.",
+    "expected_effect": "Keeps the Haiku brain from undoing items 1 to 8 when it replaces RuleBrain, and makes its escalations cheaper and more accurate.",
+    "effort": "small"
+   }
+  ]
+ },
+ "inputs": {
+  "human_strategies": {
+   "strategies": [
+    {
+     "title": "Prayer timeout gate",
+     "category": "survival",
+     "rule": "Track turns since game start and since last successful prayer. Initial timeout ~300 and drops 1/turn. Allow emergency prayer only when in MAJOR trouble and (turn >= 300 for the first prayer, or turns since last prayer >= ~1000). Never pray just to fix minor trouble unless ~1000+ turns since the last prayer. Never pray with known negative Luck (after killing a peaceful, breaking a mirror, cannibalism) or after a 'You feel that X is displeased' result; treat that result as resetting the clock.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Prayer_timeout ; https://nethackwiki.com/wiki/Prayer"
+    },
+    {
+     "title": "What counts as major trouble",
+     "category": "survival",
+     "rule": "Treat these as prayable major trouble: HP < 1/7 of max HP or HP < 6; hunger status Weak or Fainting; 'You are slowing down' / stoning; turning into slime; strangled; food poisoning ('You feel deathly sick') or illness; lycanthropy ('You feel feverish'). A prayer fixes HP to full, sets nutrition to 900, and cures these. Wire pray_when_critical to exactly this list.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Prayer ; https://nethackwiki.com/wiki/Lycanthropy ; https://nethackwiki.com/wiki/Nutrition"
+    },
+    {
+     "title": "Prayer is the backup food source",
+     "category": "food",
+     "rule": "When status reaches Weak and no known-safe food is in inventory, pray if the prayer gate allows (Weak is major trouble, restores nutrition to 900). Only fall back to 'stall' when the gate is closed. This alone should remove most 'Weak and no known-safe food' endings, since the first prayer is available from turn ~300.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Nutrition ; https://nethackwiki.com/wiki/Prayer_timeout"
+    },
+    {
+     "title": "Corpse freshness window",
+     "category": "food",
+     "rule": "Eat a corpse only if you (or your pet within view) killed it and it is <= 30 turns old (hard limit 50; rot can start earlier since rottenness = age / rnd(10..29)). Record kill turn and square for every corpse. Lichen and lizard corpses never rot: always pick them up and keep them as emergency food. Never eat corpses found lying on the floor with unknown age.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Corpse"
+    },
+    {
+     "title": "Corpse blacklist",
+     "category": "food",
+     "rule": "Never eat: cockatrice, chickatrice, Medusa (stoning); any were* (lycanthropy); human or elf corpses for a human Valkyrie, dwarf for a dwarf (cannibalism, -Luck, aggravate); dogs/cats (aggravate); green slime; bats/giant bats (stun); yellow mold, violet fungus, black light (hallucination); kobolds and other poisonous corpses unless poison resistant; nurse, chameleon/doppelganger (polymorph); Death-related undead (zombies/mummies are old corpses, tainted). Acidic corpses are safe from rot and also cure stoning.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Corpse ; https://nethackwiki.com/wiki/Standard_strategy"
+    },
+    {
+     "title": "Eat at Hungry, never while Satiated",
+     "category": "food",
+     "rule": "Start eating (safe fresh corpse first, then permanent food) when status shows Hungry, not later. Prefer eating fresh corpses over rations whenever a safe one is underfoot even when Not Hungry, but never start a meal while Satiated (overeating to 2000+ chokes and can kill). Interrupt eating if 'You're having a hard time getting all of it down' appears.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Nutrition"
+    },
+    {
+     "title": "Tins are safe-ish reserve food",
+     "category": "food",
+     "rule": "Pick up tins; they never rot. Before eating, the game names the contents after opening: refuse (answer n) cockatrice/chickatrice, were*, own-race, chameleon tins; accept everything else. Opening without a tin opener can take up to 50 turns, so only open tins when no hostile is visible. Do not open tins while hallucinating.",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://nethackwiki.com/wiki/Tin"
+    },
+    {
+     "title": "Pet as corpse tester",
+     "category": "food",
+     "rule": "If unsure whether a corpse is safe, note whether the pet eats it: pets refuse poisonous and tainted corpses (unless resistant). Useful as a tie-breaker, not as a primary rule.",
+     "layer": "brain",
+     "priority": 1,
+     "source": "https://nethackwiki.com/wiki/Corpse"
+    },
+    {
+     "title": "Elbereth: who ignores it",
+     "category": "combat",
+     "rule": "Only engrave Elbereth (E, -, Elbereth) against monsters that respect it. Treat as NOT respecting: any @ (humans, elves, and werecreatures in human form such as a werejackal shown as @), A (angels), minotaurs, shopkeepers, guards/watchmen, priests, peacefuls, and blinded monsters. It does not stop ranged attacks or wands. So for @ threats and wand users, retreat or fight instead of engraving.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Elbereth"
+    },
+    {
+     "title": "Elbereth erosion discipline",
+     "category": "combat",
+     "rule": "In 3.6 attacking in any way (melee, firing, throwing, zapping) while standing on Elbereth erases it. Dust engravings can also misengrave (~27% chance a letter is wrong) and smudge. After engraving, read it back (look at floor / check engraving text) and re-engrave if it is not exactly 'Elbereth'. While standing on it, only rest/search; never attack. Resume fighting only after HP recovers above rest_below.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Elbereth"
+    },
+    {
+     "title": "Elbereth as a rest point",
+     "category": "survival",
+     "rule": "When HP is low, no prayer is available, and the adjacent threats all respect Elbereth, engrave Elbereth and search (s) in place until HP recovers. Pre-engraving next to stairs or at corridor choke points before a big fight is a good habit.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Elbereth"
+    },
+    {
+     "title": "Upstairs escape hatch",
+     "category": "survival",
+     "rule": "When a fight goes bad (HP under retreat_below, or several fast monsters like soldier ants) and you are on or near the up or down staircase, take the stairs. Only monsters adjacent to you follow, and usually just one, turning a crowd into a duel. Prefer fighting near known stairs.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Soldier_ant"
+    },
+    {
+     "title": "Floating eye: never melee",
+     "category": "combat",
+     "rule": "Never make a melee attack on a floating eye (blue 'e') unless blind or with free action/reflection. Mark it as a no-melee target in the avoid list, including with the F-direction key and when auto-fighting while moving. It moves at speed 1, so walk around it if possible.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Floating_eye"
+    },
+    {
+     "title": "Floating eye blocking a corridor",
+     "category": "exploration",
+     "rule": "If a floating eye blocks the only path: throw anything (daggers, spare spears, rocks, gems, spare junk items); any ranged attack is safe and you can pick up and re-throw items when it drifts. Keep a stack of rocks or pebbles for this. If nothing to throw, back off and search for another route (search dead ends and walls), or wait: it moves slowly but does move. Never step into it. Killing it and eating the corpse gives telepathy, which is well worth it.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Floating_eye"
+    },
+    {
+     "title": "Cockatrice and chickatrice handling",
+     "category": "combat",
+     "rule": "Never fight a cockatrice/chickatrice ('c', yellow) bare-handed and never pick up or eat the corpse without gloves. Prefer ranged kills. If the message 'You are slowing down' or 'Your limbs are stiffening' appears, immediately eat a lizard corpse or an acidic corpse if carried; otherwise pray if the gate allows; this is a hard emergency. Always carry a lizard corpse once you find one.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Cockatrice"
+    },
+    {
+     "title": "Nymph protocol",
+     "category": "combat",
+     "rule": "Nymphs ('n') steal an item and teleport away. Kill them fast (they have poor AC) or kill from range; if a nymph is asleep, leave it asleep and route around. Nymphs respect Elbereth. Do not chase a nymph that has teleported away with a non-essential item; chase only if it took the main weapon, and re-wield a backup weapon immediately after a theft.",
+     "layer": "brain",
+     "priority": 3,
+     "source": "https://nethackwiki.com/wiki/Wood_nymph"
+    },
+    {
+     "title": "Soldier ants",
+     "category": "combat",
+     "rule": "Soldier ants (blue 'a') are speed 18 and one of the top killers. You cannot outrun them. On sight: move into a corridor or doorway so only one can reach you, and engrave Elbereth (they respect it) if HP drops below about half. Take the stairs if they are adjacent. Do not try to flee across open rooms.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Soldier_ant"
+    },
+    {
+     "title": "Werecreatures",
+     "category": "combat",
+     "rule": "Werejackals/wererats/werewolves in @ (human) form ignore Elbereth and summon animal packs; in animal form their bite can give lycanthropy. Fight them in a corridor, kill fast, and never eat their corpses. If 'You feel feverish' appears, flag lycanthropy as major trouble and pray at the next safe prayer window (or eat a sprig of wolfsbane / quaff holy water if you have them).",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Lycanthropy ; https://nethackwiki.com/wiki/Elbereth"
+    },
+    {
+     "title": "Invisible attackers",
+     "category": "combat",
+     "rule": "When hit by 'It' or an unseen attacker, or when an 'I' marker is on the map, attack that square with F+direction instead of moving (plain movement into an I just 'bumps'). If there is no I, search (s) once to mark the attacker's position. Back into a corridor so there are fewer directions it can come from. Clear the I after killing it.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Invisible"
+    },
+    {
+     "title": "Wand-zapping monsters",
+     "category": "combat",
+     "rule": "If a monster is seen to 'zap a wand' or pick up a wand, or an unknown bolt hits you, do not stay on its row, column, or diagonal. Either close to melee in one move (so it has few chances) or break line of sight around a corner. Elbereth does not block ranged attacks. Kill and loot wand users with priority, since picking up the wand removes the threat and gives you the wand.",
+     "layer": "brain",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Elbereth ; https://nethackwiki.com/wiki/Standard_strategy"
+    },
+    {
+     "title": "Never attack peacefuls",
+     "category": "combat",
+     "rule": "Never attack a monster the game flags as peaceful (the 'Really attack?' prompt must always be answered n). As a lawful Valkyrie, many dwarves, gnomes, and hobbits in the Mines are peaceful. Killing a peaceful costs alignment and Luck (negative Luck breaks prayer), and in Minetown turns the whole watch hostile. Swap places or walk around them.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Luck ; https://nethackwiki.com/wiki/Watchman"
+    },
+    {
+     "title": "Shop safety rules",
+     "category": "special levels",
+     "rule": "Before entering a shop: do not carry a pick-axe or mattock (drop it outside), do not be invisible. Inside: never attack the shopkeeper, never dig, never kick or break doors, never zap wands of digging or striking. Pay (p) for anything picked up before leaving; if you cannot pay, drop it back. If the shopkeeper blocks the door, you owe money: pay or drop items until he moves.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Shopkeeper"
+    },
+    {
+     "title": "Minetown watch rules",
+     "category": "special levels",
+     "rule": "In Minetown: never kick doors, never dip into or quaff from fountains (dipping for Excalibur there instantly angers the watch), never attack peacefuls or the priest, never dig or cut trees. If the message 'Hey, stop picking that lock!' or a fountain warning appears, stop the action at once and never repeat it.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://nethackwiki.com/wiki/Watchman ; https://nethackwiki.com/wiki/Excalibur"
+    },
+    {
+     "title": "Price identification by selling",
+     "category": "items",
+     "rule": "In a shop that buys the item's class, drop an unknown scroll/potion/ring/wand and read the offered price (normally 1/2 base, sometimes 1/3), then answer n to keep it. Map offered price back to base price. For scrolls, base 20 = identify (read freely); base 80 = enchant armor or remove curse (good to read); base 300 includes genocide/punishment/stinking cloud/charging (hold, needs judgment). Record results by appearance.",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://nethackwiki.com/wiki/Price_identification"
+    },
+    {
+     "title": "Altar BUC testing",
+     "category": "items",
+     "rule": "Whenever you find an altar (in Minetown temples or random rooms), drop all unknown-BUC items on it and pick them back up. Black flash = cursed (never wear/wield/read), amber flash = blessed, no flash = uncursed. Mark each item's BUC. Only equip unknown armor, rings, or amulets that tested uncursed or blessed.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Altar"
+    },
+    {
+     "title": "Sacrifice on co-aligned altar",
+     "category": "items",
+     "rule": "On a co-aligned (lawful) altar, kill monsters nearby and offer (#offer) their fresh corpses (same freshness rule as eating, not your own race, not former pets). This lowers prayer timeout, raises Luck, and can grant an artifact weapon. Never sacrifice at a cross-aligned altar early (risk of angering gods or converting).",
+     "layer": "brain",
+     "priority": 2,
+     "source": "https://nethackwiki.com/wiki/Altar"
+    },
+    {
+     "title": "Safe item testing order",
+     "category": "items",
+     "rule": "Without identification: wear only armor that altar-tested non-cursed. Read unknown scrolls only when BUC is non-cursed, not in a shop, not standing on items you care about, and not while carrying unpaid items. Never put on unknown rings or amulets unless tested non-cursed (teleportitis, hunger, or strangulation can kill). Engrave-test unknown wands (E, then the wand) to learn their type safely.",
+     "layer": "brain",
+     "priority": 3,
+     "source": "https://nethackwiki.com/wiki/Standard_strategy ; https://nethackwiki.com/wiki/Price_identification"
+    },
+    {
+     "title": "Branch order: Mines to Minetown, then Sokoban",
+     "category": "pacing",
+     "rule": "The Mines entrance is on Dlvl 2-4 (a second down staircase). As a lawful Valkyrie, go down the Mines to Minetown (3-4 levels into the Mines) for the altar, temple, and shops, then come back up. Do not go to Mines' End early. Then continue down the main dungeon to the Oracle; Sokoban is the up staircase on the level just below the Oracle (Dlvl 6-9). Do Sokoban before going much deeper for XP and the bag of holding or amulet of reflection.",
+     "layer": "brain",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Gnomish_Mines ; https://nethackwiki.com/wiki/Sokoban ; https://nethackwiki.com/wiki/Standard_strategy"
+    },
+    {
+     "title": "Sokoban constraints",
+     "category": "special levels",
+     "rule": "In Sokoban, boulders cannot be pushed diagonally, and squeezing past, breaking, or creating boulders costs -1 Luck each. That makes Sokoban a solver problem: if the bot cannot solve the puzzles deterministically (a fixed move list per known map variant), skip Sokoban entirely rather than bumping boulders and wrecking Luck.",
+     "layer": "engine",
+     "priority": 2,
+     "source": "https://nethackwiki.com/wiki/Sokoban"
+    },
+    {
+     "title": "Descent pace keyed to XL and HP",
+     "category": "pacing",
+     "rule": "Do not go down while XL < (Dlvl + 1) roughly, or with HP below about 70%. Fully explore Dlvl 1-4 for items and XP. After that, descend once the level is explored or the stairs are known and nutrition is not low. Fighting on the current level gives food (corpses) and XP; diving without XP is what kills early characters.",
+     "layer": "brain",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Standard_strategy"
+    },
+    {
+     "title": "Finding stairs when 'no way on'",
+     "category": "exploration",
+     "rule": "If the downstairs are not visible after exploring every room: search (s, about 10-15 times each) at dead-end corridors and at room walls facing large unexplored map regions, and kick/open locked doors outside Minetown. As a last resort, go back up and down again, or dig down if you have a pick-axe (never in shops).",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Standard_strategy"
+    },
+    {
+     "title": "Valkyrie kit use",
+     "category": "other",
+     "rule": "Keep the +1 long sword wielded (Valkyries start with a long sword and dagger, plus a +3 small shield). Throw the dagger (t) at floating eyes or fleeing monsters and pick it up afterward. Cold resistance from level 1 means cold rays are safe; stealth comes at XL 3 and speed at XL 7. Wear any found non-cursed armor that fits alongside the shield.",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://nethackwiki.com/wiki/Valkyrie"
+    },
+    {
+     "title": "Excalibur at XL5",
+     "category": "other",
+     "rule": "Once lawful Valkyrie reaches XL 5 and a fountain outside Minetown is known (the Oracle level has four), #dip the long sword into the fountain repeatedly (1/6 chance per dip) until Excalibur is created. Before each dip, check HP is high because water moccasins, water demons, or nymphs may appear. Never do this in Minetown.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://nethackwiki.com/wiki/Excalibur ; https://nethackwiki.com/wiki/Valkyrie"
+    },
+    {
+     "title": "Protect Luck",
+     "category": "survival",
+     "rule": "Avoid everything that lowers Luck: killing peacefuls, breaking mirrors, cannibalism, killing co-aligned unicorns, Sokoban boulder cheating. Keep a Luck estimate in the engine and block prayer when it may be negative.",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://nethackwiki.com/wiki/Luck"
+    }
+   ]
+  },
+  "bot_techniques": {
+   "strategies": [
+    {
+     "title": "Per-tile search counter with scored search targets",
+     "category": "exploration",
+     "rule": "Keep a search_count per map tile, incremented by N every time you issue nS standing there. Once no unseen tiles or unopened doors are reachable, score each reachable walkable tile that touches at least one stone or wall tile: prio = -1 - 2*search_count^2, +250 if it is a door with more than 3 stone neighbors (a doorway that leads nowhere), +250 if it is a dead end (at most 1 orthogonal walkable neighbor), minus 4*path_distance. Walk to the best tile and search 5 there, then rescore. The squared penalty spreads searching across candidates so you never sink 200 turns into one wall.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/exploration_logic.py"
+    },
+    {
+     "title": "Tiered search order with escalating budgets",
+     "category": "exploration",
+     "rule": "Search in rounds with a multiplier mul = 1, 2, 3. First re-check dead ends until each has min(30*mul, 50) searches. Then search tiles that face a large blank region (see the unexplored-column rule) up to 20*mul. From mul 2 onward, search corridor and door tiles up to 5*mul. Finally search along room walls up to 15*mul, skipping wall ends, shop walls and the screen edge (row < 3 or > 20, col < 2 or > 78). Always search in bursts of 10. Saiph's order: unvisited corridors and dead ends (2x16 searches) first, then corridor and room corners, then three-way corridors and room walls, then dead ends again, in 16-search intervals.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/pathing.clj ; https://github.com/canidae/saiph/blob/master/src/Analyzers/Explore.cpp"
+    },
+    {
+     "title": "Unexplored-column test: is the level really done?",
+     "category": "exploration",
+     "rule": "Treat a level as incomplete if any of the screen columns x in {17, 20, 40, 60, 63} has no known feature (floor, wall, corridor, door) in rows 2 to 18. If so, pick the searchable room-floor tiles and corridor ends that face that blank column (scan each row toward it) as the first search targets, before the generic wall search. Skip this in the Mines, Gehennom, and on big-room or special levels.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/pathing.clj"
+    },
+    {
+     "title": "Stuck ladder: search, then other levels, then unstuck items, then relax constraints",
+     "category": "exploration",
+     "rule": "When there is no downstairs and nothing left to explore: (1) run the tiered search for 3 rounds; (2) if another reachable level is less searched (compare total search counts, with a hysteresis of about 150 to 1000 so you don't ping-pong), go there and come back later. Saiph interleaves 'explore another level' between each search tier; (3) unstuck: read teleportation, zap teleportation at self, step into a known trapdoor or hole, or dig down with a pick-axe or wand of digging; (4) search 3 more rounds; (5) AutoAscend then relaxes safety: once one tile's search count exceeds the 30th-percentile count by more than 400 it allows pathing through known traps, and above 500 it allows attacking whatever blocks the path. Only after all of that, escalate to the brain as 'no way on'.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/pathing.clj ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/exploration_logic.py ; https://github.com/canidae/saiph/blob/master/src/Analyzers/Explore.cpp"
+    },
+    {
+     "title": "Passive and only-ranged monster list (floating eye in the corridor)",
+     "category": "combat",
+     "rule": "Keep a do-not-melee list: floating eye, gas spore, acid blob, blue jelly, brown mold. Melee priority for these is -100 (floating eye -110). Never melee a floating eye unless blind, reflecting, or with free action. Instead throw anything: daggers first, then any spare weapon, rocks or junk. Put on a blindfold or towel if you have one. When one blocks a corridor, give that tile a high path cost (not impassable) and wait or search a few turns, since floating eyes have speed 1 and drift away. Always keep a stack of junk to throw. A Valkyrie has cold resistance, so brown mold and blue jelly can be meleed at full HP (AutoAscend allows melee on those two at full HP). Gas spore: never melee, stay 2 or more tiles away.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/combat/monster_utils.py ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/combat/fight_heur.py ; https://github.com/krajj7/BotHack/blob/master/src/bothack/bots/mainbot.clj"
+    },
+    {
+     "title": "Food triad: fresh corpses first, rations when Hungry, prayer when Weak",
+     "category": "food",
+     "rule": "(1) Whenever the hunger state is not Satiated, eat safe fresh corpses from the ground (under you, or within reach), never in a shop. (2) Eat inventory food only when Hungry or worse, preferring the lowest nutrition-per-weight item first and saving lizard corpses and wolfsbane. (3) At Weak or Fainting, pray if prayer is safe. BotHack prays instead of eating when prayer is safe and total carried nutrition is under 1200, to save rations. The competition winner reported this rule set gave a significant improvement.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://arxiv.org/abs/2203.11889 ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/global_logic.py ; https://github.com/krajj7/BotHack/blob/master/src/bothack/bots/mainbot.clj"
+    },
+    {
+     "title": "Corpse freshness through kill tracking",
+     "category": "food",
+     "rule": "On 'You kill/destroy the X', record (tile, monster type, turn). A corpse on that tile is edible only if it matches a recorded kill younger than 30 turns (BotHack) or 50 turns (AutoAscend) and no older or unknown death is recorded on that tile. Lichen and lizard corpses never rot, so they are always fine. A corpse whose kill you did not see is never eaten, and neither is a corpse that was moved or stacked. This removes the 'no known-safe food' ambiguity without guessing.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/tracker.clj ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/agent.py"
+    },
+    {
+     "title": "Corpse blacklist and wishlist",
+     "category": "food",
+     "rule": "Never eat: poisonous corpses (unless poison resistant), acidic, any were-creature, chameleon, doppelganger, sandestin, disenchanter, hallucinogenic (violet fungus, yellow mold, abbot), bat and giant bat (stun), dogs and cats (aggravate), cockatrice, chickatrice or Medusa, mimics, own race (human or dwarf for a Valkyrie), or cursed food. Eat on purpose: corpses that grant a missing resistance, giants (strength), newts and wraiths. Eat those even when not hungry, as long as you are not Satiated.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/agent.py ; https://github.com/krajj7/BotHack/blob/master/src/bothack/player.clj"
+    },
+    {
+     "title": "Prayer timer with bot-proven thresholds",
+     "category": "survival",
+     "rule": "Track last_prayer_turn yourself. Prayer is safe at turn > 300 if you have never prayed, then when turn - last > ~1000 (BotHack uses a conservative 1300; AutoAscend uses a riskier 500 for HP and 400 for fainting). Never pray in Gehennom or on a cross-aligned altar. Pray for HP when HP < 6 or HP <= maxHP/7 (BotHack, Saiph and AutoAscend all use the 1/7 or 1/5-1/6 range). Also pray for Weak or Fainting hunger, food poisoning, illness, stoning without a lizard, and lycanthropy (major trouble).",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/game.clj ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/agent.py ; https://github.com/canidae/saiph/blob/master/src/Analyzers/Health.cpp"
+    },
+    {
+     "title": "Emergency ladder: potion, pray, Elbereth, retreat upstairs",
+     "category": "survival",
+     "rule": "BotHack defines low HP as HP < 10 or HP <= 45% of max. Emergency order: quaff a known healing, extra healing or full healing potion when HP < 1/3 or HP < 8 (AutoAscend); pray if the prayer rule allows; engrave Elbereth in the dust when a non-fleeing adjacent hostile respects it; if no threats remain or you stand on a permanent Elbereth, rest; else path to the up staircase avoiding fights and climb it if hostiles are near and Dlvl > 1 (search on the stairs if none are adjacent yet); else step to a non-exposed neighbor tile that no threat is next to.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/bots/mainbot.clj ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/agent.py"
+    },
+    {
+     "title": "Elbereth rules adapted to 3.6",
+     "category": "survival",
+     "rule": "Engrave Elbereth (E - Elbereth) when more than one adjacent non-fleeing hostile respects it, or when HP < 30 and adjacent threat is high. AutoAscend scores this as -15 + 20*weighted_adjacent_count*(1 - sqrt(hp_ratio)), weighting fast monsters x2 and dangerous ones +2. Once standing on it, rest with search (priority 30 - 40*hp_ratio) and do not melee, fire or zap, because in 3.6 any attack erases it. Re-check it with a look. Saiph engraves up to 3 times, then just searches. It is useless against @ humans (including a werejackal in @ form), minotaurs, shopkeepers, guards, priests, and peaceful monsters. Against those, retreat instead.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/combat/fight_heur.py ; https://github.com/canidae/saiph/blob/master/src/Analyzers/Health.cpp ; https://nethackwiki.com/wiki/Elbereth"
+    },
+    {
+     "title": "Rest with hysteresis in a non-exposed spot",
+     "category": "survival",
+     "rule": "Start resting when HP < 4/7 of max and stop when HP > 6/7 (Saiph). BotHack rests until HP >= 90% or HP > 175. Before resting, move up to 8 steps to a tile with at most 2 walkable neighbors (a corridor), then search 10 at a time. Saiph stops early at > 4/7 when maxHP > 42 and no monster is visible within 5 tiles. AutoAscend avoids new exploration until HP >= 80%. Never take stairs down below that level.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://github.com/canidae/saiph/blob/master/src/Analyzers/Health.cpp ; https://github.com/krajj7/BotHack/blob/master/src/bothack/bots/mainbot.clj"
+    },
+    {
+     "title": "Combat as scored one-step actions with a movement heatmap",
+     "category": "combat",
+     "rule": "Every combat turn, list candidate actions (move in 8 directions, melee in 8, fire or throw in 8, zap a wand in 8, Elbereth, wait) and give each a numeric score, then execute the max. Build the move scores from a per-tile heatmap. For a normal melee monster: +3 on tiles at distance 2 (distance 3 if it is faster than speed 12), -9 on tiles adjacent to it, and -1 along its 8 lines when you have no ranged attack. Weak monsters (lichen, newt, grid bug, shrieker): +2 adjacent, freely engage. Monsters that would kill you in melee (HP <= 8, or <= 16 for dangerous ones): -10 adjacent. Scores are taken relative to your current tile. Monsters farther than 7 are ignored for combat. Log the full scored list for debugging.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/combat/movement_priority.py ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/combat/fight_heur.py ; https://arxiv.org/abs/2203.11889"
+    },
+    {
+     "title": "Let the monster come to you (bait for the first hit)",
+     "category": "combat",
+     "rule": "When a mobile, non-trivial hostile is exactly 2 tiles away and is not fleeing, passive or a spellcaster, search (wait) one turn instead of stepping in, so it walks into your reach and you swing first. BotHack does this 90% of the time (97% for slow monsters). After moving during a fight, AutoAscend waits up to 5 search turns for the monster to close before resuming exploration.",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/bots/mainbot.clj ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/agent.py"
+    },
+    {
+     "title": "Fight from non-exposed tiles (corridors and doorways)",
+     "category": "combat",
+     "rule": "exposed(tile) = more than 2 walkable neighbors. If you are exposed and more than one mobile hostile is adjacent, move (at most 2 steps, no fighting on the way) to a non-exposed tile with no monster around it. If you are already non-exposed and more than 2 mobile threats are near, don't step into an exposed tile to chase: search and let them come one at a time. If more than 2 non-trivial fast threats are around and the up staircase is within 40 steps along a safe path, head for it.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/bots/mainbot.clj"
+    },
+    {
+     "title": "Target selection order among adjacent hostiles",
+     "category": "combat",
+     "rule": "When several hostiles are adjacent, hit in this order: were-creatures, monsters that ignore Elbereth (@, minotaurs), remembered-invisible 'I' markers, monsters that hit hard, other 'nasty' ones, then the rest. For an adjacent 'I' or an unseen attacker ('It hits!'), attack that square with F plus the direction instead of moving, because moving onto 'I' can waste turns. Kill were-creatures (werejackal @ or d) first to limit lycanthropy exposure.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/bots/mainbot.clj"
+    },
+    {
+     "title": "Keep-away and exploding monster handling",
+     "category": "combat",
+     "rule": "Keep away (tile score -10 adjacent, +6 on your ranged lines if you have projectiles; BotHack engraves Elbereth when one is within 3 tiles): nymphs, leprechauns, rust monsters, disenchanters, mind flayers, and homunculus without sleep resistance. Drop your gold before a leprechaun reaches you. Exploding monsters (gas spore, yellow light, flaming, freezing and shocking spheres): -10 on adjacent tiles and -5 at distance 2 for mobile ones; kill them with thrown weapons from range.",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/combat/movement_priority.py ; https://github.com/krajj7/BotHack/blob/master/src/bothack/bots/mainbot.clj"
+    },
+    {
+     "title": "Stay off wand and bolt lines",
+     "category": "combat",
+     "rule": "When you have no ranged option, add -1 to every tile on each hostile's 8 straight lines (up to range 7, stopping at walls) so movement prefers off-line approaches (knight-move offsets). When zapping your own ray wands, simulate the bounce: rays bounce back off walls and have range 13, reduced by 2 per creature hit. Reject any direction where the expected hits on yourself or a pet are above zero (weight -30 for self, -20 for a pet).",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/combat/movement_priority.py ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/combat/fight_heur.py"
+    },
+    {
+     "title": "Peacefuls, shopkeepers, watch and vault: hard rules",
+     "category": "combat",
+     "rule": "Always answer 'Really attack?' with n and mark that monster peaceful. When a peaceful blocks the path, give its tile a path cost of about 50 and step aside or wait so it moves, never swapping places or attacking. Never fire a ranged attack when a pet or peaceful is on the line. Don't kick doors in the Gnomish Mines, including Minetown (the watch gets angry). Never kick, dig or break things in or next to a shop. Don't eat or pick up corpses in a shop. If you land in a vault, drop all gold and follow the guard out. NetPlay's biggest time-sink was a loop of bumping a peaceful shopkeeper, cancelling the prompt, and moving again.",
+     "layer": "engine",
+     "priority": 5,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/pathing.clj ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/global_logic.py ; https://arxiv.org/abs/2403.00690"
+    },
+    {
+     "title": "Wait out impairments instead of acting",
+     "category": "survival",
+     "rule": "While blind, confused, stunned or hallucinating (and polymorphed, in AutoAscend), don't explore, travel, or take stairs. Only fight adjacent threats, otherwise search in place until it clears. Apply a non-cursed unicorn horn if you have one. Food poisoning or illness is fatal, so pray even if the prayer timer is uncertain. Saiph and AutoAscend both hard-gate exploration on this.",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/global_logic.py ; https://github.com/canidae/saiph/blob/master/src/Analyzers/Health.cpp ; https://github.com/canidae/saiph/blob/master/src/Analyzers/Explore.cpp"
+    },
+    {
+     "title": "Lycanthropy cure routine",
+     "category": "survival",
+     "rule": "Every 5 turns, check 'You feel feverish' or lycanthropy status. If infected: eat a sprig of wolfsbane, else quaff blessed holy water, else pray when the prayer timer allows (lycanthropy is major trouble). Keep any wolfsbane you find (AutoAscend ranks it above all other food to carry but never eats it for hunger).",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/agent.py"
+    },
+    {
+     "title": "Stair graph and per-level memory",
+     "category": "pacing",
+     "rule": "Persist each level's map, search counts, items, corpse ages, altars (with alignment), shop tiles, and for every staircase the level it leads to. To reach a target level, run DFS or BFS over the stair graph and follow it. Stairs whose destination is unknown are exploration targets with a large bonus (-10000 on the level's exploration score). If a level shows two down staircases on Dlvl 2 to 4, one is the Gnomish Mines. Sokoban is up from the level after the Oracle.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/exploration_logic.py ; https://github.com/canidae/saiph/blob/master/src/Analyzers/Explore.cpp"
+    },
+    {
+     "title": "XL-gated descent balanced against food",
+     "category": "pacing",
+     "rule": "AutoAscend stays on Dlvl 1 until XL 8 before looking for the Mines, and NetPlay's guided prompt used 'stay on Dlvl 1-2 until XL 8'. Both raised XL but caused starvation deaths, the challenge's most common death cause. Use a descent gate such as max_depth = f(XL, AC, HP), but override it to descend when total carried nutrition falls below about 1000 and prayer is on cooldown. The brain sets this as the standing 'descend' order. The engine enforces the food override.",
+     "layer": "brain",
+     "priority": 4,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/global_logic.py ; https://arxiv.org/abs/2403.00690 ; https://arxiv.org/abs/2203.11889"
+    },
+    {
+     "title": "Item pickup priority under a weight budget",
+     "category": "items",
+     "rule": "Fill carrying capacity in this order: best melee weapon and best armor set, known healing potions, (as a lawful) a long sword for Excalibur, throwable projectiles sorted by damage, non-corpse food sorted by nutrition per weight (wolfsbane first), then light unidentified potions, rings, amulets, wands, scrolls and tools. Leave one inventory slot free. After a fight, pick up your thrown daggers from the floor (AutoAscend gives this pickup action priority 15, above most moves). This keeps the floating-eye answer (throwables) always in stock.",
+     "layer": "engine",
+     "priority": 3,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/global_logic.py ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/combat/fight_heur.py"
+    },
+    {
+     "title": "Preemptible priority stack as the engine skeleton",
+     "category": "other",
+     "rule": "Structure the engine as an ordered list of handlers checked top-down on every key, where the first one that returns an action wins and any long routine can be preempted. BotHack's order: offer amulet, enhance skills, drowning, starvation, illness, retreat, fight, impairment, re-equip, feed, items here, recover HP, containers, use items, identify, features, shop, progress/explore. AutoAscend layers from outermost to innermost: explore or goto < sokoban < altar < wait-out-impairment < cure disease < eat < vault guard < fight < engulfed < emergency heal/pray. Every action should carry a 'reason' string for logs.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://github.com/krajj7/BotHack/blob/master/src/bothack/bots/mainbot.clj ; https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/global_logic.py ; https://arxiv.org/abs/2203.11889"
+    },
+    {
+     "title": "LLM picks skills, never keys, and is interrupted by events",
+     "category": "other",
+     "rule": "Give the LLM brain only parametrized skills (explore level, go to x y, fight, set avoid flag, go down, and so on). Let the engine run each skill until it completes or an event fires (new monster, low HP, menu opened, skill failed with a reason), then re-prompt with a short event log and the failure reason. NetPlay had to replace LLM-driven exploration with AutoAscend's explorer, and its LLM failed at multi-step menus (forgot to confirm or close), so menus and prompts must stay in the engine. BALROG found a 'knowing-doing gap': models state that rotten food is dangerous and then eat it anyway. Keep all safety rules (food, prayer, peacefuls) deterministic and out of the brain's hands.",
+     "layer": "brain",
+     "priority": 4,
+     "source": "https://arxiv.org/abs/2403.00690 ; https://arxiv.org/abs/2411.13543"
+    },
+    {
+     "title": "Loop detection with target blacklisting",
+     "category": "other",
+     "rule": "Detect repeating (position, action, top-line message) cycles over the last N keys, for example bump-into-peaceful then cancel, or open menu then close. After K failed attempts at a target (an item that is gone because a pet took it, an unreachable tile, a door that won't open), blacklist that target for about 100 turns and recompute. Escalate to the brain only if the loop persists after blacklisting. NetPlay's timeouts came mostly from these loops, including a stale tracker that believed an item was still on a tile. BotHack keeps a 3-minute idle auto-unstuck as a last resort.",
+     "layer": "engine",
+     "priority": 4,
+     "source": "https://arxiv.org/abs/2403.00690 ; https://github.com/krajj7/BotHack/blob/master/doc/issues.md"
+    },
+    {
+     "title": "Door handling: open up to N times, then kick (except in town)",
+     "category": "exploration",
+     "rule": "On a closed door adjacent to you (orthogonal only): try to open it. If the answer is 'This door is locked', kick until it opens. Otherwise retry opening up to 6 times, then kick. Never kick in the Mines/Minetown or at shop doors. Count open attempts per door and drop a door as an exploration target after 4 failed opens when kicking is disallowed.",
+     "layer": "engine",
+     "priority": 2,
+     "source": "https://github.com/maciej-sypetkowski/autoascend/blob/main/autoascend/exploration_logic.py"
+    },
+    {
+     "title": "Benchmark: what a strong Valkyrie bot reaches",
+     "category": "pacing",
+     "rule": "Use this as a yardstick for the batch runs: the 2021 challenge winner's median score was about 5,300 across all roles, and 1 in 20 of its Valkyries passed 30,000 points, reached Dlvl 10, or reached XL 10. The easy roles (Valkyrie, Samurai, Barbarian) dominate. The report's most common deaths involved fainting from hunger or dying while praying. Track 'fainted' and 'killed while praying' as separate xlogfile failure buckets to check the food and prayer rules.",
+     "layer": "brain",
+     "priority": 2,
+     "source": "https://arxiv.org/abs/2203.11889"
+    }
+   ]
+  },
+  "code_analysis": {
+   "failure_breakdown": "Data: 217 finished games across the 20 CSVs in playground/batch (7 empty rows from the 193825 run left out), 135 stall snapshots (batch/B*.json) and 19 saved scenarios. Averages across all games: deepest level 2.88, XL 3.25, 3734 turns. The last 8 runs (108 games) average deepest level 2.97, XL 3.72, 4464 turns. Deepest level: Dlvl1 18, Dlvl2 85, Dlvl3 61, Dlvl4 29, Dlvl5 11, Dlvl6 10, Dlvl7 2, Dlvl8 1.\n\nHow games end: 175 stalls (81%) and 42 deaths (19%). In the last 8 runs: 74 stalls and 34 deaths.\n\nSTALLS\n- Hunger: 92 (80 \"Weak and no known-safe food\", 12 \"Hungry\"), 42% of all games; 25 of the last 108. The Weak escalation reaches RuleBrain, which has no handler for it, so the game stops.\n  - 24 of the 64 Weak snapshots were carrying edible food that is missing from SAFE_FOOD: tripe, tins, eucalyptus, garlic, wolfsbane.\n  - 27 of all 135 snapshots carry unpaid shop goods. The pilot looted a shop and was trapped inside it.\n  - B20313002: a prayer was sent as \"safe\" and came back \"You feel that Tyr is displeased\".\n- \"No way on\": 50 (28 in the last 108).\n  - 18 name a blocker: floating eye in 10 reasons, gas spore 6, acid blob 5, yellow mold 2.\n  - 8 snapshots have the stairs down reachable only through a floating eye, and most of those have no dagger left.\n  - 3 Mines snapshots show the stairs on screen but with no floor path to them (B19571504, B20061113, B20313006).\n  - 12 of the 46 no-way-on snapshots are in the Gnomish Mines, where dark floor is not drawn.\n- Brain loops: 19. Seven are \"badly hurt, last order elbereth\". Seven are \"shopkeeper adjacent, last order fight shopkeeper\". Five are a small mimic or ghost with a fight order. Under the current code these turn into melee: the badly-hurt ones fight the monster instead of engraving, and the shopkeeper ones attack an angry shopkeeper. This was checked by replaying the snapshots through Engine and RuleBrain.\n- Other stalls: \"routines finish at once\" 6 (older runs), \"elbereth stuck\" 5 (each snapshot shows \"Never mind.\", so the engrave was aborted), turn limit 20000 3 (all on Dlvl 2).\n\nDEATHS\n- Wand or bolt: 14 (wand 8, magic missile 4, fire and lightning bolts 2). 13 of the 14 had 0 gold. Two feeds show the cause: B20313001 kicked a \"Closed for inventory\" shop door and was zapped with lightning; B20313004 was blind in a shop, F-attacked an \"I\" marker (\"It gets angry!\"), and was killed by striking. The gold=0 pattern fits the shk.c rule that a shopkeeper goes hostile at once if you cannot pay for a broken door. For the other 12 this is an inference.\n- Melee: 18 (giant bat 3, dwarf, dwarf lord, gnome, goblin and others).\n- Domestic animals: 4 (kitten 2, little dog, pony). The feeds for B20313003 and B20313007 show \"badly hurt -> elbereth\" immediately followed by \"standing order: fight\".\n- Invisible monster: 4. Lycanthrope: 3 (1 of them counted under invisible).\n- 12 of 44 xlogfile deaths were in the Mines (deathdnum=2). 3 deaths happened while praying.",
+   "findings": [
+    {
+     "title": "Standing orders pre-empt the brain's retreat routine, so Elbereth never runs",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "In step(), _standing() runs before self.routine. When the brain answers 'badly hurt' or 'critical HP' with elbereth, _escalate() treats the alarm as handled and returns None, so _standing carries on to the fight order (lines 951-961) and sends F at the adjacent monster. The elbereth routine (and step_away) never gets a turn, and attacking would also erase the engraving in 3.6.",
+     "evidence": "Replaying B19470908, B19504802 and B19551810 through Engine and RuleBrain: the brain orders elbereth and the next step returns 'Fk' with 'standing order: fight the goblin'. The B20313003 feed shows 'badly hurt (HP 21/63) ... -> elbereth', then 'standing order: fight the kitten', then death. B20313007 shows the same with a little dog. There were 7 'badly hurt ... (last order: elbereth)' stalls in older runs.",
+     "fix": "While a brain routine is active that acknowledged a danger escalation (elbereth, step_away, rest, pray), skip every standing order after the prayer check (fight, eat, corpse, rest, gold) and run the routine next. Simplest version: in _standing, return None right after the critical-HP and retreat block when self.routine is in {'elbereth','step_away'}.",
+     "impact": "high"
+    },
+    {
+     "title": "RuleBrain has no answer for the two most common escalations",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/brain.py",
+     "problem": "decide() handles prompts, badly hurt, dangerous-adjacent and difficulty. Everything else, including 'Weak and no known-safe food' and 'no way on', returns Order(None), and batch.Game.on_state treats that as a stall and saves the game.",
+     "evidence": "92 of 217 games (42%) stall on hunger and 50 of 217 (23%) on no way on, so 65% of all games end on an escalation the rule brain never tries to handle (lines 39-50).",
+     "fix": "Add fallbacks. For Weak: eat any non-dangerous food (see the SAFE_FOOD finding); if none, pray when the last prayer was at least 1000 turns ago and no prayer has failed; otherwise take any known stairs down (a new level means new corpses). For no way on: run another round of dead-end and wall searching, then fight or throw past an avoid-list blocker, then try a trap door or hole. Return None only when every step has been tried.",
+     "impact": "high"
+    },
+    {
+     "title": "The prayer-timeout guess is too optimistic and a failed prayer is never noticed",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "prayer_safe (lines 277-278) allows a prayer 800 turns after the last one. A successful prayer resets the timeout to rnz(350) (pray.c:1220), which goes over 1000 about 8% of the time, and major trouble needs a timeout of 200 or less (pray.c:1821). A prayer that comes too soon adds rnz(250) to the timeout, costs 3 Luck and angers the god (pray.c:1913-1918), so later prayers fail. Negative Luck also hurts searching (rnl). The engine logs the turn and carries on as if nothing happened.",
+     "evidence": "B20313002 feed: 'standing order: pray (Weak, no food)', then 'You feel that Tyr is displeased.', then the Weak stall. Three xlogfile deaths are 'while=praying' (B20323701 watchman, B20323703 rothe, B20234308 invisible werejackal). B20323701 also shows 'You murderer!' (Luck -2) before its prayer.",
+     "fix": "Use a gap of 1000 or more turns. Parse the result: 'You feel a hopeful feeling' or 'much better' means success; 'displeased', 'You feel that Tyr is angry', 'smiting' or 'You feel guilty' should set memory.prayer_broken, which makes prayer_safe False until the god is appeased. 'You murderer!' and killing a peaceful should also set a luck_bad flag that blocks prayer.",
+     "impact": "high"
+    },
+    {
+     "title": "SAFE_FOOD leaves out common edible food, so the pilot starves while carrying some",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "SAFE_FOOD (lines 34-36) has no tripe ration, tin, eucalyptus leaf, clove of garlic, sprig of wolfsbane, kelp frond, meatball, meat stick, huge chunk of meat or lump of royal jelly. It does include 'egg', and eating an unidentified cockatrice egg means stoning. A tin asks 'Eat it?' with a capital E, which mechanics (line 340, 'eat it?') does not match, so it goes to the brain as an unknown prompt.",
+     "evidence": "24 of the 64 Weak-stall snapshots carry unlisted food, for example B19492901 'a tripe ration', B19551803 'a eucalyptus leaf', B19470904 'a sprig of wolfsbane', B19535706 'a tin, a tripe ration, a clove of garlic'.",
+     "fix": "Add those foods, with tripe and tins as a fallback tier used only when Weak. Drop 'egg'. In mechanics, answer the tin prompt ('It smells like X. Eat it?') with y when X passes corpse_safe and n otherwise, matching case-insensitively.",
+     "impact": "high"
+    },
+    {
+     "title": "Kicking locked doors enrages shopkeepers; the 'Closed for inventory' guard is fragile",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "r_explore (lines 419-434) kicks any locked orthogonal door. The shop guard fires only if 'Closed for inventory' appears in the messages of the very snapshot that r_explore sees. It then marks the 8 neighbours of where the hero stands at that moment, not the door next to the engraving. If you cannot pay for a broken shop door, the shopkeeper turns hostile immediately (shk.c pay_for_damage). Kicking Minetown doors also angers the Watch.",
+     "evidence": "B20313001 feed: 'You read: \"Closed for inventory\"', then 'open the door', 'This door is locked', 'kick', '\"How dare you break my door?\"', 'Angmagssalik zaps a forked wand!', dead by a bolt of lightning. There are 14 wand or bolt deaths and 13 had 0 gold, which is when paying is impossible (inference for all but the two feeds shown).",
+     "fix": "Keep a per-level set of engraving squares that read 'Closed for inventory' and mark every door orthogonally next to one as dead. Never kick when gold is under about 500, when a shopkeeper or watchman has been seen on the level, or when the dungeon is the Mines (Minetown). If a 'pay for the door?' prompt comes up, answer y in mechanics.",
+     "impact": "high"
+    },
+    {
+     "title": "The pilot loots shops and gets trapped inside with unpaid goods",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "r_loot (lines 657-658) stops only when a monster named shopkeeper is visible right now. If the pilot is blind, the shop is dark, the shopkeeper is out of line of sight, or the pilot is hallucinating, it picks up merchandise. Nothing ever pays for or drops unpaid items, and the shopkeeper blocks the door while you owe money. The pilot wanders inside until it goes Weak. The loot classes also include '+' (spellbooks) and '(' (tools), which are heavy, useless and expensive.",
+     "evidence": "27 of the 135 stall snapshots carry '(unpaid, N zorkmids)' items: B19455905 has 17, B19504800 has 20 tools including 2 pick-axes, B19470910 has 8 spellbooks. Nearly all are Weak stalls. The B20313004 feed shows 'You feel here 2 food rations (for sale, 160 zorkmids)', 'loot: pick up', 'v - 2 food rations (unpaid...)' while blind.",
+     "fix": "Skip loot after any 'for sale' or 'Welcome to' message until you leave the room, and whenever Blind or Hallu. Add a standing order: if any inventory text contains 'unpaid', pay ('p' and answer y) when gold is enough, otherwise drop those items with D before walking. Remove '+' from the default loot classes and narrow '('.",
+     "impact": "high"
+    },
+    {
+     "title": "Walking into an 'I' marker attacks it, even when blind in a shop",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "_step (lines 204-206) sends F plus a direction at any 'invisible' cell on the path. While blind, the monster there is often a peaceful, such as the shopkeeper.",
+     "evidence": "B20313004 feed: 'Everything suddenly goes dark' (rotten food), then loot and explore, 'Wait! There's something there you can't see!', 'It gets angry!', 'The wand hits you!' three times, death: 'killed by a wand'.",
+     "fix": "When conditions include Blind, stop loot and explore and search in place until sight returns. Never F an 'I' on a square where a peaceful was last seen, or inside a shop (after a Welcome message). Walk around it instead.",
+     "impact": "high"
+    },
+    {
+     "title": "The checks ignore invisible monsters, so the pilot rests while something beats it",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "checks() (lines 254-256) counts only kind=='monster'. Adjacent 'invisible' cells never trigger the fight order or the retreat escalation, and the rest order (line 983) sends '20s' because nothing is 'in view', even while messages say 'It hits!'.",
+     "evidence": "4 deaths are 'killed by an invisible X' (goblin B20015106, hill orc B20211303, gnome lord B20234302, werejackal B20234308).",
+     "fix": "Treat adjacent 'invisible' cells as adjacent hostiles (fight with F plus direction, count toward the retreat check). Block the rest and search orders whenever HP fell since the last snapshot or a recent message matches 'It hits|It bites|You are hit'.",
+     "impact": "medium"
+    },
+    {
+     "title": "Status conditions are passed along but nothing acts on them",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "checks() copies status.conditions (line 289), but no standing order reads them. Sick (food poisoning or illness), Stone, Slime and Strngl kill in a few turns and prayer fixes them. Blind, Conf and Stun make movement and attacks go wrong. Hallu removes the peaceful flag from the snapshot (aipipe.c:335) and scrambles names, so the pilot can attack peacefuls.",
+     "evidence": "A grep shows conditions used only at engine.py:289 and in the brain briefing. The shop death in B20313004 followed blindness from rotten food.",
+     "fix": "Add a top-priority standing order: Sick, Stone, Slime or Strngl means pray if prayer has not failed before, otherwise escalate. Blind, Stun, Conf or Hallu with no adjacent hostile means '5s' in place, with no loot or explore until it clears.",
+     "impact": "medium"
+    },
+    {
+     "title": "Dark floor the hero has walked on is not walkable to bfs",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "View.walkable (lines 118-130) trusts only the characters on screen. In dark areas, the Mines especially, floor already walked is shown blank, so bfs cannot route back along the hero's own trail and known stairs are unreachable.",
+     "evidence": "B19571504 (Mines 4): '>' at (16,11) and the hero at (7,8) inside a 2x2 area of '.', with no floor drawn along the way it came, and bfs finds no path even with avoid off. B20061113 and B20313006 are the same. 12 of the 46 no-way-on snapshots are in the Mines.",
+     "fix": "Keep a per-level set of remembered floor: every square in memory.visited, plus every square ever drawn in FLOOR_CHARS or as a walkable feature. walkable() returns True for those unless a boulder or monster is there now.",
+     "impact": "high"
+    },
+    {
+     "title": "probe_dark runs only when no stairs are known, and only probes orthogonally",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "_default_activity (lines 1008-1013) calls r_probe_dark only if stairs_down is unknown. When the stairs are visible but unreachable it jumps to go_down (fails), then search_walls, then 'no way on'. r_probe_dark (lines 686-691) also probes only ORTHO neighbours, but Mines caves often connect diagonally.",
+     "evidence": "B19571504, B20061113 and B20313006 all show a staircase-down cell with no path and ended in 'no way on' after searching walls, which cannot help in the Mines (no hidden passages there).",
+     "fix": "Gate probing on 'no path to any known stairs' instead of 'stairs unknown', and probe all 8 directions.",
+     "impact": "medium"
+    },
+    {
+     "title": "Floating eyes block corridors for good: one-shot daggers, never picked back up",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "memory.retrieve is filled by r_throw (line 631) and never read. Loot is skipped whenever any hostile is visible (line 998), and a floating eye never approaches, so a thrown dagger stays on the floor. ranged_kill fires only if the eye already happens to be in line (line 946); the pilot never moves to line up a shot. The fallback waits 60 turns per level in total (lines 1034-1038), about 5 floating-eye moves, and then stalls.",
+     "evidence": "Floating eye appears in 10 stall reasons. 8 snapshots have the stairs reachable only through an eye (B19455901, B19470909, B19504809, B19584107, B20015103, B20015107, B20015115, B20061101), and most carry only the long sword. B20015107 sat on Dlvl2 until T17984 and B20211307 until T20001.",
+     "fix": "Let loot run when every visible hostile is on the avoid list and at distance 2 or more, and always pick up items named in memory.retrieve. Add a line-up step: bfs to a square 2-8 away in a straight line with a clear path, then throw. After the daggers run out, throw other junk (darts, orcish daggers, rocks) before giving up.",
+     "impact": "high"
+    },
+    {
+     "title": "The avoid list and gas-spore handling ignore the character, so immobile or weak monsters block the level",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "DONT_MELEE (lines 29-31) puts every mold on the permanent avoid list, but molds never move. A brown mold is harmless to a cold-resistant Valkyrie, and a yellow mold only stings for 1d4. With HP of 26 or less a gas spore is only stepped away from (lines 943-945), so when it sits on the only path the pilot backs off forever.",
+     "evidence": "Stall reasons include '(gas spore in the way)' 6 times, '(yellow mold in the way)' twice, and '(acid blob in the way)' 5 times (older runs whose avoid list included acid blob).",
+     "fix": "Build avoid from role and intrinsics: drop brown mold for a Valkyrie, and allow a yellow mold at HP 20 or more. For a gas spore on the only path with low HP, back off to distance 3 or more and throw anything, or wait until it drifts off the path, instead of stepping away forever.",
+     "impact": "medium"
+    },
+    {
+     "title": "The pilot does not know about the Mines branch and takes whichever '>' it finds",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "r_go_down (lines 472-480) and checks.stairs_down (line 285) take the first staircase down. On Dlvl 2-4 that is often the Gnomish Mines branch, where the dark floor breaks pathing, gnome lords and dwarves carry wands and mattocks (for a human Valkyrie), and Minetown punishes door kicks and shoplifting.",
+     "evidence": "12 of the 44 xlogfile deaths are in the Mines (deathdnum=2). 19 of the 135 stall snapshots are in the Mines, 12 of them no way on. The deepest Mines level reached is 6.",
+     "fix": "After arriving, if status.dungeon is 'The Gnomish Mines' and XL is under 10, go back up, record that staircase as the branch, and choose the other '>' on the parent level.",
+     "impact": "medium"
+    },
+    {
+     "title": "memory.blocked is permanent and applies to every bfs, stairs included",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "_step (lines 211-214) blocks a square forever after 10 waits for a peaceful, and _stuck_guard (line 1053) blocks one after 5 no-op repeats. bfs excludes those squares for every goal, so one peaceful gnome standing in a Mines corridor can cut the level in two for the rest of the game.",
+     "evidence": "B20313006 feed: 'search walls: wait for the peaceful gnome to move', then oscillating 'go search near (41,11)' and '(42,11)', then no way on. A peaceful gnome and a gnome lord are next to the hero in the snapshot.",
+     "fix": "Store blocked squares as (square, turn) and expire them after about 50 turns. Never block a square next to the stairs being targeted; take another route or swap instead.",
+     "impact": "medium"
+    },
+    {
+     "title": "Searching gives up too early",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "r_search_dead_ends (lines 709-717) searches each dead end once, with '10s'. At Luck 0 each search finds an adjacent hidden spot about 1 time in 7, so 10 searches miss it about 21% of the time, and more often with negative Luck after a failed prayer. r_search_walls stops after 2 rounds of 10.",
+     "evidence": "About 10 no-way-on snapshots in the Dungeons of Doom have no staircase down known, for example B19470913, B19492911, B19535704 and B19584102.",
+     "fix": "Escalate before declaring no way on: dead ends up to 3 rounds (30 searches), then walls up to 4 rounds, closest to the biggest unexplored region first.",
+     "impact": "medium"
+    },
+    {
+     "title": "Known traps count as walls, and trap doors are never used as a way down",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "View.walkable returns False for every trap (line 129). A squeaky board or arrow trap in a one-wide corridor or doorway seals off the rest of the level, and a known trap door or hole, which is a free way down, is ignored.",
+     "evidence": "Traps sit in the explored area of no-way-on snapshots B19492907 (sleeping gas trap), B19584112 (two bear traps) and B20313006 (arrow and teleport traps).",
+     "fix": "Make low-risk traps (squeaky board, arrow, dart, rust, rolling boulder) walkable at a higher path cost. Use 'trap door' or 'hole' as a go_down target when no stairs can be reached.",
+     "impact": "low"
+    },
+    {
+     "title": "RuleBrain orders a fight with shopkeepers, watchmen and ghosts",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/brain.py",
+     "problem": "Any 'X adjacent, difficulty N > limit' escalation becomes fight {target: X} (lines 47-49). That includes an angry shopkeeper (difficulty 15) and watchmen, and Elbereth does not stop @-humans or shopkeepers either.",
+     "evidence": "7 stalls read 'shopkeeper adjacent, difficulty 15 > N (last order: fight shopkeeper)'. Replaying B20234314, B20015104 and B20061114 with the current code attacks the shopkeeper at 7/37, 14/43 and 15/56 HP.",
+     "fix": "Never fight shopkeepers, watchmen, priests or guards. For an angry shopkeeper, pay with 'p' if gold allows (that calms him), otherwise leave by the nearest stairs or pray. For monsters over difficulty that are not @, step_away or elbereth first.",
+     "impact": "medium"
+    },
+    {
+     "title": "'Eat the fresh kill' sends e when no corpse is there and leaves a pack prompt open",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "_corpse_to_eat (lines 902-907) sends 'e' on the kill square without checking a corpse is there; small monsters often leave none. The pack prompt that follows ('What do you want to eat? [d or ?*]') is handled in mechanics only when declined_corpse is set (lines 334-336), so it goes to the brain. eating_corpse also stays True, and the kill record stays.",
+     "evidence": "B20323702 stalled on \"prompt: yn 'What do you want to eat? [d or ?*]'\" straight after 'You kill the jackal!' and 'standing order: eat the fresh kill'.",
+     "fix": "Send 'e' only if the square showed a corpse cell before the hero stepped on it, or a 'You see here ... corpse' message came in. In mechanics, if eating_corpse is set and the prompt starts 'What do you want to eat', send ESC, clear the flag and pop the kill.",
+     "impact": "low"
+    },
+    {
+     "title": "The corpse diet is narrow and kill records miss most kills",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "SAFE_CORPSES (lines 43-49) leaves out common safe early corpses: hobbit, dwarf, dwarf lord and dwarf king (for non-dwarves), Woodland-elf, Green-elf and Grey-elf (for non-elves), giant ant, garter snake and grid bug. _record_kills (lines 874-885) credits a kill only when pending_fight is set, so kills by thrown daggers or the pet are lost, and 'You kill it' becomes '?'. FRESH_TURNS=30 is stricter than needed; about 40 is still safe.",
+     "evidence": "Together with the missing packed foods, this is why 80 games reach Weak with nothing to eat. The Weak snapshots average about 4500 turns, and most are on Dlvl 2-3.",
+     "fix": "Extend the list with race-aware kin checks. Record kills from thrown weapons at the square that was targeted. Accept lichen and lizard corpses anywhere, regardless of who killed them.",
+     "impact": "medium"
+    },
+    {
+     "title": "No progress watchdog: the pilot loops for thousands of turns with stairs known",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "_default_activity has no check that the dungeon level or the explored area changes over time. Only the per-key _stuck_guard exists, and it misses loops of different keys.",
+     "evidence": "B20313002 sat on Dlvl2 until T10509 with two staircases down known at (20,4) and (69,13). Its feed alternates 'go down: head for the stairs down' and 'search walls: go search near (8,18)' next to a shop door until the hero goes Weak. Three games hit the 20000-turn limit on Dlvl2.",
+     "fix": "Track turns since the last new dlvl or new explored square. After about 1500 turns with stairs known, force go_down (fight whatever is in the way); with no stairs, escalate once with the loop as the reason.",
+     "impact": "medium"
+    },
+    {
+     "title": "Thrown daggers ignore pets and peacefuls in the line of fire",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "r_throw (lines 626-633) picks any monster cell whose name matches, peaceful or not, and fires down the line without checking for the pet, a peaceful or a wall between. Hitting the pet turns it hostile; hitting a peaceful angers it and costs alignment.",
+     "evidence": "Inference: 4 deaths to domestic animals (kitten 2, little dog, pony). In B20313003 a hostile kitten sat next to a floating eye and a yellow mold, the kinds of targets ranged_kill throws at.",
+     "fix": "Take the target from visible_hostiles, which excludes peacefuls, and walk the line square by square, refusing if a pet, peaceful or wall comes before the target.",
+     "impact": "low"
+    },
+    {
+     "title": "Message-driven logic misses messages that arrive with --More--",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/engine.py",
+     "problem": "aipipe clears its message buffer on every snapshot (aipipe.c emit_state, nmsgs = 0), and mechanics() returns early on 'more' snapshots, so routines only see messages from the final command snapshot. That affects door state and the shop sign (lines 419-427), smudged engravings (line 592) and the corpse check (line 903). _default_activity also runs r_loot before r_explore, so the door checks are skipped on any step where loot acts.",
+     "evidence": "'Closed for inventory' was on screen in B20313001, yet the next door was kicked anyway. Some of the 5 elbereth-stuck snapshots end with 'Never mind.' after an aborted engrave, with no handler seeing why.",
+     "fix": "In Engine.step, keep appending messages to memory.recent_msgs on every snapshot, and clear the list after the first command snapshot has been processed. Message checks read recent_msgs, and the door and shop checks run before r_loot.",
+     "impact": "medium"
+    },
+    {
+     "title": "Batch data loses its diagnostics, and scenario replays overwrite the stall snapshots",
+     "file": "/Users/dave/git/github/games/NetHack/pilot/batch.py",
+     "problem": "Engine stats (turns by activity, corpses eaten and declined, throws, prayers, waits) only go to stdout; the CSV drops them (cols at lines 490-491). finish() records maxlvl as the current dlvl for stalls. Game.play writes batch/<name>.json on any stall, so a scenario replay overwrites the original snapshot.",
+     "evidence": "batch/B20234307.json says 'Weak' at T1463, but the CSV and scenarios/B20234307.json say 'brain loop: small mimic' at T1165. Turn-sink questions (resting, searching, waiting) cannot be answered from saved data.",
+     "fix": "Add a stats column (JSON) to the CSV or write per-game stats JSON. Have scenario.run write to playground/replays/ instead of batch/. Track the deepest dlvl in the Game object.",
+     "impact": "low"
+    }
+   ]
+  }
+ }
+}
