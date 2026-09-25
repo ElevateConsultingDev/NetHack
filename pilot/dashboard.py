@@ -10,6 +10,7 @@ from __future__ import annotations
 import csv
 import glob
 import html
+import json
 import os
 import threading
 import time
@@ -186,9 +187,16 @@ def _history(batch_dir: str) -> str:
             ends[e] = ends.get(e, 0) + 1
         top = "; ".join(f"{n}× {html.escape(e)}" for e, n in sorted(ends.items(), key=lambda kv: -kv[1])[:3])
         run = os.path.basename(path)[:-4]
-        rows.append(f"<tr><td>{run}</td><td>{len(games)}</td><td>{avg('maxlvl')}</td><td>{avg('xlvl')}</td>"
-                    f"<td>{avg('turn')}</td><td>{top}</td></tr>")
-    return ("<table><tr><th>Run</th><th>Games</th><th>Avg deepest</th><th>Avg XL</th><th>Avg turns</th>"
+        try:  # Which brain played, from the run's summary sidecar (pilot.runs writes it).
+            with open(path[:-4] + ".summary.json") as f:
+                sm = json.load(f)
+            who = f"{sm.get('brain')}{' ' + sm['model'] if sm.get('model') else ''}" \
+                  f"{' (no conclusions)' if sm.get('journal') is False else ''}, seed {sm.get('seed')}"
+        except (OSError, ValueError):
+            who = ""
+        rows.append(f"<tr><td>{run}</td><td>{html.escape(who)}</td><td>{len(games)}</td><td>{avg('maxlvl')}</td>"
+                    f"<td>{avg('xlvl')}</td><td>{avg('turn')}</td><td>{top}</td></tr>")
+    return ("<table><tr><th>Run</th><th>Brain</th><th>Games</th><th>Avg deepest</th><th>Avg XL</th><th>Avg turns</th>"
             "<th>Most common endings</th></tr>" + "".join(rows) + "</table>") if rows else "<p class=sub>No runs yet.</p>"
 
 
