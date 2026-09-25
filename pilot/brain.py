@@ -285,11 +285,12 @@ class QwenBrain(HaikuBrain):
         if not self._messages:
             self._start()
         self._messages.append({"role": "user", "content": text})
-        body = {"model": self.model, "messages": self._messages[-41:] if len(self._messages) > 41 else self._messages,
-                "stream": False, "think": False,
-                "options": {"num_predict": 200, "temperature": 0.3, "num_ctx": 16384}}  # default 4k drops the system prompt
-        if len(self._messages) > 41:  # Keep the system prompt when trimming old turns.
-            body["messages"] = [self._messages[0]] + self._messages[-40:]
+        # System prompt plus the last 4 exchanges: each brief is ~2 KB and a
+        # local model re-reads the whole prompt every call (40 turns of
+        # history took a call past 180 s with 3 games queued).
+        msgs = [self._messages[0]] + self._messages[-8:] if len(self._messages) > 9 else self._messages
+        body = {"model": self.model, "messages": msgs, "stream": False, "think": False,
+                "options": {"num_predict": 200, "temperature": 0.3, "num_ctx": 8192}}  # default 4k drops the system prompt
         req = urllib.request.Request(self.URL, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=self.TIMEOUT_S) as r:

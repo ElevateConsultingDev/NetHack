@@ -35,6 +35,8 @@ Rules:
 - Keep a lesson unless this batch contradicts it; sharpen it if the evidence refines it; drop it only with a reason you can see in the records. Never drop a lesson humans wrote without contrary evidence.
 - Engine section: behavior the brain can't fix (loops, a routine doing the wrong thing, a missing rule, a prompt handled badly), with the game names that show it. At most 15 items; remove ones the records show are fixed.
 - A 'turn limit' or 'time limit' stall is the test harness's cap, not a failure: learn nothing from where it stopped.
+- Cite games by count ("(6 games)"), not by name: names bloated the file to 25k characters and a local model timed out reading it.
+- Keep the whole file under 9000 characters.
 - Only claim what the records show. No em dashes or double hyphens.
 Reply with the whole new journal between <journal> and </journal>, and nothing else."""
 
@@ -50,6 +52,9 @@ def summarize(run: dict) -> str:
         for turn, kind, text in g.get("feed", [])[-15:]:
             lines.append(f"  feed T{turn} {kind}: {text[:160]}")
     return "\n".join(lines)
+
+
+MAX_CHARS = 10000  # a small local model re-reads this every call
 
 
 def _slugify(text: str) -> str:
@@ -149,6 +154,9 @@ def main() -> None:
     new = text[start + len("<journal>"):end].strip() + "\n" if 0 <= start < end else ""
     if "## Lessons for the brain" not in new or "## For the engine" not in new:
         raise SystemExit(f"no usable conclusions in the reply; left {JOURNAL} alone.\n{out.stderr[-500:]}{text[-1500:]}")
+    if len(new) > MAX_CHARS:
+        raise SystemExit(f"revised conclusions are {len(new)} chars (cap {MAX_CHARS}); left {JOURNAL} alone. "
+                         f"Rerun, or compact by hand (archive first).")
     slug = re.search(r"SLUG:\s*(.+)", text)
     slug = (slug.group(1).strip() if slug else "revised").rstrip(".")
     if new.strip() != journal.strip():
