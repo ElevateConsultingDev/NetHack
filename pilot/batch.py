@@ -208,6 +208,11 @@ class Game:
                 self.channel.send(keys)
                 return
             order = self._decide(events, s)
+            if s["context"]["kind"] != "command" and order.routine not in (None, "keys"):
+                # Only keys answer a game prompt; a routine here re-fires the
+                # same prompt until the game ends. The rules escape it.
+                fb = RuleBrain().decide(self.engine.last_checks, events, s, self.engine.orders)
+                order.routine, order.args, order.say = fb.routine, fb.args, f"(rules: a routine can't answer a prompt) {fb.say}"
             if order.routine is None and isinstance(self.brain, HaikuBrain):
                 # Unattended: no human to wait for, so null ends the game. Try the rules first.
                 fb = self.brain.fallback.decide(self.engine.last_checks, events, s, self.engine.orders)

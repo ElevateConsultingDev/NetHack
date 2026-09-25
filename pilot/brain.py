@@ -286,7 +286,8 @@ class QwenBrain(HaikuBrain):
             self._start()
         self._messages.append({"role": "user", "content": text})
         body = {"model": self.model, "messages": self._messages[-41:] if len(self._messages) > 41 else self._messages,
-                "stream": False, "think": False, "options": {"num_predict": 200, "temperature": 0.3}}
+                "stream": False, "think": False,
+                "options": {"num_predict": 200, "temperature": 0.3, "num_ctx": 16384}}  # default 4k drops the system prompt
         if len(self._messages) > 41:  # Keep the system prompt when trimming old turns.
             body["messages"] = [self._messages[0]] + self._messages[-40:]
         req = urllib.request.Request(self.URL, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})

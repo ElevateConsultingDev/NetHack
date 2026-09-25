@@ -402,6 +402,13 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
         if prompt.startswith("Are you sure you want to pray") and memory.pending_pray:
             memory.pending_pray = False
             return "y", "confirm the prayer"
+        if prompt.startswith("What do you want to eat") and memory.eating_corpse:
+            # We sent 'e' for a corpse on this square, but the game went
+            # straight to the pack: no corpse here after all. Back out.
+            memory.eating_corpse = False
+            memory.kills.pop((v.dlvl, *v.pos), None)
+            _count(memory, "no corpse to eat")
+            return "\x1b", "no corpse here after all"
         if prompt.startswith("What do you want to eat") and memory.pending_food:
             letter, memory.pending_food = memory.pending_food, ""
             return letter, "eat it"
