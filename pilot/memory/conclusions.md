@@ -2,6 +2,8 @@
 
 What the run record means for how the brain should play. The brain (Haiku or Qwen) reads this file at the start of every game. `python3 -m pilot.reflect <run>` revises it after a batch, archiving the previous version first; humans edit it too. Lineage: this is the former `pilot/journal.md`, carried over as the first stratum.
 
+**Status (2026-09-25):** not in the brain's prompt by default. The learning curve (events/2026-09-25T0404Z_stratigraph-efficacy-haiku.md) measured every stratum of this file below the no-conclusions base on the test seeds (-0.33 to -0.67 levels). It stays as the record and as the engine loop's notes; the reflection now writes short situation-keyed rules, and a stratum goes back into the prompt when it beats the base (`python3 -m pilot.strat`).
+
 ## Lessons for the brain
 
 - Never fight a shopkeeper, watchman, priest, or guard: pay or flee. Hostile shopkeepers/NPCs with wands keep killing during multi-step retreats (step_away, go_to) even when not adjacent; a zap can land on any turn you're still in line of sight, so prioritize ducking behind a corner or closed door over just increasing distance (2 wand deaths this batch).

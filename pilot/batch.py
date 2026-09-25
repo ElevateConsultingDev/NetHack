@@ -433,8 +433,9 @@ def main() -> None:
     p.add_argument("--max-seconds", type=float, default=600)
     p.add_argument("--no-save", action="store_true", help="kill stalled games instead of saving them")
     p.add_argument("--seed", type=int, help="reproducible games: game i gets seed SEED+i (same SEED = same dungeons)")
-    p.add_argument("--no-journal", action="store_true", help="the brain plays without conclusions.md (A/B check)")
-    p.add_argument("--conclusions", help="play with this conclusions file instead of memory/conclusions.md (a stratum)")
+    p.add_argument("--no-journal", action="store_true", help="(default since 2026-09-25: conclusions cost depth) play without conclusions")
+    p.add_argument("--with-conclusions", action="store_true", help="put memory/conclusions.md in the brain's prompt")
+    p.add_argument("--conclusions", help="play with this conclusions file (a stratum); implies --with-conclusions")
     p.add_argument("--replay", metavar="RUN/NAME", help="rerun one recorded seeded game with its brain answers")
     args = p.parse_args()
     if (args.seed is not None or args.replay) and os.environ.get("PYTHONHASHSEED") != "0":
@@ -446,6 +447,9 @@ def main() -> None:
         return
     if args.conclusions:
         os.environ["PILOT_CONCLUSIONS"] = os.path.abspath(args.conclusions)  # inherited by the game processes
+    # The learning curve (2026-09-25) showed conclusions in the prompt cost Haiku 0.3 to 0.7 levels:
+    # off unless asked for, until a stratum beats the no-conclusions base on the test seeds.
+    args.no_journal = not (args.with_conclusions or args.conclusions)
 
     prepare_playground()
     batch_dir = os.path.join(PLAYGROUND, "batch")

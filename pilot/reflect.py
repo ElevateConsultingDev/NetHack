@@ -29,6 +29,8 @@ from .brain import JOURNAL, MEMORY
 SYSTEM = """You maintain the conclusions file (the current strategy) of a NetHack 3.6 autopilot (a Valkyrie). A deterministic ENGINE plays; a BRAIN model is consulted at checkpoints and escalations and reads this journal at the start of every game. You get the current conclusions and the records of a batch of games that just finished. Rewrite the conclusions so the next batch does better.
 
 Rules:
+- The lessons are RULES THE BRAIN CAN FOLLOW, keyed to a situation and telling it what TO DO: "<situation>: <action>" (e.g. "Dlvl 5 or deeper at XL 5 or less: set descend false and clear the level first"; "a soldier ant or killer bee in view: step_away toward the stairs up, never fight"). Not cautions, not lists of what fails, not narratives: a small model given a list of don'ts hesitates and dies sooner (the 2026-09-25 learning curve: every stratum of cautions tested below no conclusions).
+- A rule needs support in at least 3 games of the records (say the count). Drop rules that lost their support. At most 12 brain rules, each one line under 200 characters.
 - Keep the two sections and their headings exactly: "## Lessons for the brain" and "## For the engine (suspected bugs and missing rules; the improvement loop reads this)". Keep the title and the intro paragraph unchanged.
 - Start the reply with one line "SLUG: <3-6 words, what assumption this batch retired>" before the <journal> block; write "SLUG: none" if nothing of substance changed.
 - Brain lessons: things the brain can act on (standing orders, routines, when to descend, what to avoid). One line each, concrete: condition, then action. Cite the evidence in parentheses (game name or count). At most 25 lessons.
@@ -36,7 +38,7 @@ Rules:
 - Engine section: behavior the brain can't fix (loops, a routine doing the wrong thing, a missing rule, a prompt handled badly), with the game names that show it. At most 15 items; remove ones the records show are fixed.
 - A 'turn limit' or 'time limit' stall is the test harness's cap, not a failure: learn nothing from where it stopped.
 - Cite games by count ("(6 games)"), not by name: names bloated the file to 25k characters and a local model timed out reading it.
-- Keep the whole file under 9000 characters.
+- Keep the whole file under 6000 characters.
 - Only claim what the records show. No em dashes or double hyphens.
 Reply with the whole new journal between <journal> and </journal>, and nothing else."""
 
@@ -54,7 +56,7 @@ def summarize(run: dict) -> str:
     return "\n".join(lines)
 
 
-MAX_CHARS = 10000  # a small local model re-reads this every call
+MAX_CHARS = 7000  # a small local model re-reads this every call
 
 
 def _slugify(text: str) -> str:

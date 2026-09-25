@@ -30,8 +30,8 @@ def batch(brain: str, model: str | None, seed: int, games: int, parallel: int, n
            "--seed", str(seed), "--max-seconds", "3600"]
     if model:
         cmd += ["--model", model]
-    if no_journal:
-        cmd.append("--no-journal")
+    if not no_journal and not conclusions:
+        cmd.append("--with-conclusions")
     if conclusions:
         cmd += ["--conclusions", conclusions]
     out = subprocess.run(cmd, capture_output=True, text=True, cwd=HERE).stdout
