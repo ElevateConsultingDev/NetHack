@@ -452,6 +452,11 @@ def main() -> None:
     os.makedirs(batch_dir, exist_ok=True)
     board = os.path.join(batch_dir, "dashboard.html")
     run = time.strftime("%Y%m%d-%H%M%S")
+    while os.path.exists(os.path.join(batch_dir, f"{run}.json")):  # Two batches started in the same second
+        time.sleep(1)                                                # once shared an id and overwrote each other.
+        run = time.strftime("%Y%m%d-%H%M%S")
+    with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Claim the id at once.
+        json.dump({"run": run, "brain": args.brain, "games": []}, f)
     specs = [{"name": f"B{run[-6:]}{i:02d}", "role": args.role, "brain": args.brain, "journal": not args.no_journal,
               "model": args.model,
               "max_turns": args.max_turns, "max_seconds": args.max_seconds, "save": not args.no_save,
@@ -530,6 +535,8 @@ def main() -> None:
         print(f"  {count} x {why}")
     print("  by bucket: " + ", ".join(f"{k} {v}" for k, v in
                                      collections.Counter(r["bucket"] for r in results).most_common()))
+    from .runs import summaries
+    summaries()  # Write this run's small summary sidecar while its file is fresh.
     print(f"details: {path}")
 
 
