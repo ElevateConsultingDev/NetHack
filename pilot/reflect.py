@@ -1,11 +1,14 @@
-"""Rewrite the pilot's journal from a finished batch.
+"""Reflect on a finished batch into the brain's memory (pilot/memory, a Stratigraph).
 
     python3 -m pilot.reflect <run> [--model sonnet]
 
-Reads playground/batch/<run>.json (every game's ending, escalations and
-last feed lines) and pilot/journal.md, asks a model for the revised
-journal, and writes it back. The file is versioned: review with
-`git diff pilot/journal.md`, keep with a commit.
+1. Writes the batch's run event to memory/events/ (immutable: outcome per
+   game, what the brain did, what worked, what failed).
+2. Asks a model for the revised conclusions; if they changed, archives the
+   current conclusions.md verbatim to memory/conclusions-archive/ FIRST
+   (with what challenged it), then writes the new one.
+3. Regenerates memory/agent-now.md (the live edge).
+Review with `git diff pilot/memory`, keep with a commit.
 """
 
 from __future__ import annotations
@@ -16,13 +19,18 @@ import os
 import subprocess
 import tempfile
 
-from .batch import PLAYGROUND
-from .brain import JOURNAL
+import collections
+import datetime as dt
+import re
 
-SYSTEM = """You maintain the journal of a NetHack 3.6 autopilot (a Valkyrie). A deterministic ENGINE plays; a BRAIN model is consulted at checkpoints and escalations and reads this journal at the start of every game. You get the current journal and the records of a batch of games that just finished. Rewrite the journal so the next batch does better.
+from .batch import PLAYGROUND
+from .brain import JOURNAL, MEMORY
+
+SYSTEM = """You maintain the conclusions file (the current strategy) of a NetHack 3.6 autopilot (a Valkyrie). A deterministic ENGINE plays; a BRAIN model is consulted at checkpoints and escalations and reads this journal at the start of every game. You get the current conclusions and the records of a batch of games that just finished. Rewrite the conclusions so the next batch does better.
 
 Rules:
 - Keep the two sections and their headings exactly: "## Lessons for the brain" and "## For the engine (suspected bugs and missing rules; the improvement loop reads this)". Keep the title and the intro paragraph unchanged.
+- Start the reply with one line "SLUG: <3-6 words, what assumption this batch retired>" before the <journal> block; write "SLUG: none" if nothing of substance changed.
 - Brain lessons: things the brain can act on (standing orders, routines, when to descend, what to avoid). One line each, concrete: condition, then action. Cite the evidence in parentheses (game name or count). At most 25 lessons.
 - Keep a lesson unless this batch contradicts it; sharpen it if the evidence refines it; drop it only with a reason you can see in the records. Never drop a lesson humans wrote without contrary evidence.
 - Engine section: behavior the brain can't fix (loops, a routine doing the wrong thing, a missing rule, a prompt handled badly), with the game names that show it. At most 15 items; remove ones the records show are fixed.
@@ -44,6 +52,83 @@ def summarize(run: dict) -> str:
     return "\n".join(lines)
 
 
+def _slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:48] or "event"
+
+
+def write_event(run: dict) -> str:
+    """The batch's immutable run record."""
+    games = run["games"]
+    n = len(games) or 1
+    avg = lambda k: sum(float(g.get(k) or 0) for g in games) / n
+    buckets = collections.Counter(g["bucket"] for g in games)
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H%MZ")
+    slug = _slugify(f"run {run['run']} {run['brain']} {buckets.most_common(1)[0][0] if buckets else ''}")
+    path = os.path.join(MEMORY, "events", f"{stamp}_{slug}.md")
+    rows = "\n".join(f"| {g['name']} | {g.get('race','')} | {g.get('maxlvl','')} | {g.get('xlvl','')} | {g.get('turn','')} | "
+                     f"{g['bucket']} | {(g.get('death') or g.get('stall') or '')[:60]} | {g.get('brain_calls', 0)} |"
+                     for g in sorted(games, key=lambda g: g["name"]))
+    body = f"""---
+timestamp: {stamp}
+run_id: {run['run']}
+kind: run
+brain: {run.get('brain')}{' (' + str(run.get('model')) + ')' if run.get('model') else ''}
+seed: {run.get('seed')}
+conclusions_in_prompt: {run.get('journal', True)}
+---
+
+# Run {run['run']}: {n} games, {run.get('brain')} brain
+
+## Outcome
+- Avg deepest level: {avg('maxlvl'):.2f}; avg XL: {avg('xlvl'):.2f}; avg turns: {avg('turn'):.0f}
+- Endings: {', '.join(f'{k} {v}' for k, v in buckets.most_common())}
+- Brain: {sum(g.get('brain_calls', 0) for g in games)} calls, {sum(g.get('brain_failures', 0) for g in games)} fell back to rules
+- Records: `playground/batch/{run['run']}.json` (keys, brain answers, traces per game)
+
+## Games
+| game | race | deepest | XL | turns | ending | detail | brain calls |
+|---|---|---|---|---|---|---|---|
+{rows}
+
+## What the brain did
+Escalations and checkpoints with the brain's answers are in the records; the conclusions revision that followed this run (if any) is in `conclusions-archive/` with this run as `challenged_by`.
+"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(body)
+    return path
+
+
+def archive(current: str, run_id: str, slug: str) -> str:
+    """Copy the current conclusions verbatim into the archive with a lineage note."""
+    date = dt.date.today().isoformat()
+    path = os.path.join(MEMORY, "conclusions-archive", f"{date}_{_slugify(slug)}.md")
+    i = 1
+    while os.path.exists(path):
+        i += 1
+        path = os.path.join(MEMORY, "conclusions-archive", f"{date}_{_slugify(slug)}-{i}.md")
+    with open(path, "w") as f:
+        f.write(f"---\narchived: {date}\nchallenged_by: run {run_id}\nsuperseded_by: conclusions.md\n"
+                f"slug_story: {slug}\n---\n\n{current}")
+    return path
+
+
+def write_agent_now(run: dict) -> None:
+    """The live edge: current model, last run, active files. Regenerable."""
+    games = run["games"]
+    n = len(games) or 1
+    avg = lambda k: sum(float(g.get(k) or 0) for g in games) / n
+    with open(os.path.join(MEMORY, "agent-now.md"), "w") as f:
+        f.write(f"""# Agent now (live edge, regenerated by pilot.reflect; never archived)
+
+- Updated: {dt.datetime.now(dt.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
+- Brain of the last reflected run: {run.get('brain')}{' (' + str(run.get('model')) + ')' if run.get('model') else ''}
+- Last run: {run['run']}, {n} games, seed {run.get('seed')}: avg deepest {avg('maxlvl'):.2f}, avg XL {avg('xlvl'):.2f}
+- Strategy in force: `conclusions.md` (archive in `conclusions-archive/`)
+- Engine: `pilot/engine.py` at the current commit; standing-order defaults in `DEFAULT_ORDERS`
+""")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Rewrite pilot/journal.md from a batch")
     p.add_argument("run", help="run id, e.g. 20260923-221812")
@@ -53,7 +138,8 @@ def main() -> None:
         run = json.load(f)
     with open(JOURNAL) as f:
         journal = f.read()
-    prompt = f"CURRENT JOURNAL:\n{journal}\n\nBATCH RECORDS:\n{summarize(run)}"
+    write_event(run)
+    prompt = f"CURRENT CONCLUSIONS:\n{journal}\n\nBATCH RECORDS:\n{summarize(run)}"
     out = subprocess.run(
         ["claude", "-p", "--model", args.model, "--system-prompt", SYSTEM, "--tools", "",
          "--strict-mcp-config", "--setting-sources="],
@@ -62,10 +148,16 @@ def main() -> None:
     start, end = text.find("<journal>"), text.rfind("</journal>")
     new = text[start + len("<journal>"):end].strip() + "\n" if 0 <= start < end else ""
     if "## Lessons for the brain" not in new or "## For the engine" not in new:
-        raise SystemExit(f"no usable journal in the reply; left {JOURNAL} alone.\n{out.stderr[-500:]}{text[-1500:]}")
-    with open(JOURNAL, "w") as f:
-        f.write(new)
-    print(f"wrote {JOURNAL}; review with: git diff pilot/journal.md")
+        raise SystemExit(f"no usable conclusions in the reply; left {JOURNAL} alone.\n{out.stderr[-500:]}{text[-1500:]}")
+    slug = re.search(r"SLUG:\s*(.+)", text)
+    slug = (slug.group(1).strip() if slug else "revised").rstrip(".")
+    if new.strip() != journal.strip():
+        archive(journal, run["run"], slug)  # Archive first, then update: the order is mandatory.
+        with open(JOURNAL, "w") as f:
+            f.write(new)
+    write_agent_now(run)
+    print(f"event written; conclusions {'revised (' + slug + ')' if new.strip() != journal.strip() else 'unchanged'}; "
+          f"review with: git diff pilot/memory")
 
 
 if __name__ == "__main__":

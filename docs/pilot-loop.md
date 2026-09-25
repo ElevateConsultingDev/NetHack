@@ -2,7 +2,7 @@
 
 Two loops improve the pilot. Both leave everything in git, so any step can be read, edited or reverted.
 
-**Inner loop (the brain learns).** After every batch, `python3 -m pilot.reflect <run>` rewrites `pilot/journal.md` from the games' records. HaikuBrain reads the journal at the start of every game. Humans can edit the journal at any time; the reflection keeps human lessons unless the records contradict them.
+**Inner loop (the brain learns).** After every batch, `python3 -m pilot.reflect <run>` rewrites `pilot/memory/conclusions.md` (the brain's Stratigraph, see `pilot/memory/STRATIGRAPH.md`) from the games' records. HaikuBrain reads the journal at the start of every game. Humans can edit the journal at any time; the reflection keeps human lessons unless the records contradict them.
 
 **Outer loop (the engine improves).** A Claude Code session runs one iteration per wake-up:
 

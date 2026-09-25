@@ -1,6 +1,6 @@
-# Pilot journal
+# Conclusions: the brain's current strategy
 
-Lessons the brain reads at the start of every game (HaikuBrain puts this file in its prompt). `python3 -m pilot.reflect <run>` rewrites it after a batch; humans edit it too. It is versioned: `git log -p pilot/journal.md` shows how it changed and why.
+What the run record means for how the brain should play. The brain (Haiku or Qwen) reads this file at the start of every game. `python3 -m pilot.reflect <run>` revises it after a batch, archiving the previous version first (see STRATIGRAPH.md); humans edit it too. Lineage: this is the former `pilot/journal.md`, carried over as the first stratum.
 
 ## Lessons for the brain
 

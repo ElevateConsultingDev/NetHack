@@ -120,14 +120,15 @@ def _brief(c: dict, events: list[str], s: dict, chat: str | None, orders: dict) 
     return "\n".join(parts)
 
 
-JOURNAL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "journal.md")
+MEMORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")  # the Stratigraph (see memory/STRATIGRAPH.md)
+JOURNAL = os.path.join(MEMORY, "conclusions.md")  # the brain's current strategy
 
 
 def _journal() -> str:
     """The versioned lessons file, read fresh for every game."""
     try:
         with open(JOURNAL) as f:
-            return "\n\nYOUR JOURNAL (lessons from past games; follow them):\n" + f.read()
+            return "\n\nYOUR CONCLUSIONS (what past runs mean for how to play; follow them):\n" + f.read()
     except OSError:
         return ""
 
