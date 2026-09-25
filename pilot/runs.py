@@ -48,6 +48,35 @@ def runs(brain: str | None = None, seed: int | None = None, games: int | None = 
     return out
 
 
+def summaries() -> list[dict]:
+    """Small per-run summaries, cached beside each run as <run>.summary.json:
+    the run files hold every key and brain answer (1 GB and counting)."""
+    out = []
+    for path in sorted(glob.glob(os.path.join(BATCH, "2*.json"))):
+        if path.endswith(".summary.json"):
+            continue
+        cache = path[:-5] + ".summary.json"
+        try:
+            if os.path.exists(cache) and os.path.getmtime(cache) >= os.path.getmtime(path):
+                out.append(json.load(open(cache)))
+                continue
+            d = json.load(open(path))
+        except (OSError, ValueError):
+            continue
+        g = d.get("games", [])
+        n = len(g) or 1
+        s = {"run": d["run"], "brain": d.get("brain"), "model": d.get("model"), "seed": d.get("seed"),
+             "journal": d.get("journal", True), "conclusions": d.get("conclusions"), "games": len(g),
+             "deepest": sum(float(x.get("maxlvl") or 0) for x in g) / n, "xl": sum(float(x.get("xlvl") or 0) for x in g) / n,
+             "turns": sum(float(x.get("turn") or 0) for x in g) / n, "calls": sum(x.get("brain_calls", 0) for x in g),
+             "failed": sum(x.get("brain_failures", 0) for x in g),
+             "buckets": dict(collections.Counter(x["bucket"] for x in g))}
+        with open(cache, "w") as f:
+            json.dump(s, f)
+        out.append(s)
+    return out
+
+
 def summary(d: dict) -> str:
     g = d["games"]
     n = len(g) or 1
