@@ -1,0 +1,1 @@
+With 2+ hostiles adjacent, target or flee the most dangerous one; don't keep attacking a weaker adjacent monster (jackal, rat) while a stronger one (werejackal, orc, bee) also lands hits (5 games this batch).

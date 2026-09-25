@@ -103,3 +103,19 @@ assert _e.order("fight", {"target": "floating eye"}) is False and _e.routine is 
 _e.last_checks = {"prayer_safe": True, "conditions": ["Blind"]}
 assert _e.order("fight", {"target": "floating eye"}) is True
 print("fight guard ok")
+
+# Branch recall: the engine picks the leaves that match the moment.
+import os as _os, tempfile as _tf
+from pilot.brain import recall as _recall
+_root = _tf.mkdtemp()
+for _leaf, _txt in (("monsters/floating-eye", "floating eye in view: throw, never melee"),
+                    ("hunger/weak", "Weak: eat a floor corpse"), ("depth/dlvl-3-5", "dlvl 3-5: clear the level"),
+                    ("general", "keep the pet"), ("monsters/jackal", "jackal: fight")):
+    _os.makedirs(_os.path.dirname(_os.path.join(_root, _leaf + ".md")) or _root, exist_ok=True)
+    open(_os.path.join(_root, _leaf + ".md"), "w").write(_txt)
+_c = {"visible_hostiles": [{"name": "floating eye", "distance": 2}], "hunger": "Weak"}
+_s = {"status": {"dlvl": 4, "dungeon": "The Dungeons of Doom"}}
+_m = _recall(_c, ["Weak and no known-safe food"], _s, root=_root)
+assert "[monsters/floating-eye]" in _m and "[hunger/weak]" in _m and "[depth/dlvl-3-5]" in _m and "[general]" in _m
+assert "jackal" not in _m, _m
+print("recall ok")

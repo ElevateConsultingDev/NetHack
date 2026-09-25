@@ -1,0 +1,1 @@
+Never fight a shopkeeper, watchman, priest, or guard: pay or flee, duck from a guard's hail (cumulative). Descend ~1 dlvl per XL; if Dlvl exceeds XL by 3+, retreat and avoid engaging (3 games). Space prayers ~1000 turns and limit total prayers per game; 8+ prayers risks punishment even when spaced (2 games).

@@ -1,0 +1,1 @@
+Flee at first sight even at full HP. If a jackal and werejackal are both adjacent, treat the werejackal as the threat: flee or Elbereth rather than fighting the weaker jackal first (3 games this batch, 8+ cumulative).

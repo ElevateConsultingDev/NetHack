@@ -19,18 +19,20 @@ import subprocess
 import sys
 
 from .batch import PLAYGROUND
-from .brain import MEMORY, JOURNAL
+from .brain import MEMORY, JOURNAL, BRANCHES
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def batch(brain: str, model: str | None, seed: int, games: int, parallel: int, no_journal: bool = False,
-          conclusions: str | None = None) -> str:
+          conclusions: str | None = None, branches: str | None = None) -> str:
     cmd = [sys.executable, "-m", "pilot.batch", "--games", str(games), "--parallel", str(parallel), "--brain", brain,
            "--seed", str(seed), "--max-seconds", "3600"]
     if model:
         cmd += ["--model", model]
-    if not no_journal and not conclusions:
+    if branches:
+        cmd += ["--branches", branches]
+    elif not no_journal and not conclusions:
         cmd.append("--with-conclusions")
     if conclusions:
         cmd += ["--conclusions", conclusions]
@@ -57,25 +59,31 @@ def main() -> None:
     p.add_argument("--test-games", type=int, help="test batch size (default: same as --games)")
     p.add_argument("--parallel", type=int, default=2)
     p.add_argument("--no-conclusions-run", help="an existing no-conclusions test run to compare against")
+    p.add_argument("--mode", choices=("branches", "flat"), default="branches",
+                   help="branches: the engine recalls matching leaves per call (default); flat: the whole file in the prompt")
     args = p.parse_args()
     tg = args.test_games or args.games
 
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H%MZ")
-    log = [f"# Stratigraph efficacy, {args.brain}{' ' + args.model if args.model else ''}: test seed {args.test_seed}, "
+    log = [f"# Stratigraph efficacy ({args.mode} memory), {args.brain}{' ' + args.model if args.model else ''}: test seed {args.test_seed}, "
            f"train seed {args.train_seed}+, {args.games} training games and {tg} test games per batch", ""]
     base = args.no_conclusions_run or batch(args.brain, args.model, args.test_seed, tg, args.parallel, no_journal=True)
     log.append(f"- stratum 0 (no conclusions): test run {base}")
-    snap = os.path.join(PLAYGROUND, "batch", f"strat-{stamp}-s0.md")
-    shutil.copy(JOURNAL, snap)
-    t0 = batch(args.brain, args.model, args.test_seed, tg, args.parallel, conclusions=snap)
+    def snapshot(k: int) -> dict:
+        if args.mode == "branches":
+            snap = os.path.join(PLAYGROUND, "batch", f"strat-{stamp}-s{k}.branches")
+            shutil.copytree(BRANCHES, snap)
+            return {"branches": snap}
+        snap = os.path.join(PLAYGROUND, "batch", f"strat-{stamp}-s{k}.md")
+        shutil.copy(JOURNAL, snap)
+        return {"conclusions": snap}
+    t0 = batch(args.brain, args.model, args.test_seed, tg, args.parallel, **snapshot(0))
     log.append(f"- stratum now: test run {t0}: {compare(base, t0)}")
     print("\n".join(log[-2:]), flush=True)
     for k in range(1, args.cycles + 1):
         train = batch(args.brain, args.model, args.train_seed + 100 * k, args.games, args.parallel)
         subprocess.run([sys.executable, "-m", "pilot.reflect", train], cwd=HERE, check=False)
-        snap = os.path.join(PLAYGROUND, "batch", f"strat-{stamp}-s{k}.md")
-        shutil.copy(JOURNAL, snap)
-        test = batch(args.brain, args.model, args.test_seed, tg, args.parallel, conclusions=snap)
+        test = batch(args.brain, args.model, args.test_seed, tg, args.parallel, **snapshot(k))
         log.append(f"- stratum +{k}: trained on {train}, test run {test}: {compare(base, test)}")
         print(log[-1], flush=True)
     path = os.path.join(MEMORY, "events", f"{stamp}_stratigraph-efficacy-{args.brain}.md")

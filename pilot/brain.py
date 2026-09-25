@@ -15,6 +15,7 @@ import json
 import os
 import urllib.request
 import queue
+import re
 import subprocess
 import tempfile
 import threading
@@ -87,7 +88,7 @@ Reply with exactly ONE line of JSON and nothing else:
 """
 
 
-def _brief(c: dict, events: list[str], s: dict, chat: str | None, orders: dict) -> str:
+def _brief(c: dict, events: list[str], s: dict, chat: str | None, orders: dict, memory: str = "") -> str:
     st = s.get("status", {})
     ctx = s.get("context", {})
     rows = [f"{y:2d} {row.rstrip()}" for y, row in enumerate(s.get("map", [])) if row.strip()]
@@ -116,12 +117,72 @@ def _brief(c: dict, events: list[str], s: dict, chat: str | None, orders: dict) 
         tag = cell["kind"] + (" (peaceful)" if cell.get("peaceful") else "")
         notable.append(f"{tag}: {cell['name']} at ({cell['x']},{cell['y']})")
     parts.append("NOTABLE: " + ("; ".join(notable) or "(nothing)"))
+    if memory:
+        parts.append("RELEVANT MEMORY (what past runs learned about exactly this situation; follow it):\n" + memory)
     parts.append("MAP:\n" + "\n".join(rows))
     return "\n".join(parts)
 
 
 MEMORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")  # the Stratigraph (see memory/STRATIGRAPH.md)
 JOURNAL = os.path.join(MEMORY, "conclusions.md")  # the brain's current strategy
+
+
+BRANCHES = os.path.join(MEMORY, "branches")  # conclusions as a tree of leaves the engine selects from
+DEPTH_BANDS = ((2, "dlvl-1-2"), (5, "dlvl-3-5"), (10, "dlvl-6-10"), (99, "dlvl-11-plus"))
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(text).lower()).strip("-")
+
+
+def recall(c: dict, events: list[str], s: dict, root: str | None = None, cap: int = 2500) -> str:
+    """The memory leaves that match this moment, most specific first: the
+    engine walks the tree so the brain reads only what applies (a flat file
+    of every rule measured 0.3 to 0.9 levels below no memory at all)."""
+    root = root or os.environ.get("PILOT_BRANCHES") or BRANCHES
+    st = s.get("status", {})
+    ev = " ".join(events).lower()
+    want = []
+    if "badly hurt" in ev:
+        want.append("escalation/badly-hurt")
+    if "critical hp" in ev:
+        want.append("escalation/critical-hp")
+    if "no way on" in ev:
+        want.append("escalation/no-way-on")
+    if ev.startswith("prompt:"):
+        want.append("escalation/prompt")
+    if " failed:" in ev:
+        want.append("escalation/failed-routine")
+    if "arrived on dlvl" in ev:
+        want.append("checkpoint/new-level")
+    if "check-in" in ev:
+        want.append("checkpoint/check-in")
+    hostiles = sorted(c.get("visible_hostiles") or [], key=lambda h: h.get("distance", 9))
+    want += [f"monsters/{_slug(h['name'])}" for h in hostiles[:3]]
+    if c.get("hunger"):
+        want.append(f"hunger/{_slug(c['hunger'])}")
+    if st.get("dungeon"):
+        want.append(f"dungeon/{_slug(st['dungeon'])}")
+    dlvl = int(st.get("dlvl") or 1)
+    want.append("depth/" + next(name for top, name in DEPTH_BANDS if dlvl <= top))
+    want.append("general")
+    out, seen, total = [], set(), 0
+    for leaf in want:
+        if leaf in seen:
+            continue
+        seen.add(leaf)
+        try:
+            with open(os.path.join(root, leaf + ".md")) as f:
+                text = f.read().strip()
+        except OSError:
+            continue
+        if not text:
+            continue
+        if total + len(text) > cap:
+            break
+        out.append(f"[{leaf}] {text}")
+        total += len(text)
+    return "\n".join(out)
 
 
 def _journal(path: str | None = None) -> str:
@@ -138,9 +199,10 @@ class HaikuBrain:  # (ReplayBrain below stands in for it when rerunning a record
     TIMEOUT_S = 60
 
     def __init__(self, model: str = "haiku", log_path: str | None = None, thinking_tokens: int = 0,
-                 journal: bool = True) -> None:
+                 journal: bool = True, branches: bool = False) -> None:
         self.model = model
-        self.journal = journal  # False: play without pilot/journal.md (the journal A/B check)
+        self.journal = journal    # the flat conclusions file in the system prompt (legacy mode)
+        self.branches = branches  # per-call recall of the leaves that match the situation
         # Thinking made each call 20-50s instead of 2-3s; checkpoints ask
         # dozens of times a game. Raise it if its decisions get worse.
         self.thinking_tokens = thinking_tokens
@@ -236,7 +298,8 @@ class HaikuBrain:  # (ReplayBrain below stands in for it when rerunning a record
         self._proc = None
 
     def decide(self, c: dict, events: list[str], s: dict, orders: dict) -> Order:
-        order = self._parse(self._ask(_brief(c, events, s, None, orders)))
+        memory = recall(c, events, s) if self.branches else ""
+        order = self._parse(self._ask(_brief(c, events, s, None, orders, memory)))
         if order is None:
             fb = self.fallback.decide(c, events, s, orders)
             fb.say = f"(brain unavailable{': ' + self.last_error if self.last_error else ''}; rules) {fb.say}"
@@ -271,8 +334,9 @@ class QwenBrain(HaikuBrain):
     URL = "http://127.0.0.1:11434/api/chat"
     TIMEOUT_S = 180  # Ollama serves one request at a time per model: parallel games queue.
 
-    def __init__(self, model: str = "qwen3:8b", log_path: str | None = None, journal: bool = True) -> None:
-        super().__init__(model, log_path, journal=journal)
+    def __init__(self, model: str = "qwen3:8b", log_path: str | None = None, journal: bool = True,
+                 branches: bool = False) -> None:
+        super().__init__(model, log_path, journal=journal, branches=branches)
         self._messages: list[dict] = []
 
     def _start(self) -> None:

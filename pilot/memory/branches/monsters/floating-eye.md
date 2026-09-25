@@ -1,0 +1,1 @@
+Never melee or stay adjacent; step back a full square before acting. If it blocks the only path, don't loop waiting: attack it from range once you have distance instead of repeated wait/search (2 blocker games this batch, cumulative).

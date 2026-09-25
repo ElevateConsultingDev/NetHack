@@ -367,8 +367,9 @@ def _live_proxy(name: str, batch_dir: str):
 def _play_one(spec: dict) -> dict:
     """One game in its own process: engine, brain, and its live page."""
     batch_dir = os.path.join(PLAYGROUND, "batch")
-    brain = (HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), journal=spec["journal"])
-             if spec["brain"] == "haiku" else QwenBrain(journal=spec["journal"]) if spec["brain"] == "qwen"
+    kw = {"journal": spec["journal"], "branches": spec.get("branches", False)}
+    brain = (HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), **kw)
+             if spec["brain"] == "haiku" else QwenBrain(**kw) if spec["brain"] == "qwen"
              else RuleBrain())
     if spec.get("model") and hasattr(brain, "model"):
         brain.model = spec["model"]
@@ -441,7 +442,9 @@ def main() -> None:
     p.add_argument("--seed", type=int, help="reproducible games: game i gets seed SEED+i (same SEED = same dungeons)")
     p.add_argument("--no-journal", action="store_true", help="(default since 2026-09-25: conclusions cost depth) play without conclusions")
     p.add_argument("--with-conclusions", action="store_true", help="put memory/conclusions.md in the brain's prompt")
-    p.add_argument("--conclusions", help="play with this conclusions file (a stratum); implies --with-conclusions")
+    p.add_argument("--conclusions", help="play with this flat conclusions file (a stratum); implies --with-conclusions")
+    p.add_argument("--branches", nargs="?", const=True, metavar="DIR",
+                   help="branch recall: the engine puts only the memory leaves matching each moment in the brief (DIR: a pinned tree)")
     p.add_argument("--replay", metavar="RUN/NAME", help="rerun one recorded seeded game with its brain answers")
     args = p.parse_args()
     if (args.seed is not None or args.replay) and os.environ.get("PYTHONHASHSEED") != "0":
@@ -454,6 +457,8 @@ def main() -> None:
     # The learning curve (2026-09-25) showed conclusions in the prompt cost Haiku 0.3 to 0.7 levels:
     # off unless asked for, until a stratum beats the no-conclusions base on the test seeds.
     args.no_journal = not (args.with_conclusions or args.conclusions)
+    if args.branches and not args.no_journal:
+        raise SystemExit("--branches and --with-conclusions are different memory modes; pick one")
 
     prepare_playground()
     batch_dir = os.path.join(PLAYGROUND, "batch")
@@ -474,8 +479,16 @@ def main() -> None:
         shutil.copy(args.conclusions or JOURNAL, snap)
         args.conclusions = snap
         os.environ["PILOT_CONCLUSIONS"] = os.path.abspath(snap)  # inherited by the game processes
+    if args.branches:
+        import shutil
+        from .brain import BRANCHES
+        src = args.branches if isinstance(args.branches, str) else BRANCHES
+        snap = os.path.join(batch_dir, f"{run}.branches")
+        shutil.copytree(src, snap)  # Pin the tree for this run.
+        args.branches = snap
+        os.environ["PILOT_BRANCHES"] = os.path.abspath(snap)
     specs = [{"name": f"B{run[-6:]}{i:02d}", "role": args.role, "brain": args.brain, "journal": not args.no_journal,
-              "model": args.model,
+              "branches": bool(args.branches), "model": args.model,
               "max_turns": args.max_turns, "max_seconds": args.max_seconds, "save": not args.no_save,
               "seed": None if args.seed is None else args.seed + i, "run": run} for i in range(args.games)]
     results: list[dict] = []
@@ -483,7 +496,7 @@ def main() -> None:
     def save_json() -> None:
         with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Everything, per game.
             json.dump({"run": run, "brain": args.brain, "model": args.model, "journal": not args.no_journal,
-                       "conclusions": args.conclusions, "seed": args.seed,
+                       "branches": args.branches or None, "conclusions": args.conclusions, "seed": args.seed,
                        "games": sorted(results, key=lambda r: r["name"])}, f)
 
     def board_games() -> list:
