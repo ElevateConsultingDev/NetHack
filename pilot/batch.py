@@ -433,7 +433,8 @@ def main() -> None:
     p.add_argument("--max-seconds", type=float, default=600)
     p.add_argument("--no-save", action="store_true", help="kill stalled games instead of saving them")
     p.add_argument("--seed", type=int, help="reproducible games: game i gets seed SEED+i (same SEED = same dungeons)")
-    p.add_argument("--no-journal", action="store_true", help="Haiku plays without pilot/journal.md (A/B check)")
+    p.add_argument("--no-journal", action="store_true", help="the brain plays without conclusions.md (A/B check)")
+    p.add_argument("--conclusions", help="play with this conclusions file instead of memory/conclusions.md (a stratum)")
     p.add_argument("--replay", metavar="RUN/NAME", help="rerun one recorded seeded game with its brain answers")
     args = p.parse_args()
     if (args.seed is not None or args.replay) and os.environ.get("PYTHONHASHSEED") != "0":
@@ -443,6 +444,8 @@ def main() -> None:
     if args.replay:
         replay(args.replay)
         return
+    if args.conclusions:
+        os.environ["PILOT_CONCLUSIONS"] = os.path.abspath(args.conclusions)  # inherited by the game processes
 
     prepare_playground()
     batch_dir = os.path.join(PLAYGROUND, "batch")
@@ -457,7 +460,8 @@ def main() -> None:
 
     def save_json() -> None:
         with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Everything, per game.
-            json.dump({"run": run, "brain": args.brain, "model": args.model, "journal": not args.no_journal, "seed": args.seed,
+            json.dump({"run": run, "brain": args.brain, "model": args.model, "journal": not args.no_journal,
+                       "conclusions": args.conclusions, "seed": args.seed,
                        "games": sorted(results, key=lambda r: r["name"])}, f)
 
     def board_games() -> list:

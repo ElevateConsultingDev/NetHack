@@ -124,10 +124,10 @@ MEMORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")  # t
 JOURNAL = os.path.join(MEMORY, "conclusions.md")  # the brain's current strategy
 
 
-def _journal() -> str:
-    """The versioned lessons file, read fresh for every game."""
+def _journal(path: str | None = None) -> str:
+    """The brain's current strategy (conclusions.md, or a given stratum), read fresh for every game."""
     try:
-        with open(JOURNAL) as f:
+        with open(path or os.environ.get("PILOT_CONCLUSIONS") or JOURNAL) as f:
             return "\n\nYOUR CONCLUSIONS (what past runs mean for how to play; follow them):\n" + f.read()
     except OSError:
         return ""
