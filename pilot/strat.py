@@ -53,19 +53,21 @@ def main() -> None:
     p.add_argument("--cycles", type=int, default=3)
     p.add_argument("--train-seed", type=int, default=4000)
     p.add_argument("--test-seed", type=int, default=3000)
-    p.add_argument("--games", type=int, default=32)
+    p.add_argument("--games", type=int, default=32, help="training batch size")
+    p.add_argument("--test-games", type=int, help="test batch size (default: same as --games)")
     p.add_argument("--parallel", type=int, default=2)
     p.add_argument("--no-conclusions-run", help="an existing no-conclusions test run to compare against")
     args = p.parse_args()
+    tg = args.test_games or args.games
 
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H%MZ")
     log = [f"# Stratigraph efficacy, {args.brain}{' ' + args.model if args.model else ''}: test seed {args.test_seed}, "
-           f"train seed {args.train_seed}+, {args.games} games per batch", ""]
-    base = args.no_conclusions_run or batch(args.brain, args.model, args.test_seed, args.games, args.parallel, no_journal=True)
+           f"train seed {args.train_seed}+, {args.games} training games and {tg} test games per batch", ""]
+    base = args.no_conclusions_run or batch(args.brain, args.model, args.test_seed, tg, args.parallel, no_journal=True)
     log.append(f"- stratum 0 (no conclusions): test run {base}")
     snap = os.path.join(PLAYGROUND, "batch", f"strat-{stamp}-s0.md")
     shutil.copy(JOURNAL, snap)
-    t0 = batch(args.brain, args.model, args.test_seed, args.games, args.parallel, conclusions=snap)
+    t0 = batch(args.brain, args.model, args.test_seed, tg, args.parallel, conclusions=snap)
     log.append(f"- stratum now: test run {t0}: {compare(base, t0)}")
     print("\n".join(log[-2:]), flush=True)
     for k in range(1, args.cycles + 1):
@@ -73,7 +75,7 @@ def main() -> None:
         subprocess.run([sys.executable, "-m", "pilot.reflect", train], cwd=HERE, check=False)
         snap = os.path.join(PLAYGROUND, "batch", f"strat-{stamp}-s{k}.md")
         shutil.copy(JOURNAL, snap)
-        test = batch(args.brain, args.model, args.test_seed, args.games, args.parallel, conclusions=snap)
+        test = batch(args.brain, args.model, args.test_seed, tg, args.parallel, conclusions=snap)
         log.append(f"- stratum +{k}: trained on {train}, test run {test}: {compare(base, test)}")
         print(log[-1], flush=True)
     path = os.path.join(MEMORY, "events", f"{stamp}_stratigraph-efficacy-{args.brain}.md")
