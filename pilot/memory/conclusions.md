@@ -6,40 +6,20 @@ What the run record means for how the brain should play. The brain (Haiku or Qwe
 
 ## Lessons for the brain
 
-- Never fight a shopkeeper, watchman, priest, or guard: pay or flee. Hostile shopkeepers/NPCs with wands keep killing during multi-step retreats (step_away, go_to) even when not adjacent; a zap can land on any turn you're still in line of sight, so prioritize ducking behind a corner or closed door over just increasing distance (2 wand deaths this batch).
-- Elbereth is unreliable, and ordering it (or "rest" once Elbereth is down) against an animal-type monster (dog, giant ant, rock mole, giant bat, killer bee, hobbit-sized golems) is actively dangerous: the rest can run several turns while the monster keeps landing hits, and HP crashes to zero before a fresh consult happens. Do not order elbereth/rest against known Elbereth-immune monsters; fight or flee instead (5+ deaths this batch: rock mole, giant ant, dog, giant bat, small mimic, hill orc).
-- Homunculus is now the single most common specific killer (4 games this batch, all via sleep bite): at first sight or any consult while one is adjacent, step_away immediately. Do not eat, rest, wait, or engrave near it; those actions all leave you exposed to the sleep bite, and once asleep you cannot act until you're dead.
-- Don't attack a gas spore while it is still adjacent by any method, melee or thrown weapon: a throw from range 1 still triggered a fatal explosion this batch. Step back at least one full square before attacking it at all.
-- Praying takes a turn or more to resolve ("begin"/"finish praying"); an adjacent monster can still land a killing hit during that window.
-- Step_away doesn't guarantee safety: an adjacent monster as fast or faster than you still gets its attack first. Don't escalate max_steps if it fails once; switch to fight or a real Elbereth-eligible target only.
-- The critical-HP prayer/elbereth/fight fallback chain is where most melee deaths happen (roughly a third this batch: straw golem, snake, hill orc, wolf, giant ant). Retreat or engrave while HP is still well above a sliver, especially with 2+ monsters adjacent or after step_away has already failed. If elbereth is ordered twice in a row at critical HP and HP keeps dropping, escalate to flee/fight, don't repeat elbereth a third time.
-- At critical HP with a monster adjacent, don't spend the turn on inventory, eating, quaffing an unidentified potion, or a malformed/non-combat order; none stop the enemy's next hit.
-- Floating eye: never melee it (unless blind); throw daggers instead. If it blocks the only path and you have nothing left to throw, route around it rather than repeating a doomed throw order.
-- Don't search or explore for thousands of turns while hungry; eat as soon as you're Hungry. Starvation despite multiple well-spaced successful prayers happened three times this batch; prayer only cures the immediate Weak/Fainting status, it does not give you food, so actively hunt for a corpse or ration well before the next Hungry warning.
-- When Weak with no known-safe food in inventory, look for a safe corpse on the floor to eat rather than cycling failed pick_up/use/eat orders.
-- Descend roughly one dungeon level per experience level early (Dlvl up to XL+1/+2 once armor is decent); camping starves, diving too fast dies.
-- In the Gnomish Mines, dwarves, watchmen, watch captains, giant spiders, and even ponies/dogs hit far harder than their difficulty suggests; retreat toward stairs the moment one is sighted, even before it's adjacent.
-- Prayer needs roughly 1000 turns of spacing; praying too soon is "not safe" and can anger the god instead of helping.
-- Don't order go_down before the stairs down are known. If explore stalls with no stairs found, order search_walls, then search_dead_ends if every wall's been searched twice.
-- When go_to fails ("no path"), don't fall back to raw movement keys; the engine rejects them. However, once you're actually standing on/adjacent to a known stairs tile and go_down still fails, a raw '>' keypress can succeed where go_down doesn't (worked in one game this batch).
-- Don't quaff unidentified potions speculatively away from healing backup. Also don't get drawn into naming a potion ("Call a ___ potion:") while a monster is adjacent; that prompt costs a combat turn for no safety benefit (2 deaths this batch involved this prompt firing mid-fight).
-- Don't melee a homunculus, ever; see above, it is now the top priority monster to flee at first sight.
-- If a guard or watch captain hails you ("who are you?"), answering costs a turn it can close distance in; if already hurt, flee instead.
-- Stationary or slow-moving monsters that block your only path (molds, fungi, shriekers) never resolve by waiting; fight through or route around rather than looping 10-20+ turns of no progress.
-- Mind flayers (including master mind flayers) can kill via repeated brain-eating tentacle attacks extremely fast, even outright; flee at first sight rather than engaging, especially below Dlvl 10 where you have no protection.
-- Werejackals, wererats, and other lycanthropes hit harder than their listed difficulty once adjacent; treat first sighting as a flee trigger, not a fight trigger, unless already at full HP.
-
-## For the engine (suspected bugs and missing rules; the improvement loop reads this)
-
-- Loot/pickup/probe routines can loop indefinitely when a peaceful creature blocks the tile or pick_up has no path/target (multiple games).
-- go_to pathfinding fails repeatedly against unreachable coordinates and cascades through fallback orders in one turn without trying an alternate target or giving up cleanly.
-- "No way on" stalls persist even after search_walls and search_dead_ends are exhausted, sometimes running thousands of turns before resolving or stalling; one confirmed fix path is go_to onto the stairs tile followed by a raw '>' keypress.
-- go_down can fail "no known way down" even when standing on or next to the actual stairs tile; the map's known-stairs state doesn't update.
-- When a consult returns no order or exhausts its fallback chain, the engine defaults to "wait," leaving the pilot idle next to danger instead of a safer default (very common).
-- Standing orders, especially "rest" once Elbereth is down, appear to keep executing turn after turn without a fresh consult even as HP crashes from a monster's repeated hits; this produced at least 5 deaths this batch where "rest on Elbereth" ran multiple turns straight into death against an Elbereth-immune animal. The rest loop needs to interrupt and re-consult after every hit taken, not just periodically.
-- Cascading same-turn fallback chains (badly hurt -> rest fails -> step_away/go_to fails -> elbereth/pray/fight) can trip the engine's loop detector and end the run as a stall instead of completing one turn's action.
-- Multi-prompt/multi-turn action sequences leave a window where an adjacent monster's attack can land and kill before the sequence completes: Elbereth's implement/text prompts, an unidentified potion's naming prompt ("Call a ___ potion:"), the eating "Continue eating?" prompt, and the prayer begin/finish sequence have all cost fatal turns this way.
-- explore's/no-way-on's "wait for the monster to move out of the way" fallback never resolves against stationary or slow monsters (molds, fungi, shriekers) and can repeat 10-20+ turns with no re-engagement or fresh consult.
-- No safety block on attacking an adjacent gas spore with a thrown weapon (still adjacent = still explodes on you), similar to the floating-eye block (confirmed working: a "fight" order against a floating eye is correctly rejected).
-- Once "keys rejected: walking is the engine's job" fires, the brain keeps retrying nonsensical raw keys for the same no-way-on stall instead of giving up cleanly to wait.
-- History of tried-and-dropped brain-side tweaks (loop iterations 11-27, kept so they aren't retried blind): Hungry-with-no-food go_down-before-clearing; wider rest HP band; multi-round wall search with quality fallback; keep-fighting-instead-of-Elbereth when badly hurt; Excalibur fountain-dipping; eating fresh floating eyes for telepathy; stepping into a corridor/doorway with 2+ hostiles adjacent; sticky explore target with visited-square path cost; remembering every seen-floor square for pathing; sticky explore target plus loot-only-near-hostiles. None produced a net gain; revisit only after the "no way on" or "rest-on-Elbereth doesn't interrupt" problems get a real fix.
+- Never fight a shopkeeper, watchman, priest, or guard: pay or flee. A guard is lethal even at first hail (difficulty 14); duck behind cover, not just distance (2+ games).
+- Never order rest with any hostile adjacent, regardless of type: it repeats turns unattended while HP crashes to zero (7+ deaths: ants, wererat pack, cats, giant bats, sewer rat, mummy).
+- Elbereth's engrave (pick implement, then write) takes a turn; a monster can land the killing hit mid-sequence. Below about 15% HP, fight or flee instead (4+ deaths).
+- step_away often fails ("nowhere further to step") in corridors; don't retry it, switch straight to fight or a different direction (9+ games this batch).
+- Homunculus: flee on sight; if step_away fails once, fight immediately rather than retry step_away/elbereth/pray. Sleep bite kills within 1-2 turns of hesitation (5 deaths).
+- At critical HP with a monster adjacent, never spend the turn on eat, quaff/use, inventory, or malformed keys; none stop the next hit (6+ deaths).
+- Giant bat, rock mole, giant ant, and cats/dogs keep hitting through Elbereth/rest; treat first sighting as flee-or-fight-now (3+ giant bat deaths).
+- Praying takes a turn or more; an adjacent monster can land a killing hit before it resolves, so don't pray as last resort if that hit would kill first.
+- Floating eye: never melee it (unless blind); throw daggers, or route around it if nothing left to throw.
+- Don't quaff unidentified potions, or answer a potion-naming prompt, while a monster is adjacent; the prompt and the effect both cost a fatal turn (3 deaths).
+- Weak with no known-safe food: don't wait or repeat prayer; actively seek a floor corpse. Prayer fixes the status, not the hunger (3 stalls/deaths despite prayers).
+- Never attack a gas spore while adjacent, melee or thrown; step back a full square first.
+- In the Gnomish Mines, dwarves, watchmen, giant spiders, gold golems, even ponies hit far harder than their difficulty; retreat toward stairs on first sighting.
+- Don't order go_down before stairs down are known; search_walls then search_dead_ends if explore stalls. On a known stairs tile, a raw '>' can work when go_down fails.
+- Mind flayers and lycanthropes (werejackal, wererat) hit harder than listed difficulty once adjacent; flee at first sight unless already at full HP.
+- Stationary/slow monsters (molds, fungi, shriekers) blocking your only path never resolve by waiting; fight through or route around.
+- Descend roughly one dungeon level per experience level early; camping starves, diving too fast dies. Prayer needs roughly 1000 turns of spacing.

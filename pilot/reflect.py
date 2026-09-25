@@ -31,16 +31,16 @@ SYSTEM = """You maintain the conclusions file (the current strategy) of a NetHac
 Rules:
 - The lessons are RULES THE BRAIN CAN FOLLOW, keyed to a situation and telling it what TO DO: "<situation>: <action>" (e.g. "Dlvl 5 or deeper at XL 5 or less: set descend false and clear the level first"; "a soldier ant or killer bee in view: step_away toward the stairs up, never fight"). Not cautions, not lists of what fails, not narratives: a small model given a list of don'ts hesitates and dies sooner (the 2026-09-25 learning curve: every stratum of cautions tested below no conclusions).
 - A rule needs support in at least 3 games of the records (say the count). Drop rules that lost their support. At most 12 brain rules, each one line under 200 characters.
-- Keep the two sections and their headings exactly: "## Lessons for the brain" and "## For the engine (suspected bugs and missing rules; the improvement loop reads this)". Keep the title and the intro paragraph unchanged.
+- Reply with two blocks: <journal> holding the brain's file (title, intro paragraph unchanged, then exactly one section "## Lessons for the brain") and <engine> holding the engine notes file (its title line, then the notes). The brain never sees the engine notes, so keep them out of <journal>.
 - Start the reply with one line "SLUG: <3-6 words, what assumption this batch retired>" before the <journal> block; write "SLUG: none" if nothing of substance changed.
 - Brain lessons: things the brain can act on (standing orders, routines, when to descend, what to avoid). One line each, concrete: condition, then action. Cite the evidence in parentheses (game name or count). At most 25 lessons.
 - Keep a lesson unless this batch contradicts it; sharpen it if the evidence refines it; drop it only with a reason you can see in the records. Never drop a lesson humans wrote without contrary evidence.
-- Engine section: behavior the brain can't fix (loops, a routine doing the wrong thing, a missing rule, a prompt handled badly), with the game names that show it. At most 15 items; remove ones the records show are fixed.
+- Engine notes: behavior the brain can't fix (loops, a routine doing the wrong thing, a missing rule, a prompt handled badly), with the game names that show it. At most 15 items; remove ones the records show are fixed.
 - A 'turn limit' or 'time limit' stall is the test harness's cap, not a failure: learn nothing from where it stopped.
 - Cite games by count ("(6 games)"), not by name: names bloated the file to 25k characters and a local model timed out reading it.
-- Keep the whole file under 6000 characters.
+- Keep the brain's file under 4000 characters; the engine notes under 9000.
 - Only claim what the records show. No em dashes or double hyphens.
-Reply with the whole new journal between <journal> and </journal>, and nothing else."""
+Reply with "SLUG: ...", then the brain's file between <journal> and </journal>, then the engine notes between <engine> and </engine>, and nothing else."""
 
 
 def summarize(run: dict) -> str:
@@ -56,7 +56,8 @@ def summarize(run: dict) -> str:
     return "\n".join(lines)
 
 
-MAX_CHARS = 7000  # a small local model re-reads this every call
+MAX_CHARS = 5000  # the brain's file: a small local model re-reads it every call
+ENGINE_NOTES = os.path.join(MEMORY, "engine-notes.md")
 
 
 def _slugify(text: str) -> str:
@@ -145,8 +146,13 @@ def main() -> None:
         run = json.load(f)
     with open(JOURNAL) as f:
         journal = f.read()
+    try:
+        with open(ENGINE_NOTES) as f:
+            engine_notes = f.read()
+    except OSError:
+        engine_notes = "# Engine notes\n"
     write_event(run)
-    prompt = f"CURRENT CONCLUSIONS:\n{journal}\n\nBATCH RECORDS:\n{summarize(run)}"
+    prompt = f"CURRENT CONCLUSIONS (the brain's file):\n{journal}\n\nCURRENT ENGINE NOTES:\n{engine_notes}\n\nBATCH RECORDS:\n{summarize(run)}"
     out = subprocess.run(
         ["claude", "-p", "--model", args.model, "--system-prompt", SYSTEM, "--tools", "",
          "--strict-mcp-config", "--setting-sources="],
@@ -154,7 +160,9 @@ def main() -> None:
     text = out.stdout
     start, end = text.find("<journal>"), text.rfind("</journal>")
     new = text[start + len("<journal>"):end].strip() + "\n" if 0 <= start < end else ""
-    if "## Lessons for the brain" not in new or "## For the engine" not in new:
+    ei, ej = text.find("<engine>"), text.rfind("</engine>")
+    new_engine = text[ei + 8:ej].strip() + "\n" if 0 <= ei < ej else ""
+    if "## Lessons for the brain" not in new or "## For the engine" in new:
         raise SystemExit(f"no usable conclusions in the reply; left {JOURNAL} alone.\n{out.stderr[-500:]}{text[-1500:]}")
     if len(new) > MAX_CHARS:
         raise SystemExit(f"revised conclusions are {len(new)} chars (cap {MAX_CHARS}); left {JOURNAL} alone. "
@@ -165,6 +173,9 @@ def main() -> None:
         archive(journal, run["run"], slug)  # Archive first, then update: the order is mandatory.
         with open(JOURNAL, "w") as f:
             f.write(new)
+    if new_engine and new_engine.strip() != engine_notes.strip():
+        with open(ENGINE_NOTES, "w") as f:
+            f.write(new_engine)
     write_agent_now(run)
     print(f"event written; conclusions {'revised (' + slug + ')' if new.strip() != journal.strip() else 'unchanged'}; "
           f"review with: git diff pilot/memory")
