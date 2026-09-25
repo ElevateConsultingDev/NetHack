@@ -95,3 +95,11 @@ _snap = {"context": {"kind": "command"}, "player": {"x": 3, "y": 2}, "messages":
 _keys, _esc = Engine().step(_snap)
 assert _keys or _esc
 print("step ok")
+
+# Hard rule: the brain may not order a melee on a floating eye (unless Blind).
+_e = _E()
+_e.last_checks = {"prayer_safe": True, "conditions": []}
+assert _e.order("fight", {"target": "floating eye"}) is False and _e.routine is None
+_e.last_checks = {"prayer_safe": True, "conditions": ["Blind"]}
+assert _e.order("fight", {"target": "floating eye"}) is True
+print("fight guard ok")

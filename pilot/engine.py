@@ -954,6 +954,11 @@ class Engine:
         if routine == "pray" and not self.last_checks.get("prayer_safe"):
             self.note = "rejected the brain's prayer: the gate is closed"  # Would anger the god.
             return False
+        target = str((args or {}).get("target") or "").lower()
+        if routine == "fight" and any(n in target for n in DONT_MELEE) \
+                and "Blind" not in self.last_checks.get("conditions", []):
+            self.note = f"rejected the brain's fight order: never melee a {target}"  # Paralysis, stoning, passive damage.
+            return False
         # Everything the brain has answered stays answered until its routine
         # finishes, even if a later answer switches routines (badly hurt ->
         # elbereth, then too-tough monster -> fight): otherwise two alarms

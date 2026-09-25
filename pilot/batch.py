@@ -208,6 +208,12 @@ class Game:
                 self.channel.send(keys)
                 return
             order = self._decide(events, s)
+            failed = next((e.split(" failed:")[0] for e in events if " failed:" in e), None)
+            if order.routine and order.routine == failed:
+                # The routine that just failed, ordered again: the rules pick something else
+                # (13 of 32 Qwen games ended as brain loops this way).
+                fb = RuleBrain().decide(self.engine.last_checks, events, s, self.engine.orders)
+                order.routine, order.args, order.say = fb.routine, fb.args, f"(rules: {failed} just failed) {fb.say}"
             if s["context"]["kind"] != "command" and order.routine not in (None, "keys"):
                 # Only keys answer a game prompt; a routine here re-fires the
                 # same prompt until the game ends. The rules escape it.
