@@ -144,6 +144,9 @@ def main() -> None:
     args = p.parse_args()
     with open(os.path.join(PLAYGROUND, "batch", f"{args.run}.json")) as f:
         run = json.load(f)
+    import fcntl
+    lock = open(os.path.join(MEMORY, ".reflect.lock"), "w")
+    fcntl.flock(lock, fcntl.LOCK_EX)  # One reflection at a time: archive-then-update must not interleave.
     with open(JOURNAL) as f:
         journal = f.read()
     try:

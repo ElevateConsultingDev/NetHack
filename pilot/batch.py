@@ -445,8 +445,6 @@ def main() -> None:
     if args.replay:
         replay(args.replay)
         return
-    if args.conclusions:
-        os.environ["PILOT_CONCLUSIONS"] = os.path.abspath(args.conclusions)  # inherited by the game processes
     # The learning curve (2026-09-25) showed conclusions in the prompt cost Haiku 0.3 to 0.7 levels:
     # off unless asked for, until a stratum beats the no-conclusions base on the test seeds.
     args.no_journal = not (args.with_conclusions or args.conclusions)
@@ -461,6 +459,15 @@ def main() -> None:
         run = time.strftime("%Y%m%d-%H%M%S")
     with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Claim the id at once.
         json.dump({"run": run, "brain": args.brain, "games": []}, f)
+    if not args.no_journal:
+        # Pin the stratum: every game of this run reads the same snapshot, whatever
+        # a reflection does to conclusions.md meanwhile (one Qwen arm mixed three).
+        import shutil
+        from .brain import JOURNAL
+        snap = os.path.join(batch_dir, f"{run}.conclusions.md")
+        shutil.copy(args.conclusions or JOURNAL, snap)
+        args.conclusions = snap
+        os.environ["PILOT_CONCLUSIONS"] = os.path.abspath(snap)  # inherited by the game processes
     specs = [{"name": f"B{run[-6:]}{i:02d}", "role": args.role, "brain": args.brain, "journal": not args.no_journal,
               "model": args.model,
               "max_turns": args.max_turns, "max_seconds": args.max_seconds, "save": not args.no_save,
