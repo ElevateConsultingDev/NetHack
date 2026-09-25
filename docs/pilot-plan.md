@@ -76,6 +76,7 @@ This is one ranked plan built from all three inputs, with duplicates combined. 8
 
 ### 10. Remember walked floor so dark areas are walkable; probe dark areas in 8 directions
 
+- **Status (2026-09-24): probe fixed too (loop iteration 28).** Probing no longer treats blank squares the pilot has stood on as unknown (dark floor is redrawn blank; two neighbours pointed probes at each other for thousands of turns). Rules 64 games: seed 1000 +0.14 +/- 0.13; held-out seed 5000 20260924-153154 -> 20260924-175758 deepest +0.42 +/- 0.17, XL +0.23 +/- 0.10 (both real, 8 better / 0 worse, together with the stale-stairs fix). Applying the same idea to the explore frontier and walkability (iteration 25) cost depth and was dropped.
 - **Status (2026-09-24): first half done (loop iteration 15).** Squares we have stood on count as walkable when drawn blank. Rules pair (seed 1000) 20260924-102621 -> 20260924-104730: avg deepest 4.44 -> 4.81, XL 4.31 -> 4.31; a dwarf crossed a dark Mines level (Dlvl 3 -> 7). Not done: squares seen as floor but never stood on, and 8-direction probing when stairs are unreachable.
 - **Layer:** engine · **Effort:** small
 - **Why:** B19571504, B20061113 and B20313006 show the stairs down on screen but no floor path to them, because dark floor already walked is drawn blank and View.walkable (lines 118-130) trusts only what is on screen. 12 of the 46 no-way-on snapshots are in the Mines. r_probe_dark runs only when stairs are unknown and probes only orthogonally (lines 686-691, 1008-1013).
