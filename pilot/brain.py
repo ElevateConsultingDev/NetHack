@@ -285,10 +285,10 @@ class QwenBrain(HaikuBrain):
         if not self._messages:
             self._start()
         self._messages.append({"role": "user", "content": text})
-        # System prompt plus the last 4 exchanges: each brief is ~2 KB and a
-        # local model re-reads the whole prompt every call (40 turns of
-        # history took a call past 180 s with 3 games queued).
-        msgs = [self._messages[0]] + self._messages[-8:] if len(self._messages) > 9 else self._messages
+        # System prompt plus the last 2 exchanges: the brief already carries
+        # the whole current state, and a local model re-reads every token
+        # each call (4 exchanges made a call ~13 s and two games queued).
+        msgs = [self._messages[0]] + self._messages[-4:] if len(self._messages) > 5 else self._messages
         body = {"model": self.model, "messages": msgs, "stream": False, "think": False,
                 "options": {"num_predict": 200, "temperature": 0.3, "num_ctx": 8192}}  # default 4k drops the system prompt
         req = urllib.request.Request(self.URL, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
