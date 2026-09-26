@@ -443,7 +443,8 @@ def main() -> None:
     p.add_argument("--no-journal", action="store_true", help="(default since 2026-09-25: conclusions cost depth) play without conclusions")
     p.add_argument("--with-conclusions", action="store_true", help="put memory/conclusions.md in the brain's prompt")
     p.add_argument("--conclusions", help="play with this flat conclusions file (a stratum); implies --with-conclusions")
-    p.add_argument("--no-checkpoints", action="store_true", help="the brain answers escalations only (no new-level, first-sight or check-in consults)")
+    p.add_argument("--checkpoints", action="store_true", help="consult the brain at new levels, first sights and check-ins too (they cost XL 0.5 and gained nothing, 2026-09-26)")
+    p.add_argument("--no-checkpoints", action="store_true", help="(the default since 2026-09-26) escalations only")
     p.add_argument("--branches", nargs="?", const=True, metavar="DIR",
                    help="branch recall: the engine puts only the memory leaves matching each moment in the brief (DIR: a pinned tree)")
     p.add_argument("--replay", metavar="RUN/NAME", help="rerun one recorded seeded game with its brain answers")
@@ -458,6 +459,7 @@ def main() -> None:
     # The learning curve (2026-09-25) showed conclusions in the prompt cost Haiku 0.3 to 0.7 levels:
     # off unless asked for, until a stratum beats the no-conclusions base on the test seeds.
     args.no_journal = not (args.with_conclusions or args.conclusions)
+    args.no_checkpoints = not args.checkpoints
     if args.no_checkpoints:
         os.environ["PILOT_NO_CHECKPOINTS"] = "1"  # inherited by the game processes
     if args.branches and not args.no_journal:
