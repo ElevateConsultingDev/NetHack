@@ -1,1 +1,1 @@
-When Fainting, seek and eat food immediately, don't idle through check-ins; praying again after several prior successful prayers this game risks punishment instead of relief (2 games this batch).
+When Fainting, eat any corpse or food in inventory immediately, don't pick_up/loot/explore first; if none available keep heading to a known food source rather than idling through check-ins (3 games this batch).

@@ -1,1 +1,1 @@
-Flee at first sight even at full HP. If a jackal and werejackal are both adjacent, treat the werejackal as the threat: flee or Elbereth rather than fighting the weaker jackal first (3 games this batch, 8+ cumulative).
+Flee (step_away/go_to away) at first sight, alone or in a pack with jackals/coyotes/kittens; if flight fails, fight, never elbereth: engraving while surrounded by a werejackal pack killed 4 games this batch (16+ cumulative).

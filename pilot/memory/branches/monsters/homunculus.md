@@ -1,1 +1,1 @@
-Flee immediately on sight, never engage even once in melee; its sleep bite lets it and other adjacent monsters land repeated free hits that are often fatal (3 games this batch, 14+ cumulative).
+Flee immediately on sight, never melee, eat, or quaff while adjacent: even one turn triggers its sleep bite. If already adjacent and step_away/go_to fails, fight it at once instead of elbereth or rest, both let the sleep-chain finish you off (4 games this batch, 19+ cumulative).

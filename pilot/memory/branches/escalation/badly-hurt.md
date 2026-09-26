@@ -1,1 +1,1 @@
-With 2+ hostiles adjacent, target or flee the most dangerous one; don't keep attacking a weaker adjacent monster (jackal, rat) while a stronger one (werejackal, orc, bee) also lands hits (5 games this batch).
+With 2+ hostiles adjacent (jackal/werejackal/coyote/kitten packs common), choose fight or flee only; never elbereth, it fails even mid-pack and while resting on it (6+ games this batch: werejackal packs x4, hobgoblin, giant ant).
