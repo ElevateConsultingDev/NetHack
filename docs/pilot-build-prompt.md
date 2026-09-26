@@ -115,6 +115,8 @@ Each of these cost at least one batch to learn. Build them in from the start.
 
 **How to find bugs like these.** Don't pick fixes from failure-bucket names. Look for effort without progress: games whose turns keep passing while the known map, depth and XL stop changing, then read their final map and the engine's last notes. That found the engulf stalls (43 of 245) and the shop ping-pong.
 
+**The brain, measured.** On the same 64 held-out dungeons the deterministic rule brain alone (5.28 / XL 4.39) matched or beat Haiku with no memory (5.08 / 3.86). The model brain is not yet adding depth over fixed rules; do not assume it does. Measure it against the rules first, on held-out seeds, before investing in what it knows.
+
 **The brain's memory, measured.** A file of lessons distilled from batch records and put in the brain's prompt did not help: on 64 held-out test dungeons every version tested 0.3 to 0.7 levels below no lessons at all, and more versions made it worse. The lessons were cautions (what fails, what not to do); a small model given cautions dies sooner. If you build a memory, keep it short (under 5k characters), keyed to situations, telling the brain what to do, supported by several games, and test each version against a no-memory base on seeds the reflection never sees. Keep engine notes out of the brain's file.
 
 ## 5. What is not done yet (good places to beat the reference)
