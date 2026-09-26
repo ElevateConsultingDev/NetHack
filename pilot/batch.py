@@ -136,7 +136,7 @@ class Game:
         self._next_trace = 0
         self.deepest = 0
         self.escalations: list = []  # (turn, events, order) for every brain call
-        self.consult = isinstance(brain, HaikuBrain)  # strategic check-ins, not just escalations
+        self.consult = isinstance(brain, HaikuBrain) and not os.environ.get("PILOT_NO_CHECKPOINTS")  # check-ins too
         self.save_on_stall = save_on_stall
         self.saving = False
         self.name, self.role, self.brain = name, role, brain
@@ -443,6 +443,7 @@ def main() -> None:
     p.add_argument("--no-journal", action="store_true", help="(default since 2026-09-25: conclusions cost depth) play without conclusions")
     p.add_argument("--with-conclusions", action="store_true", help="put memory/conclusions.md in the brain's prompt")
     p.add_argument("--conclusions", help="play with this flat conclusions file (a stratum); implies --with-conclusions")
+    p.add_argument("--no-checkpoints", action="store_true", help="the brain answers escalations only (no new-level, first-sight or check-in consults)")
     p.add_argument("--branches", nargs="?", const=True, metavar="DIR",
                    help="branch recall: the engine puts only the memory leaves matching each moment in the brief (DIR: a pinned tree)")
     p.add_argument("--replay", metavar="RUN/NAME", help="rerun one recorded seeded game with its brain answers")
@@ -457,6 +458,8 @@ def main() -> None:
     # The learning curve (2026-09-25) showed conclusions in the prompt cost Haiku 0.3 to 0.7 levels:
     # off unless asked for, until a stratum beats the no-conclusions base on the test seeds.
     args.no_journal = not (args.with_conclusions or args.conclusions)
+    if args.no_checkpoints:
+        os.environ["PILOT_NO_CHECKPOINTS"] = "1"  # inherited by the game processes
     if args.branches and not args.no_journal:
         raise SystemExit("--branches and --with-conclusions are different memory modes; pick one")
 
@@ -497,6 +500,7 @@ def main() -> None:
         with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Everything, per game.
             json.dump({"run": run, "brain": args.brain, "model": args.model, "journal": not args.no_journal,
                        "branches": args.branches or None, "conclusions": args.conclusions, "seed": args.seed,
+                       "checkpoints": not args.no_checkpoints,
                        "games": sorted(results, key=lambda r: r["name"])}, f)
 
     def board_games() -> list:
