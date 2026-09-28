@@ -373,6 +373,10 @@ def checks(v: View, memory: Memory) -> dict:
         "hunger": st.get("hunger", "").strip(),
         "hp": hp, "hpmax": hpmax, "wounded": wound_tier(hp, hpmax),
         "under_attack": unseen_attack(v),
+        # Molds and eyes can't come to us: they don't stop eating or resting.
+        # (A red mold nine squares off bounced a starving pilot between a
+        # lichen corpse and a dagger for hundreds of turns.)
+        "mobile_hostiles": [h for h in visible if h["name"] not in SESSILE],
         # Major trouble needs the prayer timeout at 200 or less. It starts at
         # 300 and is rnz(350) after a prayer, over 1000 about 8% of the time.
         # A failed prayer angers the god for good; bad Luck fails it too.
@@ -1189,7 +1193,7 @@ class Engine:
         """A fresh safe kill with a corpse still on it, within a short walk."""
         o, m = self.orders, self.memory
         policy = o["eat_corpses"]
-        if policy == "never" or c["hunger"] == "Satiated" or c["visible_hostiles"]:
+        if policy == "never" or c["hunger"] == "Satiated" or c["mobile_hostiles"]:
             return None
         if policy == "hungry" and c["hunger"] not in HUNGRY:
             return None
@@ -1363,7 +1367,7 @@ class Engine:
         corpse = self._corpse_to_eat(v, c)
         if corpse:
             return corpse[0], "standing order: " + corpse[1]
-        if c["hp"] < c["hpmax"] * float(o["rest_below"]) and not c["visible_hostiles"] and not c["under_attack"]:
+        if c["hp"] < c["hpmax"] * float(o["rest_below"]) and not c["mobile_hostiles"] and not c["under_attack"]:
             return "20s", f"standing order: rest (HP {c['hp']}/{c['hpmax']})"
         if o["pickup_gold"] and "$" not in str(o["loot"]) and c["gold_visible"] \
                 and not c["visible_hostiles"] and not self.routine:
