@@ -559,30 +559,66 @@ def r_explore(v: View, memory: Memory, args: dict):
     return None, "done: nothing left to explore"
 
 
+def distances(v: View) -> dict:
+    """Walking distance from the player to every reachable square."""
+    dist = {v.pos: 0}
+    q = deque([v.pos])
+    while q:
+        cur = q.popleft()
+        for dx, dy in DIRS.values():
+            nxt = (cur[0] + dx, cur[1] + dy)
+            if nxt not in dist and v.step_ok(cur, nxt) and not (v.memory and (v.dlvl, *nxt) in v.memory.blocked):
+                dist[nxt] = dist[cur] + 1
+                q.append(nxt)
+    return dist
+
+
 def r_search_walls(v: View, memory: Memory, args: dict):
-    """Search next to walls that face unexplored space: a hidden door there
-    leads somewhere new. Walls between two known areas can't hide anything
-    useful, so they're skipped."""
+    """Search for hidden passages: every reachable square that is a corridor
+    dead end or stands next to a wall or blank with three blank squares
+    beyond, 10 turns a visit, up to 3 visits each. The score only decides
+    the ORDER (dead ends and spots with lots of blank map nearby first):
+    picking few spots intensively (v1) found half as many passages as
+    covering all of them, so coverage stays, order improves."""
+    m = memory
+
     def facing_unknown(x, y):
         for dx, dy in ORTHO:
             wx, wy = x + dx, y + dy
             if v.ch(wx, wy) in WALL or (v.ch(wx, wy) == " " and not v.cells.get((wx, wy))):
-                beyond = [(wx + dx * k, wy + dy * k) for k in (1, 2, 3)]
-                if all(v.ch(bx, by) == " " and not v.cells.get((bx, by)) for bx, by in beyond):
+                if all(v.ch(wx + dx * k, wy + dy * k) == " " and not v.cells.get((wx + dx * k, wy + dy * k))
+                       for k in (1, 2, 3)):
                     return True
         return False
 
-    def spot(x, y, rounds):
-        return memory.searched.get((v.dlvl, x, y), 0) < rounds and facing_unknown(x, y)
-    here = (v.dlvl, *v.pos)
-    for rounds in (1, 2):
-        if spot(*v.pos, rounds):
-            memory.searched[here] = memory.searched.get(here, 0) + 1
-            return "10s", "search the walls here"
-        path = bfs(v, lambda x, y: spot(x, y, rounds))
-        if path:
-            return _step(v, memory, path, f"go search near {path[-1]}")
-    return None, "failed: searched every wall twice"
+    def blank_near(x, y):
+        return sum(v.ch(x + dx, y + dy) == " " for dx in range(-5, 6) for dy in range(-5, 6))
+
+    dist = distances(v)
+    for visits_allowed in (1, 2, 3):
+        best, best_score = None, None
+        for (x, y), d in dist.items():
+            if (v.dlvl, x, y) in m.shop_items or (v.dlvl, x, y) in m.blocked:
+                continue
+            if m.searched.get((v.dlvl, x, y), 0) >= visits_allowed:
+                continue
+            dead = _dead_end(v, x, y)
+            if not dead and not facing_unknown(x, y):
+                continue
+            score = (250 if dead else 0) + blank_near(x, y) - 4 * d
+            if best_score is None or score > best_score:
+                best, best_score = (x, y), score
+        if best is None:
+            continue
+        if best == v.pos:
+            m.searched[(v.dlvl, *best)] = m.searched.get((v.dlvl, *best), 0) + 1
+            return "10s", f"search here (score {best_score})"
+        path = bfs(v, lambda x, y: (x, y) == best)
+        if not path:
+            m.blocked.add((v.dlvl, *best))
+            continue
+        return _step(v, memory, path, f"go search at {best} (score {best_score})")
+    return None, "failed: searched every spot three times"
 
 
 def r_go_down(v: View, memory: Memory, args: dict):
