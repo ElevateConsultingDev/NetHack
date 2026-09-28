@@ -163,6 +163,11 @@ class View:
         return remembered
 
     def walkable(self, x: int, y: int) -> bool:
+        if self.memory and (self.dlvl, x, y) in self.memory.sessile:
+            # A mold or eye we've seen there is still there, drawn or not,
+            # whatever the square shows from here (a red mold on the stairs
+            # looked like plain stairs from outside the room).
+            return False
         c = self.cells.get((x, y))
         if c:
             if c["kind"] in ("object", "pet", "you"):
@@ -174,8 +179,6 @@ class View:
                 # in the way. Except ones we must never bump into.
                 return not (self.memory and c["name"] in self.memory.avoid)
             return False  # traps
-        if self.memory and (self.dlvl, x, y) in self.memory.sessile:
-            return False  # A mold or eye we've seen there; it's still there, drawn or not.
         if self.ch(x, y) in FLOOR_CHARS:
             return True
         # Dark floor we've stood on is drawn blank once we walk away (the
