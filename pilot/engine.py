@@ -32,8 +32,8 @@ DONT_MELEE = {"floating eye", "cockatrice", "chickatrice",
 # Never move; drawn only while we stand next to them. Remembered by square
 # (a brown mold on a frontier square flipped explore between two squares
 # for a thousand turns: seen from one, unseen from the other).
-SESSILE = {"lichen", "brown mold", "yellow mold", "green mold", "red mold", "shrieker", "violet fungus",
-           "blue jelly", "spotted jelly", "ochre jelly", "acid blob", "floating eye"}
+SESSILE = {"brown mold", "yellow mold", "green mold", "red mold", "shrieker", "violet fungus",
+           "blue jelly", "spotted jelly", "ochre jelly", "acid blob", "floating eye"}  # not lichens: they move, and melee is fine
 # Dangerous to stand next to, not just to hit: worth waking the brain for.
 DANGEROUS_NEAR = {"cockatrice", "chickatrice"}
 # No eggs: an unknown egg can be a cockatrice egg. Tins are checked by
@@ -1234,7 +1234,11 @@ class Engine:
                 keys, note = r_step_away(v, m, {"target": "gas spore", "max_steps": 1})
                 if keys:
                     return keys, "standing order: back off from the gas spore before it pops"
-            if mon["name"] in o["ranged_kill"] and throwable(v) and in_line(v.pos, (mon["x"], mon["y"])) \
+            # A sessile monster parked on the stairs down or in a doorway
+            # blocks the level (a red mold on the '>' in B03505307): worth a dagger.
+            chokepoint = mon["name"] in SESSILE and m.features.get((v.dlvl, mon["x"], mon["y"])) in (
+                "staircase down", "doorway", "open door", "broken door")
+            if (mon["name"] in o["ranged_kill"] or chokepoint) and throwable(v) and in_line(v.pos, (mon["x"], mon["y"])) \
                     and mon["distance"] <= 8 and (mon["name"] != "gas spore" or mon["distance"] >= 2):
                 keys, note = r_throw(v, m, {"target": mon["name"]})
                 if keys:
