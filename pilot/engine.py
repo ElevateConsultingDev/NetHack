@@ -29,6 +29,11 @@ NO_DIAGONAL = {"open door"}  # NetHack: no diagonal moves into or out of a doorw
 DONT_MELEE = {"floating eye", "cockatrice", "chickatrice",
               "blue jelly", "spotted jelly", "ochre jelly", "green mold", "brown mold",
               "yellow mold", "red mold"}
+# Never move; drawn only while we stand next to them. Remembered by square
+# (a brown mold on a frontier square flipped explore between two squares
+# for a thousand turns: seen from one, unseen from the other).
+SESSILE = {"lichen", "brown mold", "yellow mold", "green mold", "red mold", "shrieker", "violet fungus",
+           "blue jelly", "spotted jelly", "ochre jelly", "acid blob", "floating eye"}
 # Dangerous to stand next to, not just to hit: worth waking the brain for.
 DANGEROUS_NEAR = {"cockatrice", "chickatrice"}
 # No eggs: an unknown egg can be a cockatrice egg. Tins are checked by
@@ -122,6 +127,7 @@ class Memory:
     probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
     tried_wear: set = field(default_factory=set)  # inventory texts we've tried to put on
     shop_items: set = field(default_factory=set)  # (dlvl, x, y) objects seen near a shopkeeper: never loot
+    sessile: dict = field(default_factory=dict)   # (dlvl, x, y) -> name of a stationary monster seen there
     tin_smell: str = ""                           # "newts", "spinach": what the tin being opened holds
     last_down: tuple | None = None                # (dlvl, x, y) of the stairs we last went down
     mines_stairs: set = field(default_factory=set)  # (dlvl, x, y) stairs down into the Gnomish Mines
@@ -168,6 +174,8 @@ class View:
                 # in the way. Except ones we must never bump into.
                 return not (self.memory and c["name"] in self.memory.avoid)
             return False  # traps
+        if self.memory and (self.dlvl, x, y) in self.memory.sessile:
+            return False  # A mold or eye we've seen there; it's still there, drawn or not.
         if self.ch(x, y) in FLOOR_CHARS:
             return True
         # Dark floor we've stood on is drawn blank once we walk away (the
@@ -987,6 +995,15 @@ class Engine:
                     self.memory.corridors.add((v.dlvl, x, y))
         if v.pos:
             self.memory.visited.add((v.dlvl, *v.pos))
+            for (x, y), c in v.cells.items():
+                if c["kind"] == "monster" and c["name"] in SESSILE:
+                    self.memory.sessile[(v.dlvl, x, y)] = c["name"]
+            # Adjacent squares are always drawn: one we remember a sessile
+            # monster on that now shows none has been cleared (killed).
+            for (d, x, y) in [k for k in self.memory.sessile if k[0] == v.dlvl
+                              and max(abs(k[1] - v.pos[0]), abs(k[2] - v.pos[1])) == 1]:
+                if v.cells.get((x, y), {}).get("kind") != "monster":
+                    del self.memory.sessile[(d, x, y)]
         # Shop stock: objects near a shopkeeper. Looting toward them while
         # the shopkeeper drifts in and out of view ping-ponged with explore
         # for thousands of turns (7 of 64 games).
