@@ -1338,11 +1338,20 @@ class Engine:
         # to it let kobold zombies and jackals kill XL 1 pilots resting on a
         # smudged engraving (iteration 36a, -0.44 / -0.27 levels).
         for mon in c["adjacent_hostiles"]:
-            if mon["name"] in o["avoid"]:
-                # Never melee it; paths already route around it. Only ones
-                # that hurt just by being near are worth asking about.
-                esc = (self._escalate(f"{mon['name']} adjacent (dangerous to be near)")
-                       if mon["name"] in DANGEROUS_NEAR else None)
+            if mon["name"] in DANGEROUS_NEAR:
+                # A cockatrice next to us: back off; cornered, hit it with the
+                # wielded weapon (safe; its touch comes whether we fight or
+                # not). Asking the brain looped step_away forever (3 stalls).
+                keys, note = r_step_away(v, m, {"target": mon["name"], "max_steps": 1})
+                if keys:
+                    return keys, f"standing order: back off from the {mon['name']}"
+                if any("weapon in hand" in i["text"] for i in v.s.get("inventory", [])):
+                    m.pending_fight = (mon["x"], mon["y"])
+                    return ("F" + KEY_FOR[(mon["x"] - v.pos[0], mon["y"] - v.pos[1])],
+                            f"standing order: cornered by the {mon['name']}: fight it with the weapon")
+                esc = self._escalate(f"{mon['name']} adjacent (dangerous to be near), cornered and unarmed")
+            elif mon["name"] in o["avoid"]:
+                esc = None  # Never melee it; paths already route around it.
             elif mon["difficulty"] <= limit:
                 m.pending_fight = (mon["x"], mon["y"])
                 return ("F" + KEY_FOR[(mon["x"] - v.pos[0], mon["y"] - v.pos[1])],
