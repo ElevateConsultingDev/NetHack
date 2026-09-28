@@ -139,6 +139,7 @@ class Memory:
     last_down: tuple | None = None                # (dlvl, x, y) of the stairs we last went down
     mines_stairs: set = field(default_factory=set)  # (dlvl, x, y) stairs down into the Gnomish Mines
     floor: set = field(default_factory=set)       # (dlvl, x, y) room floor seen; dark rooms draw it blank again
+    watch: set = field(default_factory=set)       # dlvls where the watch (Minetown) has been seen: never kick doors
 
 
 class View:
@@ -558,12 +559,16 @@ def r_explore(v: View, memory: Memory, args: dict):
     if any("Closed for inventory" in m for m in v.s.get("messages", [])):
         for dx, dy in DIRS.values():  # A shop door: kicking it angers the shopkeeper.
             memory.dead_doors.add((v.dlvl, v.pos[0] + dx, v.pos[1] + dy))
+    watched = v.dlvl in memory.watch or any("stop damaging that door" in m or "stop picking that lock" in m
+                                              for m in v.s.get("messages", []))
     for dx, dy in ORTHO:
         d = (v.dlvl, v.pos[0] + dx, v.pos[1] + dy)
         if v.feature(*d[1:]) == "closed door" and d not in memory.dead_doors:
             if any("This door is locked" in m for m in v.s.get("messages", [])):
                 memory.kicks[d] = memory.kicks.get(d, 0) + 1
-                if memory.kicks[d] > 6:
+                if memory.kicks[d] > 6 or watched:
+                    # Kicking a door with the Minetown watch about gets one
+                    # warning, then the whole watch attacks (10 of 102 deaths).
                     memory.dead_doors.add(d)
                     continue
                 return "\x04" + KEY_FOR[(dx, dy)], "kick the locked door"
@@ -1086,6 +1091,8 @@ class Engine:
             for (x, y), c in v.cells.items():
                 if c["kind"] == "monster" and c["name"] in SESSILE:
                     self.memory.sessile[(v.dlvl, x, y)] = c["name"]
+                if c["kind"] == "monster" and c["name"] in ("watchman", "watch captain"):
+                    self.memory.watch.add(v.dlvl)
             # Adjacent squares are always drawn: one we remember a sessile
             # monster on that now shows none has been cleared (killed).
             for (d, x, y) in [k for k in self.memory.sessile if k[0] == v.dlvl

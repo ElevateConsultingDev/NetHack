@@ -142,3 +142,14 @@ _bee = dict(_snap, cells=[{"x": 4, "y": 2, "kind": "monster", "name": "killer be
 _k4, _ = Engine().step(_bee)
 assert (_k4 or "").startswith("F"), _k4                 # adjacent hostiles are still fought
 print("unseen attack ok")
+
+# Minetown: a locked door is never kicked once the watch has been seen on the level.
+from pilot.engine import r_explore as _r_explore
+_town = dict(_snap, map=["", " -----", " |...|", " |.@+|", " |...|", " -----"], messages=["This door is locked."],
+             cells=[{"x": 4, "y": 3, "kind": "feature", "name": "closed door"},
+                    {"x": 2, "y": 2, "kind": "monster", "name": "watchman", "difficulty": 6, "peaceful": True}])
+_e5 = Engine(); _e5.step(_town)
+assert 1 in _e5.memory.watch
+_k5, _n5 = _r_explore(_View(_town, _e5.memory), _e5.memory, {})
+assert not (_k5 or "").startswith("\x04"), (_k5, _n5)
+print("watch ok")
