@@ -28,7 +28,14 @@ NO_DIAGONAL = {"open door"}  # NetHack: no diagonal moves into or out of a doorw
 # Monsters never to melee (passive or on-death effects).
 DONT_MELEE = {"floating eye", "cockatrice", "chickatrice",
               "blue jelly", "spotted jelly", "ochre jelly", "green mold", "brown mold",
-              "yellow mold", "red mold"}
+              "yellow mold", "red mold", "yellow light"}  # a yellow light explodes and blinds
+# An unseen attacker (we're blind, or it's invisible or in the dark): the
+# only sign is the message. Resting through it killed two of four drilled games.
+UNSEEN_ATTACK = re.compile(r"^It (hits|bites|stings|kicks|butts|touches|misses|just misses)")
+
+
+def unseen_attack(v) -> bool:
+    return any(UNSEEN_ATTACK.match(m) for m in v.s.get("messages", []))
 # Never move; drawn only while we stand next to them. Remembered by square
 # (a brown mold on a frontier square flipped explore between two squares
 # for a thousand turns: seen from one, unseen from the other).
@@ -364,6 +371,7 @@ def checks(v: View, memory: Memory) -> dict:
     return {
         "hunger": st.get("hunger", "").strip(),
         "hp": hp, "hpmax": hpmax, "wounded": wound_tier(hp, hpmax),
+        "under_attack": unseen_attack(v),
         # Major trouble needs the prayer timeout at 200 or less. It starts at
         # 300 and is rnz(350) after a prayer, over 1000 about 8% of the time.
         # A failed prayer angers the god for good; bad Luck fails it too.
@@ -691,8 +699,8 @@ def r_rest(v: View, memory: Memory, args: dict):
     goal = int(args.get("until_hp") or st.get("hpmax", 1))
     if st.get("hp", 0) >= goal:
         return None, "done: rested"
-    if v.monsters_visible():
-        return None, "failed: something's in view"
+    if v.monsters_visible() or unseen_attack(v):
+        return None, "failed: something's in view or hitting us"
     return "20s", f"rest (HP {st.get('hp')}/{goal})"
 
 
@@ -968,7 +976,7 @@ DEFAULT_ORDERS = {
     "loot": "$?!/=\"+(%",        # item classes to pick up ($ gold ? scroll ! potion / wand = ring " amulet + book ( tool % food, never corpses)
     "explore_fully": True,      # search dead ends for hidden passages before going down
     "eat_corpses": "unless_satiated",  # fresh safe kills: "unless_satiated", "hungry" or "never"
-    "ranged_kill": ["floating eye", "acid blob", "gas spore"],  # throw at these when in line
+    "ranged_kill": ["floating eye", "acid blob", "gas spore", "yellow light"],  # throw at these when in line
     "retreat_below": 0.35,      # badly hurt with a hostile adjacent: ask the brain before it's critical
 }
 
@@ -1304,7 +1312,20 @@ class Engine:
                 keys, note = r_throw(v, m, {"target": mon["name"]})
                 if keys:
                     return keys, "standing order: " + note
+        if c["under_attack"] and not c["visible_hostiles"]:
+            # Something we can't see is hitting us. Hit back at a remembered
+            # 'I' next to us; otherwise Elbereth (the brain's answer) beats
+            # standing still: resting here died twice in four drilled games.
+            for (x, y), cell in v.cells.items():
+                if cell["kind"] == "invisible" and max(abs(x - v.pos[0]), abs(y - v.pos[1])) == 1:
+                    return "F" + KEY_FOR[(x - v.pos[0], y - v.pos[1])], "standing order: hit back at the unseen attacker"
+            esc = self._escalate(f"attacked by something unseen (HP {c['hp']}/{c['hpmax']})")
+            if esc:
+                return esc
         limit = o["fight_up_to"] if o["fight_up_to"] is not None else (c["xlvl"] or 1) + 2
+        # This fight order outranks an ordered Elbereth on purpose: yielding
+        # to it let kobold zombies and jackals kill XL 1 pilots resting on a
+        # smudged engraving (iteration 36a, -0.44 / -0.27 levels).
         for mon in c["adjacent_hostiles"]:
             if mon["name"] in o["avoid"]:
                 # Never melee it; paths already route around it. Only ones
@@ -1338,7 +1359,7 @@ class Engine:
         corpse = self._corpse_to_eat(v, c)
         if corpse:
             return corpse[0], "standing order: " + corpse[1]
-        if c["hp"] < c["hpmax"] * float(o["rest_below"]) and not c["visible_hostiles"]:
+        if c["hp"] < c["hpmax"] * float(o["rest_below"]) and not c["visible_hostiles"] and not c["under_attack"]:
             return "20s", f"standing order: rest (HP {c['hp']}/{c['hpmax']})"
         if o["pickup_gold"] and "$" not in str(o["loot"]) and c["gold_visible"] \
                 and not c["visible_hostiles"] and not self.routine:

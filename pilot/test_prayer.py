@@ -132,3 +132,13 @@ assert not _v.unknown(3, 2) and _v.walkable(3, 2)
 assert _v.unknown(0, 2)                        # never-seen blank is still unknown
 assert not _frontier(_v, _mem)(4, 2)           # nothing unknown next to us: not a frontier
 print("dark floor ok")
+
+# Unseen attacker: never rest through "It bites!"; fight yields to an ordered retreat.
+_hurt = dict(_snap, messages=["It bites!"], status=dict(_snap["status"], hp=6, hpmax=16))
+_k, _esc = Engine().step(_hurt)
+assert _k != "20s" and (_esc or _k), (_k, _esc)          # escalates (or hits back), never rests
+_bee = dict(_snap, cells=[{"x": 4, "y": 2, "kind": "monster", "name": "killer bee", "difficulty": 5}],
+            status=dict(_snap["status"], hp=6, hpmax=16, xlvl=6))
+_k4, _ = Engine().step(_bee)
+assert (_k4 or "").startswith("F"), _k4                 # adjacent hostiles are still fought
+print("unseen attack ok")
