@@ -119,3 +119,16 @@ _m = _recall(_c, ["Weak and no known-safe food"], _s, root=_root)
 assert "[monsters/floating-eye]" in _m and "[hunger/weak]" in _m and "[depth/dlvl-3-5]" in _m and "[general]" in _m
 assert "jackal" not in _m, _m
 print("recall ok")
+
+# Dark room floor: seen once, it stays known even when drawn blank again.
+from pilot.engine import View as _View, Memory as _Memory, _frontier
+_mem = _Memory()
+_dark = dict(_snap, map=["", " ---- ", " |.@| ", " ---- "], player={"x": 4, "y": 2})
+_e2 = Engine(); _e2.memory = _mem
+_e2.step(_dark)                                # sees the floor at (3, 2)
+_dark["map"][2] = " | @| "                     # drawn blank once we look away
+_v = _View(_dark, _mem)
+assert not _v.unknown(3, 2) and _v.walkable(3, 2)
+assert _v.unknown(0, 2)                        # never-seen blank is still unknown
+assert not _frontier(_v, _mem)(4, 2)           # nothing unknown next to us: not a frontier
+print("dark floor ok")

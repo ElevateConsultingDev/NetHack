@@ -131,6 +131,7 @@ class Memory:
     tin_smell: str = ""                           # "newts", "spinach": what the tin being opened holds
     last_down: tuple | None = None                # (dlvl, x, y) of the stairs we last went down
     mines_stairs: set = field(default_factory=set)  # (dlvl, x, y) stairs down into the Gnomish Mines
+    floor: set = field(default_factory=set)       # (dlvl, x, y) room floor seen; dark rooms draw it blank again
 
 
 class View:
@@ -151,6 +152,18 @@ class View:
         if 0 <= y < len(self.map) and 1 <= x <= len(self.map[y]):
             return self.map[y][x - 1]
         return " "
+
+    def unknown(self, x: int, y: int) -> bool:
+        """Blank map we have never seen into. Floor in a dark room is drawn
+        blank again once we're not next to it, so what we saw (or stood on)
+        stays known: taking it for unknown flipped the frontier and the
+        search spots with every step and bounced the pilot between two
+        squares for thousands of turns."""
+        if self.ch(x, y) != " " or self.cells.get((x, y)):
+            return False
+        m = self.memory
+        return m is None or ((self.dlvl, x, y) not in m.floor and (self.dlvl, x, y) not in m.visited
+                             and (self.dlvl, x, y) not in m.corridors)
 
     def feature(self, x: int, y: int) -> str:
         """The terrain feature here, remembered if something (like you)
@@ -183,7 +196,8 @@ class View:
             return True
         # Dark floor we've stood on is drawn blank once we walk away (the
         # Mines): it's still floor. Otherwise stairs in sight have no path.
-        return self.ch(x, y) == " " and self.memory is not None and (self.dlvl, x, y) in self.memory.visited
+        return self.ch(x, y) == " " and self.memory is not None and (
+            (self.dlvl, x, y) in self.memory.visited or (self.dlvl, x, y) in self.memory.floor)
 
     def step_ok(self, a: tuple, b: tuple) -> bool:
         c = self.cells.get(b)
@@ -293,8 +307,7 @@ def _frontier(v: View, memory: Memory):
     squares already visited don't count."""
     def goal(x, y):
         return (v.dlvl, x, y) not in memory.visited and (v.dlvl, x, y) not in memory.blocked and any(
-            v.ch(x + dx, y + dy) == " " and not v.cells.get((x + dx, y + dy))
-            for dx, dy in DIRS.values())
+            v.unknown(x + dx, y + dy) for dx, dy in DIRS.values())
     return goal
 
 
@@ -585,14 +598,13 @@ def r_search_walls(v: View, memory: Memory, args: dict):
     def facing_unknown(x, y):
         for dx, dy in ORTHO:
             wx, wy = x + dx, y + dy
-            if v.ch(wx, wy) in WALL or (v.ch(wx, wy) == " " and not v.cells.get((wx, wy))):
-                if all(v.ch(wx + dx * k, wy + dy * k) == " " and not v.cells.get((wx + dx * k, wy + dy * k))
-                       for k in (1, 2, 3)):
+            if v.ch(wx, wy) in WALL or v.unknown(wx, wy):
+                if all(v.unknown(wx + dx * k, wy + dy * k) for k in (1, 2, 3)):
                     return True
         return False
 
     def blank_near(x, y):
-        return sum(v.ch(x + dx, y + dy) == " " for dx in range(-5, 6) for dy in range(-5, 6))
+        return sum(v.unknown(x + dx, y + dy) for dx in range(-5, 6) for dy in range(-5, 6))
 
     dist = distances(v)
     for visits_allowed in (1, 2, 3):
@@ -879,8 +891,7 @@ def r_probe_dark(v: View, memory: Memory, args: dict):
             # Blank, never probed, and never stood on: dark floor we've
             # walked is drawn blank again once we leave, and treating it as
             # unknown made two neighbours point probes at each other forever.
-            if v.ch(*b) == " " and not v.cells.get(b) and (v.dlvl, *b) not in memory.probed \
-                    and (v.dlvl, *b) not in memory.visited:
+            if v.unknown(*b) and (v.dlvl, *b) not in memory.probed:
                 return dx, dy
         return None
     if (v.dlvl, *v.pos) in memory.visited and probe_dir(*v.pos):
@@ -1025,24 +1036,13 @@ class Engine:
         brain (empty when the engine has it covered)."""
         self.memory.avoid = set(self.orders["avoid"])
         v = View(s, self.memory)
-        for (x, y), c in v.cells.items():
-            if c["kind"] == "feature":
-                self.memory.features[(v.dlvl, x, y)] = c["name"]
-        for y, row in enumerate(v.map):
-            for x, ch in enumerate(row, start=1):
-                if ch == "#" and (x, y) not in v.cells:
-                    self.memory.corridors.add((v.dlvl, x, y))
-        if v.pos:
-            self.memory.visited.add((v.dlvl, *v.pos))
-            for (x, y), c in v.cells.items():
-                if c["kind"] == "monster" and c["name"] in SESSILE:
-                    self.memory.sessile[(v.dlvl, x, y)] = c["name"]
-            # Adjacent squares are always drawn: one we remember a sessile
-            # monster on that now shows none has been cleared (killed).
-            for (d, x, y) in [k for k in self.memory.sessile if k[0] == v.dlvl
-                              and max(abs(k[1] - v.pos[0]), abs(k[2] - v.pos[1])) == 1]:
-                if v.cells.get((x, y), {}).get("kind") != "monster":
-                    del self.memory.sessile[(d, x, y)]
+        # The snapshot at a --More-- right after taking the stairs carries
+        # the new level number with the OLD level still drawn (the redraw
+        # comes after the messages), so it wrote the previous level's
+        # doors, stairs and floor into this level's memory. Only a command
+        # prompt has a map that belongs to its level.
+        if v.kind == "command":
+            self._remember_map(v)
         # Shop stock: objects near a shopkeeper. Looting toward them while
         # the shopkeeper drifts in and out of view ping-ponged with explore
         # for thousands of turns (7 of 64 games).
@@ -1061,6 +1061,31 @@ class Engine:
         if mech:
             self.note = mech[1]
             return mech[0], []
+        return self._decide(v)
+
+    def _remember_map(self, v: View) -> None:
+        for (x, y), c in v.cells.items():
+            if c["kind"] == "feature":
+                self.memory.features[(v.dlvl, x, y)] = c["name"]
+        for y, row in enumerate(v.map):
+            for x, ch in enumerate(row, start=1):
+                if ch == "#" and (x, y) not in v.cells:
+                    self.memory.corridors.add((v.dlvl, x, y))
+                elif ch == ".":
+                    self.memory.floor.add((v.dlvl, x, y))
+        if v.pos:
+            self.memory.visited.add((v.dlvl, *v.pos))
+            for (x, y), c in v.cells.items():
+                if c["kind"] == "monster" and c["name"] in SESSILE:
+                    self.memory.sessile[(v.dlvl, x, y)] = c["name"]
+            # Adjacent squares are always drawn: one we remember a sessile
+            # monster on that now shows none has been cleared (killed).
+            for (d, x, y) in [k for k in self.memory.sessile if k[0] == v.dlvl
+                              and max(abs(k[1] - v.pos[0]), abs(k[2] - v.pos[1])) == 1]:
+                if v.cells.get((x, y), {}).get("kind") != "monster":
+                    del self.memory.sessile[(d, x, y)]
+
+    def _decide(self, v: View) -> tuple[str | None, list[str]]:
         if v.kind != "command":
             if self.routine == "keys":  # The brain's answer to this prompt.
                 keys, self.note = r_keys(v, self.memory, self.args)
