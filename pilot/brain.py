@@ -45,6 +45,8 @@ class RuleBrain:
             return Order("keys", {"keys": "\x1b"}, say="unfamiliar prompt: escape out of it")
         if ev.startswith("badly hurt") or ev.startswith("critical HP") or ev.startswith("attacked by something unseen"):
             return Order("elbereth", say="hurt and in trouble: engraving Elbereth")
+        if "cornered and unarmed" in ev:
+            return Order("elbereth", say="cornered by a cockatrice with no weapon: Elbereth")
         if "(dangerous to be near)" in ev:
             return Order("step_away", say="backing away from something I shouldn't touch")
         if "adjacent, difficulty" in ev:
