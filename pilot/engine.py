@@ -1400,7 +1400,11 @@ class Engine:
             if keys:
                 self.note = "search walls: " + note
                 return self._stuck_guard(v, keys, note)
-            m.searched_out.add(v.dlvl)
+            if note.startswith("failed: searched every spot"):
+                m.searched_out.add(v.dlvl)
+            else:  # A peaceful in the way (a shopkeeper on the shop door): route around it next turn.
+                self.note = "search walls: " + note
+                return "s", []
         # A never-melee monster parked in the way (a floating eye in a
         # corridor, say): they do drift, so wait a while before giving up.
         blockers = [mon["name"] for mon in self.last_checks.get("visible_hostiles", [])
