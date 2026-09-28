@@ -1353,16 +1353,13 @@ class Engine:
             if c["safe_food"]:
                 m.pending_food = c["safe_food"][0]["letter"]
                 return "e", f"standing order: eat ({c['hunger']})"
-            opens = c["prayer_opens_in"]
-            if hunger >= HUNGER_RANK.index("Weak") and not (o["pray_when_critical"] and opens is not None
-                                                            and opens <= 300):
-                # Prayer (above) handles it once the gate opens: Weak comes
-                # ~850 turns after a prayer and starving takes ~300 more, so
-                # keep playing through a short wait; else ask.
-                esc = self._escalate(f"{c['hunger']} and no known-safe food")
-                if esc:
-                    return esc
-            # Merely Hungry: keep going; the next safe kill is a meal.
+            if hunger >= HUNGER_RANK.index("Weak"):
+                # Weak with nothing safe to eat and the prayer gate shut:
+                # asking the brain ended 17 of 128 games as stalls (the rules
+                # have no answer). Carrying on, down to a fresh level with
+                # fresh kills, can only do better than stopping.
+                _count(m, "Weak with no food: carrying on")
+            # Hungry or Weak: keep going; the next safe kill is a meal.
         corpse = self._corpse_to_eat(v, c)
         if corpse:
             return corpse[0], "standing order: " + corpse[1]
