@@ -275,7 +275,14 @@ class Game:
         server.start()
         while not os.path.exists(self.sock):
             time.sleep(0.01)
-        master, slave = os.openpty()
+        for attempt in range(20):  # 16 games opening ptys at once hit a transient OSError (-6) now and then.
+            try:
+                master, slave = os.openpty()
+                break
+            except OSError:
+                time.sleep(0.25 * (attempt + 1))
+        else:
+            master, slave = os.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
         env = dict(os.environ, NETHACK_CONTROL=self.sock, NETHACKOPTIONS=OPTIONS, TERM="xterm-256color")
         if self.seed is not None:

@@ -23,7 +23,7 @@ import time
 import httpx
 
 from .brain import RuleBrain
-from .engine import (DONT_MELEE, KEY_FOR, SESSILE, Engine, View, bfs, checks, in_line, r_elbereth, r_explore,
+from .engine import (DONT_MELEE, KEY_FOR, ORTHO, SESSILE, Engine, View, bfs, checks, in_line, r_elbereth, r_explore,
                      r_go_down, r_loot, r_pray, r_probe_dark, r_search_walls, r_step_away, r_throw, throwable,
                      _count, _step)
 
@@ -55,15 +55,18 @@ ACTIONS = {
             "Never items in a shop while the shopkeeper is around.",
     "explore": "Walk toward unexplored map, opening doors (kicking locked ones only where the Minetown watch has not "
                "been seen). The default while `options.level_explored` is false and nothing is urgent.",
-    "probe": "Feel around dark areas by stepping into blank squares next to where the pilot has stood. For dark caves "
-             "such as the Gnomish Mines when the stairs down are unknown.",
-    "search": "Search walls and dead ends for hidden doors and corridors. Right when the level is fully explored, "
-              "the stairs down are not known, and `options.unsearched_spots_remain` is true.",
+    "probe": "Feel around dark areas by stepping into blank squares next to where the pilot has stood. Dark rooms and "
+             "corridors stay blank until walked, so this is the first thing to do whenever `options.level_explored` is true, "
+             "the stairs down are not known, and `options.probe_spots_remain` is true. Comes before search.",
+    "search": "Search walls and dead ends for hidden doors and corridors. Right only when the level is fully explored, "
+              "`options.probe_spots_remain` is false, the stairs down are not known, and `options.unsearched_spots_remain` "
+              "is true. Never while the stairs down are known.",
     "go_down": "Walk to the known stairs down and descend. Right when `options.stairs_down_known` and the level is "
                "explored, or the pilot is Hungry with no food and the level has nothing left. Each level deeper brings "
                "monsters about one level harder; experience level plus two is comfortable.",
-    "go_up": "Walk to the stairs up and climb. Right in the Gnomish Mines below experience level 8 for anyone but a "
-             "dwarf or gnome, or to escape a level that has become deadly.",
+    "go_up": "Walk to the stairs up and climb. Right only in the Gnomish Mines (`options.in_gnomish_mines`) below "
+             "experience level 8 for anyone but a dwarf or gnome, or to flee a fight the pilot is losing. Anywhere else it "
+             "undoes progress: the goal is depth.",
 }
 
 QUESTIONS = {
@@ -117,6 +120,8 @@ class JevEngine(Engine):
                     and "cursed" not in i["text"].replace("uncursed", ""):
                 armor = i["text"]
                 break
+        probe_spots = any(v.unknown(x + dx, y + dy) and (v.dlvl, x + dx, y + dy) not in m.probed
+                          for (d, x, y) in m.visited if d == v.dlvl for dx, dy in ORTHO)
         loot_in_view = any(cell["kind"] == "object" and cell["name"] not in ("boulder", "corpse")
                            and (v.dlvl, x, y) not in m.shop_items for (x, y), cell in v.cells.items())
         return {
@@ -138,7 +143,7 @@ class JevEngine(Engine):
             "options": {"safe_food_in_pack": len(c["safe_food"]), "fresh_safe_corpse_nearby": corpse is not None,
                         "can_throw_at": target, "armor_to_wear": armor, "stairs_down_known": c["stairs_down"] is not None,
                         "on_stairs_down": bool(c["on_stairs_down"]), "level_explored": bool(c["level_explored"]),
-                        "unsearched_spots_remain": v.dlvl not in m.searched_out,
+                        "unsearched_spots_remain": v.dlvl not in m.searched_out, "probe_spots_remain": probe_spots,
                         "in_gnomish_mines": st.get("dungeon") == "The Gnomish Mines",
                         "loot_in_view": loot_in_view, "gold_in_view": bool(c["gold_visible"]),
                         "stairs_up_known": any(d == v.dlvl and n == "staircase up" for (d, x, y), n in m.features.items())},
@@ -213,8 +218,8 @@ class JevEngine(Engine):
         if action == "probe":
             return r_probe_dark(v, m, {})
         if action == "search":
-            if v.dlvl in m.searched_out:
-                return None, "searched out"
+            if v.dlvl in m.searched_out or c["stairs_down"] is not None or not c["level_explored"]:
+                return None, "searched out, stairs known, or not yet explored"
             keys, note = r_search_walls(v, m, {})
             if keys is None and note.startswith("failed: searched every spot"):
                 m.searched_out.add(v.dlvl)
@@ -222,6 +227,11 @@ class JevEngine(Engine):
         if action == "go_down":
             return r_go_down(v, m, {"start_dlvl": v.dlvl})
         if action == "go_up":
+            mines = v.status.get("dungeon") == "The Gnomish Mines" and v.status.get("race") not in ("dwarf", "gnome") \
+                and (c["xlvl"] or 0) < 8
+            losing = c["adjacent_hostiles"] and c["hp"] * 3 < c["hpmax"]
+            if not (mines or losing):  # Climbing anywhere else undoes progress (386 such picks in 30 games).
+                return None, "no reason to go up"
             if v.feature(*v.pos) == "staircase up":
                 return "<", "climb the stairs up"
             path = bfs(v, lambda x, y: v.feature(x, y) == "staircase up")
