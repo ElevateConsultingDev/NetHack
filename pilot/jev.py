@@ -94,6 +94,7 @@ class JevEngine(Engine):
         self.client = httpx.Client(timeout=TIMEOUT_S)
         self.jev_args: dict[str, dict] = {}
         self.calls, self.seconds, self.failures = 0, 0.0, 0
+        self.last_ask = None
 
     # ---------- state ----------
     def _state(self, v: View, c: dict) -> dict:
@@ -235,7 +236,9 @@ class JevEngine(Engine):
         if v.engulfed:  # Mechanics, not a choice: any direction hits whatever swallowed us.
             self.note = "jev mode: engulfed, fight out"
             return "Fk", []
-        answer = self.ask(self._state(v, c))
+        state = self._state(v, c)
+        answer = self.ask(state)
+        self.last_ask = (c["turn"], state, answer)  # for the replay page's brain log
         if answer is None:
             _count(self.memory, "jev: api failure, rules decided")
             return super()._decide(v)

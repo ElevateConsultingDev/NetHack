@@ -91,7 +91,8 @@ def _game_card(g) -> str:
     why = g.result.get("death") if g.result and g.result.get("death") else (g.stall or g.engine.note or "")
     meta = (f"Dlvl {st.get('dlvl', '?')} · XL {st.get('xlvl', '?')} · HP {st.get('hp', '?')}/{st.get('hpmax', '?')} · "
             f"T{st.get('turn', 0)} · ${st.get('gold', 0)} {html.escape(st.get('hunger', '') or '')}")
-    return (f'<a class="card" href="game-{html.escape(g.name)}.html">'
+    target = f"replay-{g.name}.html" if g.result is not None else f"game-{g.name}.html"
+    return (f'<a class="card" href="{html.escape(target)}">'
             f'<h3>{html.escape(g.name)} <span class="pill {state}">{label}</span></h3>'
             f'<div class="meta">{meta}</div><div class="note">{html.escape(why)}</div>'
             f'<pre>{_map_text(g.last or {})}</pre></a>')
@@ -283,7 +284,7 @@ def write_game(path: str, g, run: str) -> None:
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">{refresh}
 <title>Pilot Game</title><style>{CSS}</style></head><body><main>
-<div class="sub"><a href="dashboard.html">&larr; all games</a> · run {html.escape(run)}</div>
+<div class="sub"><a href="dashboard.html">&larr; all games</a> · run {html.escape(run)}{'' if g.result is None else f' · <a href="replay-{html.escape(g.name)}.html">step-by-step replay</a>'}</div>
 <h1>{html.escape(g.name)} <span class="pill {state}">{html.escape(label)}</span></h1>
 <div class="stats">
   <div class="stat"><b>{st.get('dlvl', '?')}</b><span>dungeon level</span></div>

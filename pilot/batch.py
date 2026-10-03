@@ -30,6 +30,7 @@ import time
 from .brain import HaikuBrain, QwenBrain, ReplayBrain, RuleBrain
 from .channel import Channel
 from . import dashboard
+from .frames import Recorder
 from .engine import Engine
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -143,6 +144,7 @@ class Game:
         self.max_turns, self.max_seconds = max_turns, max_seconds
         self.sock = f"/tmp/nhb-{name}.sock"
         self.engine = engine or Engine()
+        self.frames = Recorder()  # every frame, for the step-by-step replay page
         self.channel = Channel(self.sock, self._on_state_safe)
         self.last: dict = {}
         self.brain_calls = 0
@@ -205,6 +207,7 @@ class Game:
             keys, events = self.engine.step(s)
             if keys:
                 self.keys.append((turn, keys))
+                self.frames.record(self, s)
                 self.channel.send(keys)
                 return
             order = self._decide(events, s)
@@ -402,6 +405,7 @@ def _play_one(spec: dict) -> dict:
         g.result = r
     stop.set()
     if g.last:
+        g.frames.write_page(os.path.join(batch_dir, f"replay-{g.name}.html"), g, spec["run"])
         dashboard.write_game(page, g, spec["run"])
     _write_live(g, live)
     return r
