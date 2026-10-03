@@ -115,8 +115,15 @@ def _all_games(batch_dir: str) -> list[dict]:
         pass
     games = []
     for path in sorted(glob.glob(os.path.join(batch_dir, "*.csv"))):
+        brains = {}
+        try:  # The run's JSON knows which brain played each game; the CSV does not.
+            with open(path[:-4] + ".json") as f:
+                brains = {g["name"]: g.get("brain") or "rules" for g in json.load(f).get("games", [])}
+        except (OSError, ValueError):
+            pass
         with open(path) as f:
             for r in csv.DictReader(f):
+                r["brain"] = brains.get(r["name"], "rules")
                 rec = xlog.get(r["name"], {})
                 r["achieve"] = int(rec.get("achieve", "0"), 16) if rec.get("achieve", "0").startswith("0x") \
                     else int(rec.get("achieve", "0") or 0)
@@ -132,8 +139,9 @@ def _num(v) -> float:
         return 0.0
 
 
-def _north_star(batch_dir: str) -> str:
-    games = _all_games(batch_dir)
+def _north_star(batch_dir: str, jev: bool = False) -> str:
+    """The all-time panel: one for the rule and LLM brains, one for JEV mode (kept apart on purpose)."""
+    games = [g for g in _all_games(batch_dir) if (g["brain"] == "jev") == jev]
     if not games:
         return ""
     n = len(games)
@@ -157,7 +165,7 @@ def _north_star(batch_dir: str) -> str:
     ladder += [rung(f"survived {t:,} turns", lambda g, t=t: _num(g.get("turn")) >= t) for t in (5000, 10000, 20000)]
     ladder += [rung(label, lambda g, b=b: g["achieve"] & b) for b, label in ACHIEVE]
     return f"""<section class="north">
-<h2 style="margin-top:0">North star: how well the pilot plays (all {n} games, {len(runs)} runs)</h2>
+<h2 style="margin-top:0">North star: {"JEV mode" if jev else "how well the pilot plays"} ({"all " if not jev else ""}{n} games, {len(runs)} runs{", Jev picks every action" if jev else ", rule and LLM brains"})</h2>
 <div class="stats">
   <div class="stat"><b>{max(deep):.0f}</b><span>deepest level ever</span></div>
   <div class="stat"><b>{max(xl):.0f}</b><span>highest XL ever</span></div>
@@ -225,6 +233,7 @@ def write(path: str, run: str, brain: str, games: list, batch_dir: str) -> None:
 <meta http-equiv="refresh" content="{REFRESH_S}">
 <title>Pilot Runs</title><style>{CSS}</style></head><body><main>
 {_north_star(batch_dir)}
+{_north_star(batch_dir, jev=True)}
 <h1>NetHack pilot: run {html.escape(run)}</h1>
 <div class="sub">{len(games)} games · {brain} brain · {done_note} · updated {time.strftime('%H:%M:%S')}</div>
 <div class="stats">
