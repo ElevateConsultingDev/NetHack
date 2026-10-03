@@ -31,6 +31,7 @@ DONT_MELEE = {"floating eye", "cockatrice", "chickatrice",
               "yellow mold", "red mold", "yellow light"}  # a yellow light explodes and blinds
 # An unseen attacker (we're blind, or it's invisible or in the dark): the
 # only sign is the message. Resting through it killed two of four drilled games.
+SHOP_WELCOME = re.compile(r"! +Welcome( again)? to .*'s ")  # "Velkommen, X!  Welcome again to Y's general store!"
 UNSEEN_ATTACK = re.compile(r"^It (hits|bites|stings|kicks|butts|touches|misses|just misses)")
 
 
@@ -112,7 +113,7 @@ def species_ok(name: str, race: str) -> tuple[bool, str]:
         return False, "cannibalism"
     return True, "ok"
 NEVER_ROTS = {"lichen", "lizard"}
-FRESH_TURNS = 30
+FRESH_TURNS = 45  # eat.c: a corpse under 50 turns old can never be tainted
 
 @dataclass
 class Memory:
@@ -157,6 +158,8 @@ class Memory:
     mines_stairs: set = field(default_factory=set)  # (dlvl, x, y) stairs down into the Gnomish Mines
     floor: set = field(default_factory=set)       # (dlvl, x, y) room floor seen; dark rooms draw it blank again
     watch: set = field(default_factory=set)       # dlvls where the watch (Minetown) has been seen: never kick doors
+    last_threat_turn: int = -999                  # last turn a hostile worth minding was in view
+    blocker_engraved: tuple = ()                  # (dlvl, x, y) where Elbereth was written to shoo a blocker
 
 
 class View:
@@ -1089,6 +1092,11 @@ class Engine:
             if sc["kind"] == "monster" and sc["name"] == "shopkeeper":
                 self.memory.shop_items |= {(v.dlvl, x, y) for (x, y), c in v.cells.items()
                                            if c["kind"] == "object" and max(abs(x - sx), abs(y - sy)) <= 7}
+        if v.pos and any(SHOP_WELCOME.search(msg) for msg in v.s.get("messages", [])):
+            # Standing in the shop door: everything in sight is stock, whether or not the
+            # shopkeeper is in view (dungeon 7001: a 10,000-turn ping-pong at a general store).
+            self.memory.shop_items |= {(v.dlvl, x, y) for (x, y), c in v.cells.items()
+                                       if c["kind"] == "object" and max(abs(x - v.pos[0]), abs(y - v.pos[1])) <= 12}
 
         self._record_kills(v)
         self._read_messages(v)
@@ -1137,6 +1145,8 @@ class Engine:
 
         c = checks(v, self.memory)
         self.last_checks = c
+        if any(h["name"] not in self.orders["avoid"] or h["name"] in DANGEROUS_NEAR for h in c["mobile_hostiles"]):
+            self.memory.last_threat_turn = c["turn"]
         self._checkpoints(v, c)
 
         standing = self._standing(v, c)
@@ -1185,7 +1195,7 @@ class Engine:
                 if PRAYER_OK.match(msg) or msg.startswith("You are surrounded by a shimmering light"):
                     _count(m, "prayers ok")
                     m.prayer_log.append((m.last_pray_turn, "ok"))
-                elif msg.startswith(PRAYER_FAILED):
+                elif msg.startswith(PRAYER_FAILED):  # "displeased" included: pray.c takes Luck -3 and angers the god
                     m.prayer_broken = True
                     _count(m, "prayers failed")
                     m.prayer_log.append((m.last_pray_turn, "failed"))
@@ -1222,7 +1232,8 @@ class Engine:
         turn = c["turn"]
         spots = {(x, y) for (d, x, y), (name, when) in m.kills.items()
                  if d == v.dlvl and species_ok(name, v.status.get("race", ""))[0]
-                 and (name in NEVER_ROTS or turn - when <= FRESH_TURNS)}
+                 and (name in NEVER_ROTS or turn - when <= FRESH_TURNS)
+                 and (d, x, y) not in m.shop_items}  # A corpse in a shop is stock, not a meal.
         if not spots:
             return None
         if v.pos in spots:
@@ -1311,6 +1322,14 @@ class Engine:
         if c["major_trouble"] and o["pray_when_critical"] and c["prayer_safe"]:
             return r_pray(v, m, {})[0], f"standing order: pray ({', '.join(c['major_trouble'])})"
         if c["wounded"] == "critical":
+            since = (c["turn"] - m.last_pray_turn) if m.last_pray_turn is not None else None
+            if c["major_trouble"] and o["pray_when_critical"] and not m.prayer_broken and c["turn"] >= m.luck_bad_until \
+                    and since is not None and since >= 700 and c["adjacent_hostiles"]:
+                # The gate waits 1000 turns to be sure; the timeout is rnz(350), so at 700+ turns a
+                # prayer succeeds about nine times in ten. Dying is the alternative (dungeon 7001,
+                # a throne room at 2 HP, 840 turns after the last prayer).
+                _count(m, "prayer gamble")
+                return r_pray(v, m, {})[0], "standing order: pray (critical, the gate is probably open)"
             esc = self._escalate("critical HP and prayer isn't safe")
             if esc:
                 return esc
@@ -1419,6 +1438,12 @@ class Engine:
                 # have no answer). Carrying on, down to a fresh level with
                 # fresh kills, can only do better than stopping.
                 _count(m, "Weak with no food: carrying on")
+            if hunger >= HUNGER_RANK.index("Fainting") and not c["prayer_safe"]:
+                risky = [i for i in v.s.get("inventory", []) if i["class"] == "%" and "corpse" not in i["text"]]
+                if risky:  # An unknown egg is a 1-in-20 cockatrice; fainting next to a giant ant is certain (dungeon 7001).
+                    m.pending_food = risky[0]["letter"]
+                    _count(m, "desperate meal")
+                    return "e", f"standing order: desperate meal ({risky[0]['text']})"
             # Hungry or Weak: keep going; the next safe kill is a meal.
         corpse = self._corpse_to_eat(v, c)
         if corpse:
@@ -1454,7 +1479,10 @@ class Engine:
         # into them): that's how thrown daggers come back. Cockatrices do.
         threats = [h for h in self.last_checks.get("visible_hostiles", [])
                    if h["name"] not in self.orders["avoid"] or h["name"] in DANGEROUS_NEAR]
-        if self.orders["loot"] and not burdened and not threats:
+        # Loot waits a few turns after the last sighting: a room seen from one corridor square
+        # and not the next flipped loot on and off and bounced the pilot for 3,000 turns (dungeon 7001).
+        # Five turns: 25 cost 0.4 levels on the held-out set (iteration 46a).
+        if self.orders["loot"] and not burdened and not threats and v.status.get("turn", 0) - m.last_threat_turn >= 5:
             keys, note = r_loot(v, m, self._loot_args)
             if keys:
                 self.note = "loot: " + note
