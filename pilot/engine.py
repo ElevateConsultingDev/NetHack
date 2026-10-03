@@ -1523,10 +1523,18 @@ class Engine:
         blockers = [mon["name"] for mon in self.last_checks.get("visible_hostiles", [])
                     if mon["name"] in self.orders["avoid"] and mon["distance"] <= 2]
         waited = m.stats.get(f"waited on dlvl {v.dlvl}", 0)
-        if blockers and waited < 60:
-            _count(m, f"waited on dlvl {v.dlvl}", 5)
-            self.note = f"wait for the {blockers[0]} to move out of the way"
-            return "5s", []
+        if blockers and waited < 600:
+            # A floating eye in the only corridor moves one square every dozen turns, and away
+            # from Elbereth. Scare it once, then wait it out (dungeon 7001 gave up after 60 turns).
+            here = (v.dlvl, *v.pos)
+            if m.blocker_engraved != here:
+                m.blocker_engraved = here
+                m.engraving = True
+                self.note = f"engrave Elbereth to shoo the {blockers[0]}"
+                return "E", []
+            _count(m, f"waited on dlvl {v.dlvl}", 20)
+            self.note = f"wait for the {blockers[0]} to move out of the way ({waited} turns so far)"
+            return "20s", []
         return None, ["no way on: explored, searched the walls, no stairs down known"
                       + (f" ({', '.join(blockers)} in the way)" if blockers else "")]
 
