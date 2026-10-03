@@ -11,6 +11,8 @@ game's DM) and falls back to RuleBrain if the answer is missing or invalid.
 
 from __future__ import annotations
 
+from .spoilers import spoiler
+
 import json
 import os
 import urllib.request
@@ -43,6 +45,11 @@ class RuleBrain:
         ev = "; ".join(events)
         if ev.startswith("prompt:"):
             return Order("keys", {"keys": "\x1b"}, say="unfamiliar prompt: escape out of it")
+        if ev.startswith("badly hurt") and " with " in ev:
+            names = ev.split(" with ", 1)[1].split(" adjacent")[0].split(", ")
+            deaf = [n for n in names if not spoiler(n).get("elbereth", True)]
+            if deaf:  # Humans, minotaurs, the watch: the engraving means nothing to them.
+                return Order("fight", {"target": deaf[0]}, say=f"the {deaf[0]} ignores Elbereth: fighting")
         if ev.startswith("badly hurt") or ev.startswith("critical HP") or ev.startswith("attacked by something unseen"):
             return Order("elbereth", say="hurt and in trouble: engraving Elbereth")
         if "cornered and unarmed" in ev:

@@ -8,6 +8,8 @@ done, failed, or something changed that the brain should look at.
 
 from __future__ import annotations
 
+from .spoilers import spoiler
+
 import re
 from collections import deque
 from dataclasses import dataclass, field
@@ -791,6 +793,9 @@ def r_elbereth(v: View, memory: Memory, args: dict):
         return "E", "engrave Elbereth"
     if v.pos != tuple(args["at"]) or st.get("turn", 0) - args["turn"] > 300:
         return None, "done: left the Elbereth square"
+    if any(c["kind"] == "monster" and not v.peaceful(x, y) and max(abs(x - v.pos[0]), abs(y - v.pos[1])) == 1
+           and not spoiler(c["name"]).get("elbereth", True) for (x, y), c in v.cells.items()):
+        return None, "done: something adjacent ignores Elbereth"
     if st.get("hp", 0) >= st.get("hpmax", 1) * 0.7:
         return None, "done: healed up on Elbereth"
     if any("You disturb the engraving" in m or "engraving now reads" in m for m in v.s.get("messages", [])):
