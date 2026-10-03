@@ -172,3 +172,11 @@ assert closed_for_inventory('Something is written here in the dust. You read: "C
 assert closed_for_inventory('You read: "Closed for inventory".')
 assert not closed_for_inventory('You read: "Elbereth".') and not closed_for_inventory('You read: "ad aerarium".')
 print("closed shop ok")
+
+# Spoiler table from src/monst.c: speed, Elbereth, hazards.
+from pilot.spoilers import spoiler, SPOILERS
+assert spoiler("soldier ant")["speed"] == 18 and not spoiler("soldier ant")["outrun"]
+assert spoiler("hill orc")["outrun"] and spoiler("floating eye")["passive"] == ["paralysis"]
+assert not spoiler("watchman")["elbereth"] and not spoiler("minotaur")["elbereth"] and spoiler("killer bee")["elbereth"]
+assert "stoning" in spoiler("cockatrice")["hazards"] and len(SPOILERS) > 350
+print("spoilers ok")
