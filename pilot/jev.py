@@ -42,19 +42,22 @@ ACTIONS = {
              "in line, and for a stationary monster sitting on the stairs down or in a doorway.",
     "elbereth": "Engrave Elbereth in the dust and rest on it. Right when badly hurt (under about a third of maximum HP) "
                 "with a hostile adjacent, or when something unseen is hitting the pilot, and prayer is not safe. "
-                "Useless against humans (@), minotaurs and shopkeepers; attacking from the square erases it.",
+                "Useless against humans (@), minotaurs and shopkeepers; attacking from the square erases it. If "
+                "`threats.hit_while_on_elbereth` is true the engraving has failed: do not rest on it again, fight or pray.",
     "back_off": "Step one square away from the nearest hostile. Right next to a cockatrice, next to a gas spore about "
                 "to explode, or to pull a single enemy into a corridor before fighting.",
     "eat": "Eat safe food from the pack, or the fresh corpse of a safe species the pilot just killed. Right when Hungry "
            "or Weak and `options.safe_food_in_pack` is above zero, or when `options.fresh_safe_corpse_nearby` and the "
            "pilot is not Satiated. Never corpses of unknown age, never unknown eggs.",
     "rest": "Search in place for twenty turns to recover HP. Right when HP is under half, nothing hostile that can move "
-            "is in view, and nothing unseen is hitting the pilot. Stationary molds in view do not matter.",
+            "is in view, and nothing unseen is hitting the pilot. Stationary molds in view do not matter. Never when "
+            "Weak or Fainting from hunger: resting does not feed you.",
     "wear": "Put on `options.armor_to_wear`. Right when armor for an empty slot is in the pack and no hostile is in view.",
     "loot": "Walk to a visible object and pick it up: gold, scrolls, potions, wands, rings, amulets, books, tools, food. "
             "Never items in a shop while the shopkeeper is around.",
     "explore": "Walk toward unexplored map, opening doors (kicking locked ones only where the Minetown watch has not "
-               "been seen). The default while `options.level_explored` is false and nothing is urgent.",
+               "been seen). The default while `options.level_explored` is false and nothing is urgent. Never with a "
+               "hostile adjacent and HP low: walking away from a fight at 5 HP is how a pilot dies.",
     "probe": "Feel around dark areas by stepping into blank squares next to where the pilot has stood. Dark rooms and "
              "corridors stay blank until walked, so this is the first thing to do whenever `options.level_explored` is true, "
              "the stairs down are not known, and `options.probe_spots_remain` is true. Comes before search.",
@@ -62,8 +65,9 @@ ACTIONS = {
               "`options.probe_spots_remain` is false, the stairs down are not known, and `options.unsearched_spots_remain` "
               "is true. Never while the stairs down are known.",
     "go_down": "Walk to the known stairs down and descend. Right when `options.stairs_down_known` and the level is "
-               "explored, or the pilot is Hungry with no food and the level has nothing left. Each level deeper brings "
-               "monsters about one level harder; experience level plus two is comfortable.",
+               "explored, and always when Weak or Fainting with no food and the stairs are known: a fresh level has "
+               "fresh kills to eat. Each level deeper brings monsters about one level harder; experience level plus "
+               "two is comfortable.",
     "go_up": "Walk to the stairs up and climb. Right only in the Gnomish Mines (`options.in_gnomish_mines`) below "
              "experience level 8 for anyone but a dwarf or gnome, or to flee a fight the pilot is losing. Anywhere else it "
              "undoes progress: the goal is depth.",
@@ -98,6 +102,8 @@ class JevEngine(Engine):
         self.jev_args: dict[str, dict] = {}
         self.calls, self.seconds, self.failures = 0, 0.0, 0
         self.last_ask = None
+        self.prev_hp: tuple = (None, None)  # (turn, hp) of the previous command prompt
+        self.loot_quiet_until = 0           # turn until which loot is reported absent (a loot just failed)
 
     # ---------- state ----------
     def _state(self, v: View, c: dict) -> dict:
@@ -122,8 +128,9 @@ class JevEngine(Engine):
                 break
         probe_spots = any(v.unknown(x + dx, y + dy) and (v.dlvl, x + dx, y + dy) not in m.probed
                           for (d, x, y) in m.visited if d == v.dlvl for dx, dy in ORTHO)
-        loot_in_view = any(cell["kind"] == "object" and cell["name"] not in ("boulder", "corpse")
-                           and (v.dlvl, x, y) not in m.shop_items for (x, y), cell in v.cells.items())
+        loot_in_view = c["turn"] >= self.loot_quiet_until and any(
+            cell["kind"] == "object" and cell["name"] not in ("boulder", "corpse")
+            and (v.dlvl, x, y) not in m.shop_items for (x, y), cell in v.cells.items())
         return {
             "pilot": {"hp": c["hp"], "hp_max": c["hpmax"], "wounded": c["wounded"] or "fine", "experience_level": c["xlvl"],
                       "armor_class": st.get("ac"), "dungeon_level": v.dlvl, "dungeon": st.get("dungeon"),
@@ -137,6 +144,8 @@ class JevEngine(Engine):
                         "in_view": [{"name": h["name"], "distance": h["distance"], "difficulty": h["difficulty"],
                                      "stationary": h["name"] in SESSILE} for h in hostiles[:8]],
                         "attacked_by_something_unseen": bool(c["under_attack"]),
+                        "hit_while_on_elbereth": self._hit_on_elbereth(v, c),
+                        "hp_dropped_this_turn": self._hit(c),
                         "difficulty_limit": limit,
                         "shopkeeper_in_view": any(cell["kind"] == "monster" and cell["name"] == "shopkeeper" for cell in v.cells.values()),
                         "watch_seen_on_level": v.dlvl in m.watch},
@@ -148,6 +157,14 @@ class JevEngine(Engine):
                         "loot_in_view": loot_in_view, "gold_in_view": bool(c["gold_visible"]),
                         "stairs_up_known": any(d == v.dlvl and n == "staircase up" for (d, x, y), n in m.features.items())},
         }
+
+    def _hit(self, c: dict) -> bool:
+        t, hp = self.prev_hp
+        return t is not None and c["turn"] - t <= 2 and hp is not None and c["hp"] < hp
+
+    def _hit_on_elbereth(self, v: View, c: dict) -> bool:
+        a = self.jev_args.get("elbereth") or {}
+        return bool(a.get("sent")) and v.pos == tuple(a.get("at") or ()) and (self._hit(c) or c["under_attack"])
 
     # ---------- the call ----------
     def ask(self, state: dict) -> dict | None:
@@ -175,6 +192,9 @@ class JevEngine(Engine):
     # ---------- carrying the choice out ----------
     def _do(self, action: str, v: View, c: dict):
         m, args = self.memory, self.jev_args
+        cornered = c["adjacent_hostiles"] and c["hp"] * 3 < c["hpmax"]
+        if cornered and action in ("explore", "loot", "probe", "search", "wear", "rest"):
+            return None, "a hostile is adjacent and HP is low: not the moment to wander"
         if action == "pray":
             return r_pray(v, m, {}) if c["prayer_safe"] else (None, "prayer gate closed")
         if action == "fight":
@@ -189,6 +209,9 @@ class JevEngine(Engine):
                     return r_throw(v, m, {"target": mon["name"]})
             return None, "nothing to throw at"
         if action == "elbereth":
+            if self._hit_on_elbereth(v, c):  # Jev chose Elbereth at 0.6-0.8 for eight turns while a coyote bit through it.
+                args.pop("elbereth", None)
+                return None, "Elbereth is not working: still being hit on it"
             keys, note = r_elbereth(v, m, args.setdefault("elbereth", {}))
             if keys is None:
                 args.pop("elbereth", None)
@@ -202,16 +225,19 @@ class JevEngine(Engine):
             corpse = self._corpse_to_eat(v, c)
             return corpse if corpse else (None, "nothing safe to eat")
         if action == "rest":
-            if c["mobile_hostiles"] or c["under_attack"]:
-                return None, "not safe to rest"
+            if c["mobile_hostiles"] or c["under_attack"] or c["hunger"] in ("Weak", "Fainting", "Fainted"):
+                return None, "not safe to rest, or starving"
             return "20s", f"rest (HP {c['hp']}/{c['hpmax']})"
         if action == "wear":
             got = self._wear_armor(v, c)
             return got if got else (None, "nothing to wear")
         if action == "loot":
+            if c["turn"] < self.loot_quiet_until:
+                return None, "loot just failed; quiet for a while"
             keys, note = r_loot(v, m, args.setdefault("loot", {"classes": self.orders["loot"]}))
             if keys is None:
                 args.pop("loot", None)
+                self.loot_quiet_until = c["turn"] + 20  # 400 top picks of loot with nothing reachable in 4 games
             return keys, note
         if action == "explore":
             return r_explore(v, m, {})
@@ -246,13 +272,26 @@ class JevEngine(Engine):
         if v.engulfed:  # Mechanics, not a choice: any direction hits whatever swallowed us.
             self.note = "jev mode: engulfed, fight out"
             return "Fk", []
+        starving = c["hunger"] in ("Weak", "Fainting", "Fainted") and not c["safe_food"] and c["stairs_down"] is not None
+        if starving and not c["adjacent_hostiles"] and not self._corpse_to_eat(v, c):
+            # The engine's own rule: a fresh level has fresh kills. Jev's probabilities went flat here and the fallback rested.
+            keys, note = r_go_down(v, m := self.memory, {"start_dlvl": v.dlvl})
+            if keys:
+                _count(m, "jev: starving, went down by rule")
+                self.note = "jev mode, rule: starving with a known way down: " + note
+                self.prev_hp = (c["turn"], c["hp"])
+                return self._stuck_guard(v, keys, note)
         state = self._state(v, c)
         answer = self.ask(state)
         self.last_ask = (c["turn"], state, answer)  # for the replay page's brain log
+        self.prev_hp = (c["turn"], c["hp"])
         if answer is None:
             _count(self.memory, "jev: api failure, rules decided")
             return super()._decide(v)
-        order = sorted(answer["probabilities"].items(), key=lambda kv: -kv[1])
+        order = [(a, p) for a, p in sorted(answer["probabilities"].items(), key=lambda kv: -kv[1]) if p >= 0.05]
+        if not order:  # Flat: Jev does not know. The rules decide this turn rather than the fallback order.
+            _count(self.memory, "jev: unsure, rules decided")
+            return super()._decide(v)
         for action, p in order:
             keys, note = self._do(action, v, c)
             if keys:
@@ -261,9 +300,8 @@ class JevEngine(Engine):
                     _count(self.memory, f"jev: {order[0][0]} not possible, did {action}")
                 self.note = f"jev {action} ({p:.2f}): {note}"
                 return self._stuck_guard(v, keys, note)
-        _count(self.memory, "jev: nothing possible, waited")
-        self.note = "jev: no action possible; wait a turn"
-        return "s", []
+        _count(self.memory, "jev: nothing possible, rules decided")
+        return super()._decide(v)
 
 
 if __name__ == "__main__":  # Smoke test: one call on a sample state, with timing.
