@@ -8,6 +8,7 @@ few seconds while games run and once more at the end.
 from __future__ import annotations
 
 import csv
+import re
 import glob
 import html
 import json
@@ -115,15 +116,16 @@ def _all_games(batch_dir: str) -> list[dict]:
         pass
     games = []
     for path in sorted(glob.glob(os.path.join(batch_dir, "*.csv"))):
-        brains = {}
-        try:  # The run's JSON knows which brain played each game; the CSV does not.
+        brain = "rules"
+        try:  # The run's JSON header names the brain; the CSV does not. Read only the head: the files are big.
             with open(path[:-4] + ".json") as f:
-                brains = {g["name"]: g.get("brain") or "rules" for g in json.load(f).get("games", [])}
-        except (OSError, ValueError):
+                m = re.search(r'"brain":\s*"(\w+)"', f.read(300))
+                brain = m.group(1) if m else "rules"
+        except OSError:
             pass
         with open(path) as f:
             for r in csv.DictReader(f):
-                r["brain"] = brains.get(r["name"], "rules")
+                r["brain"] = brain
                 rec = xlog.get(r["name"], {})
                 r["achieve"] = int(rec.get("achieve", "0"), 16) if rec.get("achieve", "0").startswith("0x") \
                     else int(rec.get("achieve", "0") or 0)
