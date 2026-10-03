@@ -272,6 +272,15 @@ class JevEngine(Engine):
         if v.engulfed:  # Mechanics, not a choice: any direction hits whatever swallowed us.
             self.note = "jev mode: engulfed, fight out"
             return "Fk", []
+        if c["major_trouble"] and c["prayer_safe"]:
+            # The rules pilot's first standing order. Jev fought a human zombie at 1 HP with prayer available (round two).
+            _count(self.memory, "jev: prayed by rule")
+            self.prev_hp = (c["turn"], c["hp"])
+            self.note = "jev mode, rule: pray (" + ", ".join(c["major_trouble"]) + ")"
+            return r_pray(v, self.memory, {})[0], []
+        hit = self._hit(c)  # An HP drop since last turn counts as being under attack: blind, one quiet message turn let rest through.
+        if hit:
+            c["under_attack"] = True
         starving = c["hunger"] in ("Weak", "Fainting", "Fainted") and not c["safe_food"] and c["stairs_down"] is not None
         if starving and not c["adjacent_hostiles"] and not self._corpse_to_eat(v, c):
             # The engine's own rule: a fresh level has fresh kills. Jev's probabilities went flat here and the fallback rested.
