@@ -921,6 +921,11 @@ def r_probe_dark(v: View, memory: Memory, args: dict):
     return None, "done: nothing left to probe"
 
 
+def _chokepoint(v: View, x: int, y: int) -> bool:
+    """A walkable square with at most two walkable neighbours: a corridor interior, where a crowd queues up."""
+    return v.walkable(x, y) and sum(v.walkable(x + dx, y + dy) for dx, dy in DIRS.values()) <= 2
+
+
 def _dead_end(v: View, x: int, y: int) -> bool:
     """A corridor square with one way out: hidden passages hide past these."""
     if v.ch(x, y) != "#" and not (v.memory and (v.dlvl, x, y) in v.memory.corridors):
@@ -1299,6 +1304,31 @@ class Engine:
         mines = self._leave_mines(v, c)
         if mines:
             return mines
+        # Retreat upstairs: hurt with a crowd in view, or badly hurt with anything adjacent, and no
+        # prayer. Only adjacent monsters follow up the stairs; 44 of 75 recorded melee deaths were
+        # swarms, 73 of 75 never prayed, and Elbereth erodes under a crowd (iteration 43).
+        crowd = len(c["mobile_hostiles"]) >= 2 and c["hp"] * 2 < c["hpmax"]
+        pressed = c["adjacent_hostiles"] and c["hp"] * 3 < c["hpmax"]
+        if (crowd or pressed) and not c["prayer_safe"]:
+            up = [(x, y) for (d, x, y), n in m.features.items() if d == v.dlvl and n == "staircase up"]
+            if up:
+                if v.pos in up:
+                    _count(m, "fled upstairs")
+                    return "<", "standing order: flee up the stairs (hurt, outnumbered)"
+                path = bfs(v, lambda x, y: (x, y) in up)
+                if path and len(path) <= 12:
+                    keys, note = _step(v, m, path, "standing order: retreat to the stairs up")
+                    if keys:
+                        return keys, note
+            if crowd and not _chokepoint(v, *v.pos):
+                # No stairs in reach: back into a corridor, where they come one at a time
+                # (118 of 128 games had a hurt-and-crowded moment; stairs were near in 16).
+                path = bfs(v, lambda x, y: _chokepoint(v, x, y))
+                if path and len(path) <= 8:
+                    keys, note = _step(v, m, path, "standing order: retreat into a corridor (hurt, outnumbered)")
+                    if keys:
+                        _count(m, "retreated to a corridor")
+                        return keys, note
         if c["adjacent_hostiles"] and c["hp"] < c["hpmax"] * float(o["retreat_below"]):
             names = ", ".join(sorted({m["name"] for m in c["adjacent_hostiles"]}))
             esc = self._escalate(f"badly hurt (HP {c['hp']}/{c['hpmax']}) with {names} adjacent")

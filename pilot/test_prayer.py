@@ -153,3 +153,15 @@ assert 1 in _e5.memory.watch
 _k5, _n5 = _r_explore(_View(_town, _e5.memory), _e5.memory, {})
 assert not (_k5 or "").startswith("\x04"), (_k5, _n5)
 print("watch ok")
+
+# Retreat upstairs: hurt, two hostiles in view, no prayer, stairs up known and close.
+_e6 = Engine(); _e6.memory.last_pray_turn = 5  # prayer gate shut
+_e6.memory.features[(1, 2, 2)] = "staircase up"
+_flee = dict(_snap, map=["", " -----", " |<..|", " |.@.|", " |...|", " -----"],
+             cells=[{"x": 2, "y": 2, "kind": "feature", "name": "staircase up"},
+                    {"x": 4, "y": 3, "kind": "monster", "name": "jackal", "difficulty": 1},
+                    {"x": 4, "y": 4, "kind": "monster", "name": "jackal", "difficulty": 1}],
+             status=dict(_snap["status"], hp=6, hpmax=16, turn=50))
+_k6, _ = _e6.step(_flee)
+assert _k6 in ("h", "y"), _k6   # a step toward the stairs up, not a fight
+print("flee upstairs ok")
