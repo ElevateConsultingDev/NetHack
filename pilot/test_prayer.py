@@ -165,3 +165,10 @@ _flee = dict(_snap, map=["", " -----", " |<..|", " |.@.|", " |...|", " -----"],
 _k6, _ = _e6.step(_flee)
 assert _k6 in ("h", "y"), _k6   # a step toward the stairs up, not a fight
 print("flee upstairs ok")
+
+# A worn "Closed for inventory" engraving still shuts the shop door.
+from pilot.engine import closed_for_inventory
+assert closed_for_inventory('Something is written here in the dust. You read: "C?o??c fo  inventory".')
+assert closed_for_inventory('You read: "Closed for inventory".')
+assert not closed_for_inventory('You read: "Elbereth".') and not closed_for_inventory('You read: "ad aerarium".')
+print("closed shop ok")

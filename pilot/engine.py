@@ -34,6 +34,23 @@ DONT_MELEE = {"floating eye", "cockatrice", "chickatrice",
 UNSEEN_ATTACK = re.compile(r"^It (hits|bites|stings|kicks|butts|touches|misses|just misses)")
 
 
+CLOSED_SHOP = re.compile(r'You read: "(.{15,24})"')
+
+
+def closed_for_inventory(msg: str) -> bool:
+    """The engraving in front of a shut shop reads "Closed for inventory", but it wears:
+    a pilot read "C?o??c fo  inv" and kicked the door open (the shopkeeper's wand
+    killed it). Anything that length with most of the letters still in place counts."""
+    if "Closed for inventory" in msg:
+        return True
+    m = CLOSED_SHOP.search(msg)
+    if not m:
+        return False
+    text, ref = m.group(1), "Closed for inventory"
+    hits = sum(1 for a, b in zip(text, ref) if a == b)
+    return hits >= 8
+
+
 def unseen_attack(v) -> bool:
     return any(UNSEEN_ATTACK.match(m) for m in v.s.get("messages", []))
 # Never move; drawn only while we stand next to them. Remembered by square
@@ -560,7 +577,7 @@ DOOR_NOT_CLOSED = ("This door is broken", "This door is already open", "You see 
 def r_explore(v: View, memory: Memory, args: dict):
     if any(m.startswith(DOOR_NOT_CLOSED) for m in v.s.get("messages", [])) and memory.last_door:
         memory.features[memory.last_door] = "broken door"  # Our picture was stale.
-    if any("Closed for inventory" in m for m in v.s.get("messages", [])):
+    if any(closed_for_inventory(m) for m in v.s.get("messages", [])):
         for dx, dy in DIRS.values():  # A shop door: kicking it angers the shopkeeper.
             memory.dead_doors.add((v.dlvl, v.pos[0] + dx, v.pos[1] + dy))
     watched = v.dlvl in memory.watch or any("stop damaging that door" in m or "stop picking that lock" in m
