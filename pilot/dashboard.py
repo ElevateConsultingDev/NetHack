@@ -234,8 +234,8 @@ def write(path: str, run: str, brain: str, games: list, batch_dir: str) -> None:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="{REFRESH_S}">
 <title>Pilot Runs</title><style>{CSS}</style></head><body><main>
-{_north_star(batch_dir)}
-{_north_star(batch_dir, jev=True)}
+{_north_star(batch_dir, jev=(brain == "jev"))}
+<details class="sub"><summary>{"Rule and LLM brains" if brain == "jev" else "JEV mode"}: all-time panel</summary>{_north_star(batch_dir, jev=(brain != "jev"))}</details>
 <h1>NetHack pilot: run {html.escape(run)}</h1>
 <div class="sub">{len(games)} games · {brain} brain · {done_note} · updated {time.strftime('%H:%M:%S')}</div>
 <div class="stats">
