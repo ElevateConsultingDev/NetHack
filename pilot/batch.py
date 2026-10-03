@@ -127,7 +127,7 @@ class Game:
 
     def __init__(self, name: str, role: str, brain, max_turns: int, max_seconds: float,
                  save_on_stall: bool = True, out_dir: str = os.path.join(PLAYGROUND, "batch"),
-                 seed: int | None = None) -> None:
+                 seed: int | None = None, engine=None) -> None:
         self.out_dir = out_dir
         self.seed = seed      # Set: the game is reproducible (fixed RNG seed and clock, no bones).
         self.keys: list = []  # (turn, keys) for every key the pilot sent
@@ -142,7 +142,7 @@ class Game:
         self.name, self.role, self.brain = name, role, brain
         self.max_turns, self.max_seconds = max_turns, max_seconds
         self.sock = f"/tmp/nhb-{name}.sock"
-        self.engine = Engine()
+        self.engine = engine or Engine()
         self.channel = Channel(self.sock, self._on_state_safe)
         self.last: dict = {}
         self.brain_calls = 0
@@ -302,7 +302,8 @@ class Game:
         st = self.last.get("status", {})
         return {
             "name": self.name, "seconds": round(time.time() - started, 1),
-            "brain_calls": self.brain_calls, "brain_seconds": round(self.brain_seconds),
+            "brain_calls": self.brain_calls + getattr(self.engine, "calls", 0),
+            "brain_seconds": round(self.brain_seconds + getattr(self.engine, "seconds", 0.0)),
             "brain_failures": self.brain_failures, "stall": self.stall or "",
             "dlvl": st.get("dlvl"), "xlvl": st.get("xlvl"), "turn": st.get("turn"),
             "hp": f"{st.get('hp')}/{st.get('hpmax')}", "gold": st.get("gold"),
@@ -368,13 +369,18 @@ def _play_one(spec: dict) -> dict:
     """One game in its own process: engine, brain, and its live page."""
     batch_dir = os.path.join(PLAYGROUND, "batch")
     kw = {"journal": spec["journal"], "branches": spec.get("branches", False)}
-    brain = (HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), **kw)
-             if spec["brain"] == "haiku" else QwenBrain(**kw) if spec["brain"] == "qwen"
-             else RuleBrain())
+    engine = None
+    if spec["brain"] == "jev":  # Jev picks every action; the rules only answer stray prompts.
+        from .jev import JevEngine, JevFallback
+        engine, brain = JevEngine(), JevFallback()
+    else:
+        brain = (HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), **kw)
+                 if spec["brain"] == "haiku" else QwenBrain(**kw) if spec["brain"] == "qwen"
+                 else RuleBrain())
     if spec.get("model") and hasattr(brain, "model"):
         brain.model = spec["model"]
     g = Game(spec["name"], spec["role"], brain, spec["max_turns"], spec["max_seconds"], spec["save"],
-             seed=spec["seed"])
+             seed=spec["seed"], engine=engine)
     page, live = os.path.join(batch_dir, f"game-{g.name}.html"), os.path.join(batch_dir, f"live-{g.name}.json")
     stop = threading.Event()
 
@@ -433,7 +439,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Run unattended NetHack games with the pilot")
     p.add_argument("--games", type=int, default=8)
     p.add_argument("--parallel", type=int, default=4)
-    p.add_argument("--brain", choices=("rules", "haiku", "qwen"), default="rules")
+    p.add_argument("--brain", choices=("rules", "haiku", "qwen", "jev"), default="rules")
     p.add_argument("--model", help="model for the brain (haiku alias, or an Ollama tag such as qwen3.5:9b)")
     p.add_argument("--role", default="Valkyrie")
     p.add_argument("--max-turns", type=int, default=20000)
