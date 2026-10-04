@@ -75,7 +75,7 @@ print("engulf ok")
 from pilot.engine import armor_slot
 assert armor_slot("a hard hat") == "helmet" and armor_slot("an uncursed +0 crude chain mail") == "body"
 assert armor_slot("a pair of hard shoes") == "boots" and armor_slot("a plumed helmet") is None
-assert armor_slot("a pair of padded gloves") is None and armor_slot("a +3 small shield (being worn)") is None
+assert armor_slot("a pair of padded gloves") is None and armor_slot("a +3 small shield (being worn)") == "shield"
 print("armor ok")
 
 # Corpses (plan item 11): the game's own monster flags decide.

@@ -153,6 +153,9 @@ class Memory:
     retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
     probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
     tried_wear: set = field(default_factory=set)  # inventory texts we've tried to put on
+    ate_at: set = field(default_factory=set)      # (dlvl, x, y) squares where we already tried the corpse
+    lycanthrope: bool = False                     # bitten ("You feel feverish") and not yet purified
+    wield_tried: int = -999                       # turn we last tried to wield a weapon
     shop_items: set = field(default_factory=set)  # (dlvl, x, y) objects seen near a shopkeeper: never loot
     sessile: dict = field(default_factory=dict)   # (dlvl, x, y) -> name of a stationary monster seen there
     tin_smell: str = ""                           # "newts", "spinach": what the tin being opened holds
@@ -362,6 +365,16 @@ def checks(v: View, memory: Memory) -> dict:
     """What the brain decides on. Only facts the engine can compute."""
     st = v.status
     hp, hpmax, turn = st.get("hp", 0), st.get("hpmax", 1), st.get("turn", 0)
+    msgs = " ".join(v.s.get("messages", []))
+    if "You feel feverish" in msgs:
+        memory.lycanthrope = True
+    if "You feel purified" in msgs:
+        memory.lycanthrope = False
+    if v.pos and ("You turn into a" in msgs or " stole " in msgs or "You return to" in msgs):
+        # The kit came off (a were form drops it where we stand; a monkey or nymph took a piece):
+        # it may be worn again, and this square is worth picking over again.
+        memory.tried_wear.clear()
+        memory.looted.discard((v.dlvl, *v.pos))
     adjacent, visible, dangerous = [], [], []
     if v.pos:
         for (x, y), c in v.cells.items():
@@ -386,6 +399,7 @@ def checks(v: View, memory: Memory) -> dict:
     conds = set(st.get("conditions", []))
     trouble = ([c for c in ("Stone", "Slime", "Strngl", "Sick") if c in conds]
                + (["critical HP"] if wound_tier(hp, hpmax) == "critical" else [])
+               + (["lycanthropy"] if memory.lycanthrope else [])
                + ([st.get("hunger", "").strip()] if st.get("hunger", "").strip() in ("Weak", "Fainting", "Fainted")
                   and not safe_food else [])
                + (["lycanthropy"] if memory.feverish else []))
@@ -564,7 +578,8 @@ def _pick_from_menu(v: View, memory: Memory) -> str:
             cls = MENU_HEADERS.get(item["text"].strip(), "")
         elif item["key"] and cls and (cls in memory.loot_classes or (
                 cls == ")" and any(t in item["text"] for t in ("dagger", "dart", "knife", "shuriken"))) or (
-                cls == "[" and armor_slot(item["text"]))) \
+                cls == ")" and "long sword" in item["text"] and unarmed(v)) or (
+                cls == "[" and armor_needed(v, item["text"]))) \
                 and not any(w in item["text"] for w in NOT_CARRIED + ("corpse",)):
             keys += item["key"]
     memory.loot_classes = ""
@@ -806,11 +821,21 @@ def r_elbereth(v: View, memory: Memory, args: dict):
 THROWABLE = ("dagger", "knife", "spear", "javelin", "dart", "shuriken")
 
 
+def armor_needed(v: View, text: str) -> bool:
+    """Safe armor for a slot we have nothing for: a second shield is 50 weight of nothing."""
+    slot = armor_slot(text)
+    return bool(slot) and not any(i["class"] == "[" and armor_slot(i["text"]) == slot for i in v.s.get("inventory", []))
+
+
+def unarmed(v: View) -> bool:
+    return not any("(weapon in " in i["text"] for i in v.s.get("inventory", []))
+
+
 def throwable(v: View) -> dict | None:
     """A throwable item that isn't the wielded weapon."""
     for item in v.s.get("inventory", []):
         if item["class"] == ")" and any(t in item["text"] for t in THROWABLE) \
-                and "weapon in hand" not in item["text"]:
+                and "(weapon in " not in item["text"]:
             return item
     return None
 
@@ -875,11 +900,14 @@ def r_loot(v: View, memory: Memory, args: dict):
         c = v.cells.get((x, y))
         if (v.dlvl, x, y) in memory.shop_items:
             return False
+        if c is not None and c["kind"] == "object" and "long sword" in c["name"] and unarmed(v) \
+                and (v.dlvl, x, y) not in memory.looted:
+            return True  # Ours, dropped when a were form took our hands away.
         if c is not None and c["kind"] == "object" and c.get("class") == ")" \
                 and any(t in c["name"] for t in THROWABLE if t not in ("spear", "javelin")) \
                 and (v.dlvl, x, y) not in memory.looted:
             return True  # Daggers, darts, knives: light, and what we throw.
-        if c is not None and c["kind"] == "object" and c.get("class") == "[" and armor_slot(c["name"]) \
+        if c is not None and c["kind"] == "object" and c.get("class") == "[" and armor_needed(v, c["name"]) \
                 and (v.dlvl, x, y) not in memory.looted and (v.dlvl, x, y) not in memory.blocked:
             return True  # Safe armor (see SAFE_ARMOR).
         return (c is not None and c["kind"] == "object" and c.get("class", "") in classes
@@ -909,6 +937,9 @@ SAFE_ARMOR = {
     "elven leather helm": "helmet", "leather hat": "helmet", "dented pot": "helmet",
     "low boots": "boots", "walking shoes": "boots", "high boots": "boots", "jackboots": "boots",
     "iron shoes": "boots", "hard shoes": "boots",
+    # Light shields (the Valkyrie's starting small shield is 4 of her AC; monkeys and nymphs take it).
+    "small shield": "shield", "orcish shield": "shield", "red-eyed shield": "shield", "Uruk-hai shield": "shield",
+    "white-handed shield": "shield", "elven shield": "shield", "blue and green shield": "shield",
 }
 
 
@@ -1242,9 +1273,11 @@ class Engine:
         if not spots:
             return None
         if v.pos in spots:
-            if "corpse" not in " ".join(v.s.get("messages", [])) and (v.dlvl, *v.pos) in m.looted:
+            # Its own marker, not `looted`: what the monster dropped here is still worth picking up
+            # (a monkey's stolen shield lay on its corpse's square all game, iteration 55).
+            if "corpse" not in " ".join(v.s.get("messages", [])) and (v.dlvl, *v.pos) in m.ate_at:
                 return None
-            m.looted.add((v.dlvl, *v.pos))
+            m.ate_at.add((v.dlvl, *v.pos))
             m.eating_corpse = True  # The kill record stays until the prompt is answered.
             return "e", "eat the fresh kill"
         def has_corpse(x, y):
@@ -1277,6 +1310,14 @@ class Engine:
         if c.get("visible_hostiles"):
             return None
         inv = v.s.get("inventory", [])
+        if unarmed(v) and c["turn"] - m.wield_tried >= 50:  # Not every turn: a were form can't wield.
+            blades = [i for i in inv if i["class"] == ")" and "cursed" not in i["text"].replace("uncursed", "")]
+            if blades:
+                m.wield_tried = c["turn"]
+                best = max(blades, key=lambda i: ("long sword" in i["text"], "dagger" in i["text"]))
+                m.pending_item = best["letter"]
+                _count(m, "wielded again")
+                return "w", f"wield the {best['text']}"
         filled = {armor_slot(i["text"]) for i in inv if i.get("worn")}
         cloak = any(i.get("worn") and "cloak" in i["text"] for i in inv)
         for i in inv:
@@ -1425,7 +1466,7 @@ class Engine:
                 keys, note = r_step_away(v, m, {"target": mon["name"], "max_steps": 1})
                 if keys:
                     return keys, f"standing order: back off from the {mon['name']}"
-                if any("weapon in hand" in i["text"] for i in v.s.get("inventory", [])):
+                if not unarmed(v):
                     m.pending_fight = (mon["x"], mon["y"])
                     return ("F" + KEY_FOR[(mon["x"] - v.pos[0], mon["y"] - v.pos[1])],
                             f"standing order: cornered by the {mon['name']}: fight it with the weapon")
