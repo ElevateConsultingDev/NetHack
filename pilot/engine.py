@@ -1404,6 +1404,15 @@ class Engine:
             esc = self._escalate(f"attacked by something unseen (HP {c['hp']}/{c['hpmax']})")
             if esc:
                 return esc
+        # Ranged first: anything worth a fight that is coming at us in a straight line, two to six
+        # squares out, gets a dagger before it arrives (iteration 51: melee is half of all deaths).
+        if not c["adjacent_hostiles"] and throwable(v):
+            for mon in sorted(c["mobile_hostiles"], key=lambda h: h["distance"]):
+                if 3 <= mon["distance"] <= 6 and mon["difficulty"] >= 4 and in_line(v.pos, (mon["x"], mon["y"])):
+                    keys, note = r_throw(v, m, {"target": mon["name"]})
+                    if keys:
+                        return keys, "standing order: " + note
+                    break
         limit = o["fight_up_to"] if o["fight_up_to"] is not None else (c["xlvl"] or 1) + 2
         # This fight order outranks an ordered Elbereth on purpose: yielding
         # to it let kobold zombies and jackals kill XL 1 pilots resting on a
