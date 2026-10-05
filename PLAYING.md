@@ -76,9 +76,10 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
 - Zoom: the wheel over the map (or `⌃G i` / `⌃G o`) zooms the map in and out: each square
   becomes a block of its character (2x, 4x, 6x), colors kept, centered on you; the axes
   number the part in view, and clicking a square travels there. Menus and cursor picks
-  show the normal map. In kitty (`brew install --cask kitty`), zoom uses real 2x, 3x and
-  4x characters instead (kitty's text-sizing escape code); other terminals can't size
-  part of the screen.
+  show the normal map. In Ghostty/cmux and WezTerm the zoomed map is drawn as a picture
+  (kitty's graphics protocol, rendered with Pillow), so the characters are truly 2x, 3x
+  and 4x bigger; in kitty it uses kitty's scaled text instead. Elsewhere, character
+  blocks.
 - Axes: row numbers (y, 0 at the top) down the left and column numbers (x, 1 at the
   left) along the bottom, the same coordinates the helper uses; your row and column
   are highlighted.
@@ -86,7 +87,7 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   when you would die it asks `Die?` and you can say no. Explore games skip the high scores.
 - Closing the terminal saves the game (NetHack saves on hangup).
 
-Needs `uv` (runs the helper with `pyte`, a terminal emulator) and `claude` on PATH.
+Needs `uv` (runs the helper with `pyte`, a terminal emulator, and `pillow` for the zoomed map) and `claude` on PATH.
 
 | Setting | Default |
 |---|---|

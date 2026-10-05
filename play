@@ -4,4 +4,4 @@ cd "$(dirname "$0")" || exit 1
 if [ ! -x playground/nethack ]; then
     sh sys/unix/setup.sh sys/unix/hints/macosx10.14 && make WANT_SOURCE_INSTALL=1 all || exit 1
 fi
-exec uv run -q --with pyte python3 helper.py "$@"
+exec uv run -q --with pyte --with pillow python3 helper.py "$@"

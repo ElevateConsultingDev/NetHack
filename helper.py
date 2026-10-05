@@ -92,7 +92,12 @@ RULER = 2   # rows under the game for column numbers (x)
 # kitty can draw text scaled up in place (its text-sizing protocol, OSC 66);
 # elsewhere a zoomed square is a block of its character
 KITTY = os.environ.get("TERM") == "xterm-kitty" or "KITTY_WINDOW_ID" in os.environ
-ZOOMS = ([(1, 1), (2, 2), (3, 3), (4, 4)] if KITTY  # columns x rows per map square
+try:  # terminals that show images draw the zoomed map as a picture, with truly bigger characters
+    import mapimage
+    GRAPHICS = not KITTY and os.environ.get("TERM_PROGRAM") in ("ghostty", "WezTerm")
+except ImportError:  # no Pillow
+    GRAPHICS = False
+ZOOMS = ([(1, 1), (2, 2), (3, 3), (4, 4)] if KITTY or GRAPHICS  # columns x rows per map square
          else [(1, 1), (2, 1), (4, 2), (6, 3)])
 SGR_FG = {"black": 30, "red": 31, "green": 32, "brown": 33, "blue": 34, "magenta": 35,
           "cyan": 36, "white": 37}
@@ -297,6 +302,7 @@ class App:
         self.zoom = 0           # index into ZOOMS
         self.zoom_view = None   # (x0, y0, bw, bh, top, bottom) of the zoomed map on screen
         self.big = self.big_sent = None  # kitty: big-character escapes drawn / last sent
+        self.img = self.img_sent = None  # picture zoom: what to show / what's on screen
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -527,6 +533,7 @@ class App:
         os.kill(self.pid, signal.SIGWINCH)
         self.scr.clear()
         self.big_sent = None  # kitty: the big characters were cleared too
+        self.img_sent = None  # and the map picture
         self.screen.dirty.update(range(self.gh))
 
     def color(self, fg, bg, bold):
@@ -590,7 +597,7 @@ class App:
     def zoom_active(self):
         """Zoomed drawing only while the map is what's on screen (not menus, cursor picks...)."""
         st = self.watcher.state
-        return (self.zoom > 0 and st.get("player")
+        return (self.zoom > 0 and st.get("player") and not (self.popup or self.search or self.saves_ui)
                 and (st.get("context") or {}).get("kind") in ("command", "yn", "more"))
 
     def set_zoom(self, step):
@@ -613,7 +620,7 @@ class App:
         x0 = max(1, min(MAP_W - ncols, you["x"] - ncols // 2))
         y0 = max(0, min(MAP_H - nrows, you["y"] - nrows // 2)) if nrows < MAP_H else 0
         self.zoom_view = (x0, y0, bw, bh, top, bottom)
-        buf, big = self.screen.buffer, []
+        buf, big, grid = self.screen.buffer, [], [[] for _ in range(nrows)]
         for r in range(top, bottom):
             j, k = divmod(r - top, bh)
             y = y0 + j
@@ -622,10 +629,12 @@ class App:
                 if j < nrows and y < MAP_H and x < MAP_W and top + y < self.gh:
                     c = buf[top + y][x - 1]
                     ch = (c.data or " ").translate(ASCII)
-                    if KITTY:  # curses keeps the block blank; kitty draws the big character over it
+                    if KITTY or GRAPHICS:  # curses keeps the block blank; the terminal draws over it
                         self.gput(r, i * bw, " " * bw)
-                        if k == 0:  # blanks too: they clear an old big character
+                        if k == 0 and KITTY:  # blanks too: they clear an old big character
                             big.append(big_char(r, GX + i * bw, bw, ch, c))
+                        elif k == 0 and j < len(grid) and i < MAP_W:
+                            grid[j].append((ch, c.fg, c.bold, c.reverse))
                     else:
                         self.gput(r, i * bw, ch * bw, self.cell_attr(c))
                 else:
@@ -633,6 +642,34 @@ class App:
             self.gput(r, ncols * bw, " " * (MAP_W - ncols * bw))
         self.screen.dirty.update(range(top, bottom))  # redraw normally when zoom ends
         self.big = "".join(big)
+        grid = [row for row in grid if row]
+        self.img = (top, bw, tuple(map(tuple, grid))) if grid else None
+
+    def cell_pixels(self):
+        """A character cell's size in pixels, from the terminal (or a guess)."""
+        try:
+            rows, cols, xp, yp = struct.unpack("HHHH", fcntl.ioctl(1, termios.TIOCGWINSZ, b"\0" * 8))
+            if xp and yp:
+                return xp // cols, yp // rows
+        except OSError:
+            pass
+        return 9, 18
+
+    def show_image(self):
+        """Picture zoom: draw the zoomed map as an image over its cells, or take it away."""
+        want = self.img if self.zoom_view else None
+        if want == self.img_sent:
+            return
+        if want:
+            top, scale, grid = want
+            cw, ch = self.cell_pixels()
+            png = mapimage.render(grid, cw, ch, scale)
+            out = mapimage.place(png, top, GX, len(grid[0]) * scale, len(grid) * scale)
+        else:
+            out = mapimage.delete()
+        sys.stdout.write("\x1b7" + out + "\x1b8")  # keep curses' cursor and colors
+        sys.stdout.flush()
+        self.img_sent = want
 
     def draw_game(self):
         buf = self.screen.buffer
@@ -873,6 +910,8 @@ class App:
                 sys.stdout.write("\x1b7" + self.big + "\x1b8")
                 sys.stdout.flush()
             self.big_sent = self.big if self.zoom_view else None
+            if GRAPHICS:
+                self.show_image()
 
     def helper_key(self, data):
         for b in data:
