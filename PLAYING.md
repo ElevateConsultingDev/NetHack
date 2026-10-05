@@ -77,8 +77,8 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   becomes a block of its character (2x, 4x, 6x), colors kept, centered on you; the axes
   number the part in view, and clicking a square travels there. Menus and cursor picks
   show the normal map. In Ghostty/cmux and WezTerm the zoomed map is drawn as a picture
-  (kitty's graphics protocol, rendered with Pillow), so the characters are truly 2x, 3x
-  and 4x bigger; in kitty it uses kitty's scaled text instead. Elsewhere, character
+  (kitty's graphics protocol, rendered with Pillow), so the characters are truly bigger,
+  in small steps (1.25x, 1.5x, 1.75x, 2x, 2.5x, 3x, 3.5x, 4x); in kitty it uses kitty's scaled text instead. Elsewhere, character
   blocks.
 - Axes: row numbers (y, 0 at the top) down the left and column numbers (x, 1 at the
   left) along the bottom, the same coordinates the helper uses; your row and column

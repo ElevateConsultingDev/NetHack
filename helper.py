@@ -97,7 +97,8 @@ try:  # terminals that show images draw the zoomed map as a picture, with truly 
     GRAPHICS = not KITTY and os.environ.get("TERM_PROGRAM") in ("ghostty", "WezTerm")
 except ImportError:  # no Pillow
     GRAPHICS = False
-ZOOMS = ([(1, 1), (2, 2), (3, 3), (4, 4)] if KITTY or GRAPHICS  # columns x rows per map square
+ZOOMS = ([(z, z) for z in (1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4)] if GRAPHICS  # a picture: any size
+         else [(1, 1), (2, 2), (3, 3), (4, 4)] if KITTY  # columns x rows per map square
          else [(1, 1), (2, 1), (4, 2), (6, 3)])
 SGR_FG = {"black": 30, "red": 31, "green": 32, "brown": 33, "blue": 34, "magenta": 35,
           "cyan": 36, "white": 37}
@@ -616,12 +617,21 @@ class App:
         bw, bh = ZOOMS[self.zoom]
         top, bottom = self.map_top, self.gh if self.panel_on else self.gh - 2
         you = self.watcher.state["player"]
-        ncols, nrows = MAP_W // bw, (bottom - top) // bh
+        ncols, nrows = int(MAP_W // bw), int((bottom - top) // bh)
         x0 = max(1, min(MAP_W - ncols, you["x"] - ncols // 2))
         y0 = max(0, min(MAP_H - nrows, you["y"] - nrows // 2)) if nrows < MAP_H else 0
         self.zoom_view = (x0, y0, bw, bh, top, bottom)
         buf, big, grid = self.screen.buffer, [], [[] for _ in range(nrows)]
-        for r in range(top, bottom):
+        if GRAPHICS:  # blank the map area; the picture goes over it
+            for r in range(top, bottom):
+                self.gput(r, 0, " " * MAP_W)
+            for j in range(nrows):
+                y = y0 + j
+                if y < MAP_H and top + y < self.gh:
+                    grid[j] = [((buf[top + y][x - 1].data or " ").translate(ASCII),) +
+                               (buf[top + y][x - 1].fg, buf[top + y][x - 1].bold, buf[top + y][x - 1].reverse)
+                               for x in range(x0, min(MAP_W, x0 + ncols))]
+        for r in range(top, bottom) if not GRAPHICS else ():
             j, k = divmod(r - top, bh)
             y = y0 + j
             for i in range(ncols):
@@ -664,7 +674,7 @@ class App:
             top, scale, grid = want
             cw, ch = self.cell_pixels()
             png = mapimage.render(grid, cw, ch, scale)
-            out = mapimage.place(png, top, GX, len(grid[0]) * scale, len(grid) * scale)
+            out = mapimage.place(png, top, GX, round(len(grid[0]) * scale), round(len(grid) * scale))
         else:
             out = mapimage.delete()
         sys.stdout.write("\x1b7" + out + "\x1b8")  # keep curses' cursor and colors
@@ -695,19 +705,23 @@ class App:
         you = self.watcher.state.get("player") or {}
         if self.zoom_view:
             x0, y0, bw, bh, top, bottom = self.zoom_view
+            rows = {top + int((y - y0) * bh): y for y in range(y0, MAP_H)}  # screen row of each map row
             for r in range(self.gh):
-                j, k = divmod(r - top, bh)
-                y = y0 + j
-                label = f"{y:2d} " if top <= r < bottom and k == 0 and y < MAP_H else "   "
-                self.put(r, 0, label, curses.A_REVERSE if label.strip() and y == you.get("y") else curses.A_DIM)
+                y = rows.get(r) if top <= r < bottom else None
+                self.put(r, 0, f"{y:2d} " if y is not None else "   ",
+                         curses.A_REVERSE if y is not None and y == you.get("y") else curses.A_DIM)
             self.put(self.gh, 0, " " * (GX + MAP_W))
             self.put(self.gh + 1, 0, " x ", curses.A_DIM)
-            for i in range(MAP_W // bw):
-                x = x0 + i
-                if x < MAP_W:
-                    self.gput(self.gh + 1, i * bw, str(x).ljust(bw)[:bw] if bw >= 2 or x % 5 == 0 else " ",
-                              curses.A_REVERSE if x == you.get("x") else curses.A_DIM)
-            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}  zoom {bw}x".ljust(24), curses.A_BOLD)
+            self.gput(self.gh + 1, 0, " " * MAP_W)
+            free = 0  # first column not yet used by a label
+            for x in range(x0, MAP_W):
+                col = int((x - x0) * bw)
+                if col >= MAP_W:
+                    break
+                if col >= free and (bw >= 2 or x % 5 == 0 or x == you.get("x")):
+                    self.gput(self.gh + 1, col, str(x), curses.A_REVERSE if x == you.get("x") else curses.A_DIM)
+                    free = col + len(str(x)) + 1
+            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}  zoom {bw:g}x".ljust(24), curses.A_BOLD)
             return
         for r in range(self.gh):
             y = r - self.map_top
@@ -898,7 +912,7 @@ class App:
             if self.focus == "game" and self.zoom_view:
                 x0, y0, bw, bh, top, _ = self.zoom_view
                 you = self.watcher.state["player"]
-                self.move_cursor(min(top + (you["y"] - y0) * bh, self.gh - 1), GX + (you["x"] - x0) * bw)
+                self.move_cursor(min(top + int((you["y"] - y0) * bh), self.gh - 1), GX + int((you["x"] - x0) * bw))
             elif self.focus == "game":
                 self.move_cursor(min(self.screen.cursor.y, self.gh - 1), GX + min(self.screen.cursor.x, self.gw - 1))
             else:
@@ -1105,7 +1119,7 @@ class App:
         self.focus = "game"
         if self.zoom_view and x < MAP_W and self.zoom_view[4] <= y < self.zoom_view[5]:
             x0, y0, bw, bh, top, _ = self.zoom_view
-            tx, ty = x0 + x // bw, y0 + (y - top) // bh
+            tx, ty = x0 + int(x // bw), y0 + int((y - top) // bh)
             if (self.watcher.state.get("context") or {}).get("kind") == "command" and tx < MAP_W and ty < MAP_H:
                 self.send(f"#goto\r{tx} {ty}\r".encode())  # travel to the square clicked
             return

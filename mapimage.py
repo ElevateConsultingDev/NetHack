@@ -23,8 +23,8 @@ _fonts = {}
 
 def render(grid, cell_w, cell_h, scale):
     """PNG of grid (rows of (ch, fg, bold, reverse)); each map square is scale x scale cells."""
-    bw, bh = cell_w * scale, cell_h * scale
-    img = Image.new("RGBA", (max(1, len(grid[0]) * bw), max(1, len(grid) * bh)), (0, 0, 0, 0))
+    bw, bh = cell_w * scale, cell_h * scale  # scale can be fractional (1.25x...)
+    img = Image.new("RGBA", (max(1, round(len(grid[0]) * bw)), max(1, round(len(grid) * bh))), (0, 0, 0, 0))
     size = max(8, int(bh * 0.8))
     font = _fonts.get(size) or _fonts.setdefault(size, ImageFont.truetype(FONT, size))
     draw = ImageDraw.Draw(img)
@@ -62,6 +62,7 @@ if __name__ == "__main__":
     png = render([[("@", "default", True, False), ("d", "red", False, False)],
                   [("#", "default", False, False), (" ", "default", False, True)]], 9, 18, 2)
     assert png.startswith(b"\x89PNG")
+    assert render([[("@", "default", False, False)]], 9, 18, 1.25).startswith(b"\x89PNG")  # fractional
     esc = place(png, 4, 3, 4, 4)
     assert esc.startswith(delete() + "\x1b[5;4H\x1b_Ga=T,f=100,i=7,c=4,r=4,C=1,q=2,m=")
     assert esc.endswith("\x1b\\")
