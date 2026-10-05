@@ -21,8 +21,12 @@ PALETTE = {  # xterm's colors, close to most themes
 _fonts = {}
 
 
-def render(grid, cell_w, cell_h, scale):
-    """PNG of grid (rows of (ch, fg, bold, reverse)); each map square is scale x scale cells."""
+CURSOR = (128, 128, 128)  # the block marking you, like the terminal's cursor
+
+
+def render(grid, cell_w, cell_h, scale, cursor=None):
+    """PNG of grid (rows of (ch, fg, bold, reverse)); each map square is scale x scale cells.
+    cursor is the (row, column) of the square to mark with a cursor block."""
     bw, bh = cell_w * scale, cell_h * scale  # scale can be fractional (1.25x...)
     img = Image.new("RGBA", (max(1, round(len(grid[0]) * bw)), max(1, round(len(grid) * bh))), (0, 0, 0, 0))
     size = max(8, int(bh * 0.8))
@@ -32,6 +36,8 @@ def render(grid, cell_w, cell_h, scale):
         for i, (ch, fg, bold, reverse) in enumerate(row):
             color = PALETTE.get(("bright" + fg) if bold and not fg.startswith("bright") else fg, PALETTE["default"])
             x, y = i * bw, j * bh
+            if (j, i) == cursor:
+                draw.rectangle([x, y, x + bw - 1, y + bh - 1], fill=CURSOR)
             if reverse:
                 draw.rectangle([x, y, x + bw - 1, y + bh - 1], fill=color)
                 color = (0, 0, 0)
@@ -62,7 +68,7 @@ if __name__ == "__main__":
     png = render([[("@", "default", True, False), ("d", "red", False, False)],
                   [("#", "default", False, False), (" ", "default", False, True)]], 9, 18, 2)
     assert png.startswith(b"\x89PNG")
-    assert render([[("@", "default", False, False)]], 9, 18, 1.25).startswith(b"\x89PNG")  # fractional
+    assert render([[("@", "default", False, False)]], 9, 18, 1.25, cursor=(0, 0)).startswith(b"\x89PNG")
     esc = place(png, 4, 3, 4, 4)
     assert esc.startswith(delete() + "\x1b[5;4H\x1b_Ga=T,f=100,i=7,c=4,r=4,C=1,q=2,m=")
     assert esc.endswith("\x1b\\")
