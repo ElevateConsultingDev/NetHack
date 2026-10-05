@@ -32,6 +32,9 @@ header p { color: var(--ink2); max-width: 90ch; }
 .term .secret { color: #e06bd6; font-weight: 700; background: rgba(224, 107, 214, 0.2); } .term .inrock { color: #6b6250; }
 #missed { font-family: var(--mono); font-size: 0.78rem; color: var(--term-dim); margin-top: 6px; padding-top: 6px; border-top: 1px solid #2b2f36; min-height: 4.4em; overflow-wrap: anywhere; }
 #missed label { color: var(--term-fg); cursor: pointer; } #missed i { font-style: normal; padding: 0 3px; border-radius: 2px; }
+.left { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.under { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; }
+@media (max-width: 980px) { .under { grid-template-columns: 1fr; } }
 #legend { font-family: var(--mono); font-size: 0.8rem; line-height: 1.5; }
 #legend .g { display: grid; grid-template-columns: 1.6em 1fr 1.6em 1fr; gap: 0 6px; }
 #legend .g b, #legend .c b { font-weight: 700; text-align: center; }
@@ -111,6 +114,7 @@ pre.brief { margin: 6px 0 0; font-family: var(--mono); font-size: 0.7rem; line-h
   </header>
 
   <div class="stage">
+    <div class="left">
     <div class="term">
       <pre id="msg"></pre>
       <pre id="map"></pre>
@@ -118,30 +122,7 @@ pre.brief { margin: 6px 0 0; font-family: var(--mono); font-size: 0.7rem; line-h
       <div id="missed"><label><input type="checkbox" id="showmiss" checked> Show what the pilot has not seen</label>
         &nbsp; <i class="miss">terrain</i> <i class="missobj">items</i> <i class="missmon">monsters</i> <i class="secret">hidden doors and corridors</i> <i class="inrock">buried in rock</i><div id="misslist"></div></div>
     </div>
-    <div class="side">
-      <div class="box" id="legend">
-        <h2>Map legend</h2>
-        <div class="g">
-          <b class="ly">@</b><span>the pilot</span><b>@</b><span>a human</span>
-          <b>.</b><span>floor</span><b>#</b><span>corridor</span>
-          <b>|</b><span>wall</span><b>-</b><span>wall</span>
-          <b>+</b><span>door</span><b>&gt;</b><span>stairs down</span>
-          <b>&lt;</b><span>stairs up</span><b>{</b><span>fountain</span>
-          <b>_</b><span>altar</span><b>^</b><span>trap</span>
-          <b>`</b><span>boulder</span><b>$</b><span>gold</span>
-          <b>)</b><span>weapon</span><b>[</b><span>armor</span>
-          <b>%</b><span>food</span><b>!</b><span>potion</span>
-          <b>?</b><span>scroll</span><b>/</b><span>wand</span>
-          <b>=</b><span>ring</span><b>(</b><span>tool</span>
-          <b>*</b><span>gem, rock</span><b>a-Z</b><span>monster</span>
-        </div>
-        <h3>Not seen by the pilot</h3>
-        <div class="c"><b class="lm">.</b><span>terrain it has not seen</span><b class="lo">!</b><span>item it has not seen</span>
-          <b class="ln">G</b><span>monster it has not seen</span><b class="ls">+</b><span>hidden door or corridor</span>
-          <b class="lr">$</b><span>buried in rock (needs digging)</span></div>
-        <h3>Who is on this level</h3>
-        <div id="who"></div>
-      </div>
+    <div class="under">
       <div class="box">
         <h2>What the engine is doing</h2>
         <div id="note"></div>
@@ -170,6 +151,32 @@ pre.brief { margin: 6px 0 0; font-family: var(--mono); font-size: 0.7rem; line-h
           <dt>Hostiles</dt><dd id="cm"></dd>
           <dt>Brain calls</dt><dd id="cb"></dd>
         </dl>
+      </div>
+    </div>
+    </div>
+    <div class="side">
+      <div class="box" id="legend">
+        <h2>Map legend</h2>
+        <div class="g">
+          <b class="ly">@</b><span>the pilot</span><b>@</b><span>a human</span>
+          <b>.</b><span>floor</span><b>#</b><span>corridor</span>
+          <b>|</b><span>wall</span><b>-</b><span>wall</span>
+          <b>+</b><span>door</span><b>&gt;</b><span>stairs down</span>
+          <b>&lt;</b><span>stairs up</span><b>{</b><span>fountain</span>
+          <b>_</b><span>altar</span><b>^</b><span>trap</span>
+          <b>`</b><span>boulder</span><b>$</b><span>gold</span>
+          <b>)</b><span>weapon</span><b>[</b><span>armor</span>
+          <b>%</b><span>food</span><b>!</b><span>potion</span>
+          <b>?</b><span>scroll</span><b>/</b><span>wand</span>
+          <b>=</b><span>ring</span><b>(</b><span>tool</span>
+          <b>*</b><span>gem, rock</span><b>a</b><span>a letter: monster</span>
+        </div>
+        <h3>Not seen by the pilot</h3>
+        <div class="c"><b class="lm">.</b><span>terrain it has not seen</span><b class="lo">!</b><span>item it has not seen</span>
+          <b class="ln">G</b><span>monster it has not seen</span><b class="ls">+</b><span>hidden door or corridor</span>
+          <b class="lr">$</b><span>buried in rock (needs digging)</span></div>
+        <h3>Who is on this level</h3>
+        <div id="who"></div>
       </div>
     </div>
   </div>
