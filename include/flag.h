@@ -458,6 +458,7 @@ struct instance_flags {
                                     it in the midst of options processing */
     genericptr_t returning_missile; /* 'struct obj *'; Mjollnir or aklys */
     boolean obsolete;  /* obsolete options can point at this, it isn't used */
+    boolean reveal_all; /* #reveal cheat: every square is in sight */
 };
 
 /*

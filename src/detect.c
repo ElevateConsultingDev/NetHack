@@ -2029,43 +2029,4 @@ int which_subset; /* when not full, whether to suppress objs and/or traps */
     return;
 }
 
-/* #reveal cheat: show the level as it really is (TER_ flags pick map, traps,
-   objects, monsters) without remembering any of it; the player can look
-   around with the cursor, and any key puts the normal view back */
-void
-reveal_level(what)
-int what;
-{
-    int x, y;
-    struct obj *otmp;
-    struct monst *mtmp;
-    struct trap *t;
-
-    for (x = 1; x < COLNO; x++)
-        for (y = 0; y < ROWNO; y++) {
-            if (what & TER_MAP) {
-                /* walls are drawn by the angles they've been seen from */
-                unsigned char sv = levl[x][y].seenv;
-
-                levl[x][y].seenv = SVALL;
-                show_glyph(x, y, back_to_glyph(x, y));
-                levl[x][y].seenv = sv;
-            }
-            if ((what & TER_OBJ) && (otmp = level.objects[x][y]) != 0)
-                show_glyph(x, y, obj_to_glyph(otmp, rn2_on_display_rng));
-        }
-    if (what & TER_TRP)
-        for (t = ftrap; t; t = t->ntrap)
-            if (!(what & TER_OBJ) || !level.objects[t->tx][t->ty])
-                show_glyph(t->tx, t->ty, trap_to_glyph(t, rn2_on_display_rng));
-    if (what & TER_MON)
-        for (mtmp = fmon; mtmp; mtmp = mtmp->nmon)
-            if (!DEADMONSTER(mtmp))
-                map_monst(mtmp, TRUE);
-    display_self();
-    pline("This is the level as it really is.  Move the cursor to look; Esc hides it.");
-    browse_map(what, "anything");
-    docrt();
-}
-
 /*detect.c*/

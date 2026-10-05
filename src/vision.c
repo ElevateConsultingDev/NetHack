@@ -618,7 +618,22 @@ int control;
         /*
          * Set the IN_SIGHT bit for xray and night vision.
          */
-        if (u.xray_range >= 0) {
+        if (iflags.reveal_all) { /* #reveal cheat: see the whole level */
+            for (row = 0; row < ROWNO; row++) {
+                next_row = next_array[row];
+                for (col = 1; col < COLNO; col++) {
+                    char old_row_val = next_row[col];
+
+                    next_row[col] |= IN_SIGHT;
+                    oldseenv = levl[col][row].seenv;
+                    levl[col][row].seenv = SVALL;
+                    if (!(old_row_val & IN_SIGHT) || oldseenv != SVALL)
+                        newsym(col, row);
+                }
+                next_rmin[row] = 1;
+                next_rmax[row] = COLNO - 1;
+            }
+        } else if (u.xray_range >= 0) {
             if (u.xray_range) {
                 ranges = circle_ptr(u.xray_range);
 
