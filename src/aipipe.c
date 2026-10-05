@@ -368,7 +368,19 @@ put_truth()
     put(",\"truth\":{\"map\":[");
     for (y = 0; y < ROWNO; y++) {
         for (x = 1; x < COLNO; x++) {
-            ch = (int) showsyms[glyph_to_cmap(back_to_glyph(x, y))];
+            int typ = levl[x][y].typ;
+
+            /* Walls by what they are, not by which sides have been seen
+               (back_to_glyph draws a never-seen wall as blank rock); a
+               secret door or corridor as what it will turn into. */
+            if (typ == SDOOR)
+                ch = '+';
+            else if (typ == SCORR)
+                ch = '#';
+            else if (IS_WALL(typ))
+                ch = (typ == VWALL || typ == TLWALL || typ == TRWALL) ? '|' : '-';
+            else
+                ch = (int) showsyms[glyph_to_cmap(back_to_glyph(x, y))];
             if ((ttmp = t_at(x, y)) != 0)
                 ch = '^';
             row[x - 1] = (ch >= 0x20 && ch < 0x7f) ? (char) ch : '?';
@@ -378,6 +390,17 @@ put_truth()
             put(",");
         put_str(row);
     }
+    put("],\"secrets\":[");
+    for (y = 0; y < ROWNO; y++)
+        for (x = 1; x < COLNO; x++) {
+            if (levl[x][y].typ != SDOOR && levl[x][y].typ != SCORR)
+                continue;
+            Sprintf(tmp, "%s[%d,%d,%d]", first ? "" : ",", x, y,
+                    levl[x][y].typ == SDOOR ? 1 : 0);
+            put(tmp);
+            first = FALSE;
+        }
+    first = TRUE;
     put("],\"objects\":[");
     for (y = 0; y < ROWNO; y++)
         for (x = 1; x < COLNO; x++) {

@@ -47,6 +47,7 @@ class Recorder:
         can show what the pilot had not seen."""
         self.truths.append({"t": (s.get("status") or {}).get("turn", 0), "m": [self._rid(r.rstrip()) for r in t["map"]],
                             "o": [[o["x"], o["y"], o["class"], o["name"]] for o in t["objects"]],
+                            "s": t.get("secrets") or [],  # [x, y, 1 for a secret door / 0 for a secret corridor]
                             "n": [[m["x"], m["y"], m["sym"], m["name"], m["peaceful"]] for m in t["monsters"]]})
 
     def record(self, g, s: dict) -> None:
