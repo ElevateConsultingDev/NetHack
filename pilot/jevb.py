@@ -8,15 +8,21 @@ engine works out the numbers (rounds the pilot can survive at the current rate, 
 the enemy, steps to the stairs), turns them into words with the spoiler table's facts, and asks
 three Nouls. `decide` below is the whole policy: thresholds to read and tune.
 
+Two knobs, as environment variables so arms can run side by side:
+    JEVB_LOSE_AT=0.45   act on a weaker "I will die" (default 0.6)
+    JEVB_ESCAPES=1      more escapes: the nearest stairs up or down, and backing into a corridor
+                        when more than one enemy is in view
+
     python3 -m pilot.jevb          # offline check of the state builder and the policy
     python3 -m pilot.jevb --live   # one real call on a sample fight (needs the Keychain key)
 """
 
 from __future__ import annotations
 
+import os
 import sys
 
-from .engine import DONT_MELEE, View, bfs, checks, r_elbereth, _count, _step
+from .engine import DONT_MELEE, View, bfs, checks, r_elbereth, _chokepoint, _count, _step
 from .jev import JevEngine
 from .spoilers import PILOT_SPEED, spoiler
 
@@ -36,22 +42,32 @@ QUESTIONS = {
     },
     "stairs": {
         "type": "noul",
-        "instructions": "I will reach the stairs up alive, given `escapes.stairs_up` and `me.rounds_i_can_survive_at_this_rate`.",
+        "instructions": "I will reach the stairs alive, given `escapes.STAIRS` and `me.rounds_i_can_survive_at_this_rate`.",
         "criteria": {"true": "I am on the stairs, or close enough to get there before my health runs out.",
-                     "false": "There are no stairs up in reach, or the enemies kill me on the way."},
+                     "false": "There are no stairs in reach, or the enemies kill me on the way."},
     },
 }
+CORRIDOR = {
+    "type": "noul",
+    "instructions": "Backing into the corridor described in `escapes.corridor` will let me survive this fight.",
+    "criteria": {"true": "Several enemies are on me, the corridor is close, and one at a time I can beat them.",
+                 "false": "The corridor is too far, or even one of these enemies at a time kills me."},
+}
 
-LOSE_AT = 0.6     # act when Jev thinks the fight is lost at least this strongly
-ESCAPE_AT = 0.5   # and take an escape Jev rates at least this likely to work
+LOSE_AT = float(os.environ.get("JEVB_LOSE_AT", 0.6))  # act when Jev thinks the fight is lost at least this strongly
+ESCAPE_AT = 0.5                                       # and take an escape Jev rates at least this likely to work
+MORE = os.environ.get("JEVB_ESCAPES") == "1"
+STAIRS = "stairs" if MORE else "stairs_up"
+QUESTIONS["stairs"]["instructions"] = QUESTIONS["stairs"]["instructions"].replace("STAIRS", STAIRS)
+if MORE:
+    QUESTIONS["corridor"] = CORRIDOR
 
 
-def decide(answers: dict, can_elbereth: bool, can_stairs: bool) -> str:
-    """The policy: 'stairs', 'elbereth', or 'rules' (leave it to the rules pilot)."""
+def decide(answers: dict, available: dict) -> str:
+    """The policy: the escape Jev rates most likely to work, or 'rules' (leave it to the rules pilot)."""
     if answers["lose"]["noul"] < LOSE_AT:
         return "rules"
-    options = [(answers[k]["noul"], k) for k, ok in (("stairs", can_stairs), ("elbereth", can_elbereth)) if ok]
-    best = max(options, default=(0, "rules"))
+    best = max(((answers[k]["noul"], k) for k, ok in available.items() if ok and k in answers), default=(0, "rules"))
     return best[1] if best[0] >= ESCAPE_AT else "rules"
 
 
@@ -65,7 +81,8 @@ def health(hp: int, hpmax: int) -> str:
             if f > 0.33 else "under a third left" if f > 0.15 else "almost dead")
 
 
-def fight_state(c: dict, loss_per_round: float, steps_up: int | None, on_elbereth_failed: bool, messages: list) -> dict:
+def fight_state(c: dict, loss_per_round: float, steps_up: int | None, on_elbereth_failed: bool, messages: list,
+                corridor_steps: int | None = None, stairs_word: str = "up") -> dict:
     """The fight in words. All arithmetic happens here."""
     foes = [h for h in c["adjacent_hostiles"] if h["name"] not in DONT_MELEE]
     survive = c["hp"] / max(loss_per_round, 0.5)
@@ -94,13 +111,19 @@ def fight_state(c: dict, loss_per_round: float, steps_up: int | None, on_elberet
         elbereth = "useless: an enemy next to me ignores it"
     else:
         elbereth = "possible: writing it costs one round of being attacked, then enemies that respect it stop attacking"
+    escapes = {"prayer": "not available", STAIRS: stairs, "elbereth": elbereth}
+    if MORE:
+        if steps_up is not None:
+            escapes[STAIRS] = f"the stairs {stairs_word}: " + stairs
+        escapes["corridor"] = ("not useful here" if corridor_steps is None else
+                               f"{rounds(corridor_steps)} steps away: in it only one enemy can reach me at a time")
     return {
         "me": {"health": health(c["hp"], c["hpmax"]), "rounds_i_can_survive_at_this_rate": rounds(survive),
                "armor": "poor" if (c.get("ac") or 10) >= 6 else "fair" if c["ac"] >= 3 else "good"},
         "enemies_next_to_me": enemies,
         "rounds_to_kill_all_of_them": rounds(kill_rounds),
         "other_enemies_in_view": "none" if others <= 0 else "one" if others == 1 else "several",
-        "escapes": {"prayer": "not available", "stairs_up": stairs, "elbereth": elbereth},
+        "escapes": escapes,
         "recent_messages": messages[-6:],
     }
 
@@ -140,23 +163,37 @@ class JevJudge(JevEngine):
             self.prev_hp = (turn, c["hp"])
             return super(JevEngine, self)._decide(v)
 
-        up = [(x, y) for (d, x, y), n in m.features.items() if d == v.dlvl and n == "staircase up" and v.dlvl > 1]
+        up = {(x, y): "<" for (d, x, y), n in m.features.items() if d == v.dlvl and n == "staircase up" and v.dlvl > 1}
+        if MORE:  # Down is an escape too, and it is progress.
+            up.update({(x, y): ">" for (d, x, y), n in m.features.items()
+                       if d == v.dlvl and n == "staircase down" and (d, x, y) not in m.mines_stairs})
         path = [] if v.pos in up else bfs(v, lambda x, y: (x, y) in up) if up else None
         steps = None if path is None else len(path)
+        goal = v.pos if steps == 0 else path[-1] if path else None
+        lane = None
+        if MORE and len(c["mobile_hostiles"]) >= 2 and not _chokepoint(v, *v.pos):
+            lane = bfs(v, lambda x, y: _chokepoint(v, x, y))
+            lane = lane if lane and len(lane) <= 8 else None
         failed_here = getattr(self, "elbereth_failed_at", None) == v.pos
-        state = fight_state(c, loss, steps, failed_here, [x for x in v.s.get("messages", []) if x])
+        state = fight_state(c, loss, steps, failed_here, [x for x in v.s.get("messages", []) if x],
+                            len(lane) if lane else None, "down" if up.get(goal) == ">" else "up")
         answers = self.ask(state, QUESTIONS)
         self.prev_hp = (turn, c["hp"])
         if answers is None:
             _count(m, "jev judge: api failure, rules decided")
             return super(JevEngine, self)._decide(v)
         can_elbereth = state["escapes"]["elbereth"].startswith("possible")
-        action = decide(answers, can_elbereth, steps is not None)
+        action = decide(answers, {"stairs": steps is not None, "elbereth": can_elbereth, "corridor": bool(lane)})
         probs = {k: round(a["noul"], 3) for k, a in answers.items()}
         self.last_ask = (turn, state, {"choice": action, "probabilities": probs})  # for the replay page
         _count(m, f"jev judge: {action}")
+        m.stats[f"jevb arm: lose_at {LOSE_AT}, more escapes {MORE}"] = 1  # which arm this game was, for the analysis
         if action == "stairs":
-            keys, note = ("<", "flee up the stairs") if steps == 0 else _step(v, m, path, "retreat to the stairs up")
+            keys, note = (up[v.pos], "flee by the stairs") if steps == 0 else _step(v, m, path, "retreat to the stairs")
+            if keys == ">":
+                m.last_down = (v.dlvl, *v.pos)
+        elif action == "corridor":
+            keys, note = _step(v, m, lane, "back into a corridor")
         elif action == "elbereth":
             keys, note = r_elbereth(v, m, self.jev_args.setdefault("elbereth", {}))
         else:
@@ -173,15 +210,17 @@ SAMPLE = {"hp": 41, "hpmax": 62, "xlvl": 6, "ac": 2, "mobile_hostiles": [{}],
 if __name__ == "__main__":
     st = fight_state(SAMPLE, 10.5, 9, False, ["The soldier ant bites!", "The soldier ant stings!", "You miss the soldier ant."])
     assert st["me"]["rounds_i_can_survive_at_this_rate"] == "three or four" and st["enemies_next_to_me"][0]["faster_than_me"]
-    assert st["escapes"]["elbereth"].startswith("possible") and "faster" in st["escapes"]["stairs_up"]
+    assert st["escapes"]["elbereth"].startswith("possible") and "faster" in st["escapes"][STAIRS]
     human = fight_state({**SAMPLE, "adjacent_hostiles": [{"name": "watchman"}]}, 5, None, False, [])
-    assert human["escapes"]["elbereth"].startswith("useless") and human["escapes"]["stairs_up"].startswith("none")
+    assert human["escapes"]["elbereth"].startswith("useless") and human["escapes"][STAIRS].startswith("none")
     a = lambda lose, elb, up: {"lose": {"noul": lose}, "elbereth": {"noul": elb}, "stairs": {"noul": up}}
-    assert decide(a(0.3, 0.9, 0.9), True, True) == "rules"       # not losing: the rules fight on
-    assert decide(a(0.8, 0.7, 0.2), True, True) == "elbereth"
-    assert decide(a(0.8, 0.7, 0.9), True, True) == "stairs"
-    assert decide(a(0.8, 0.9, 0.9), False, False) == "rules"     # no escape exists
-    assert decide(a(0.8, 0.3, 0.4), True, True) == "rules"       # no escape is likely to work
+    both, none = {"stairs": True, "elbereth": True, "corridor": True}, {"stairs": False, "elbereth": False}
+    assert decide(a(0.3, 0.9, 0.9), both) == "rules"       # not losing: the rules fight on
+    assert decide(a(0.8, 0.7, 0.2), both) == "elbereth"
+    assert decide(a(0.8, 0.7, 0.9), both) == "stairs"
+    assert decide(a(0.8, 0.9, 0.9), none) == "rules"       # no escape exists
+    assert decide(a(0.8, 0.3, 0.4), both) == "rules"       # no escape is likely to work
+    assert decide({**a(0.8, 0.3, 0.4), "corridor": {"noul": 0.7}}, both) == "corridor"
     print("jev judge ok")
     if "--live" in sys.argv:
         import json, time
@@ -189,4 +228,4 @@ if __name__ == "__main__":
         t = time.time()
         print(json.dumps(st, indent=1))
         ans = e.ask(st, QUESTIONS)
-        print({k: round(x["noul"], 3) for k, x in ans.items()}, "->", decide(ans, True, True), f"({time.time() - t:.2f}s)")
+        print({k: round(x["noul"], 3) for k, x in ans.items()}, "->", decide(ans, both), f"({time.time() - t:.2f}s)")
