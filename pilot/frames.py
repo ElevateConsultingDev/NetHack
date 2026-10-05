@@ -90,7 +90,7 @@ class Recorder:
             self.seen_jev = g.engine.calls
             top = sorted(jev[2]["probabilities"].items(), key=lambda kv: -kv[1])[:5]
             self.escs.append({"i": here, "t": turn, "ask": "which action now? (state below)", "routine": jev[2]["choice"],
-                              "say": ", ".join(f"{a} {p:.2f}" for a, p in top),
+                              "say": ", ".join(f"{a} {p:.2f}" for a, p in top), "p": jev[2]["probabilities"],
                               "brief": json.dumps(jev[1], indent=1)})
             self.frames[-1][20] = self.seen_jev
 

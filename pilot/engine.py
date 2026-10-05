@@ -1172,8 +1172,16 @@ class Engine:
                 "pray": True if c["prayer_safe"] and c["major_trouble"] else "prayer gate closed, or no trouble a prayer fixes",
             }
         c["in_chokepoint"] = _chokepoint(v, *v.pos)
-        self.tracker.observe(c["turn"], v.dlvl, c, self.note, [x for x in v.s.get("messages", []) if x], feasible,
-                             getattr(self, "last_ask", None))
+        msgs = [x for x in v.s.get("messages", []) if x]
+        saw = None
+        if feasible:  # What the engine knew when the tactic started, for the tactics page.
+            saw = {"wounded": c["wounded"], "hunger": c["hunger"] or "not hungry", "ac": v.status.get("ac"),
+                   "prayer": "safe now" if c["prayer_safe"] else f"not for about {c['prayer_opens_in']} turns",
+                   "trouble": c["major_trouble"], "food": [f["text"] for f in c["safe_food"]],
+                   "hostiles": [[h["name"], h["distance"], h["difficulty"]] for h in c["visible_hostiles"][:8]],
+                   "level": ("explored" if c["level_explored"] else "still exploring") + (", stairs down known" if c["stairs_down"] else ", stairs down not found"),
+                   "unseen_attacker": bool(c["under_attack"]), "messages": msgs[-4:], "note": self.note}
+        self.tracker.observe(c["turn"], v.dlvl, c, self.note, msgs, feasible, getattr(self, "last_ask", None), saw)
 
     def _remember_map(self, v: View) -> None:
         for (x, y), c in v.cells.items():

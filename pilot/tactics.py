@@ -71,7 +71,7 @@ class Tracker:
         self.open: dict | None = None
 
     def observe(self, turn: int, dlvl: int, c: dict, note: str, messages: list, feasible: dict | None = None,
-                jev: tuple | None = None) -> None:
+                jev: tuple | None = None, saw: dict | None = None) -> None:
         """One command prompt: measure the open tactic, then start or continue from this turn's note."""
         got = classify(note)
         o = self.open
@@ -92,7 +92,7 @@ class Tracker:
             self.open = {"tactic": tactic, "target": target, "turn": turn, "dlvl": dlvl, "hp": c["hp"], "hpmax": c["hpmax"],
                          "xl": c.get("xlvl"), "adjacent": len(adjacent), "in_view": len(c.get("mobile_hostiles") or []),
                          "symbol": sp.get("symbol", "?"), "fast": sp.get("speed", 12) > 12,
-                         "low": c["hp"], "menu": offered, "omitted": omitted}
+                         "low": c["hp"], "menu": offered, "omitted": omitted, "saw": saw or {}}
             if jev and jev[0] == turn:  # Jev judged this moment: its answers and the route code took.
                 self.open["jev"] = {"route": jev[2]["choice"], "p": jev[2]["probabilities"]}
         elif self.open:

@@ -336,6 +336,7 @@ class Game:
             "brain_seconds": round(self.brain_seconds + getattr(self.engine, "seconds", 0.0)),
             "brain_failures": self.brain_failures, "stall": self.stall or "",
             "brain_tokens": getattr(self.engine, "tokens", 0),
+            "escs": self.frames.escs,  # each question put to a brain: what it was shown and what it said
             "dlvl": st.get("dlvl"), "xlvl": st.get("xlvl"), "turn": st.get("turn"),
             "hp": f"{st.get('hp')}/{st.get('hpmax')}", "gold": st.get("gold"),
             "stats": dict(self.engine.memory.stats), "deepest": self.deepest,

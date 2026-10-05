@@ -19,6 +19,7 @@ import sys
 from .dashboard import CSS
 from .engine import DEFAULT_ORDERS
 from .jev import USD_PER_INPUT_TOKEN, spent
+from .jevb import QUESTIONS
 from .ledger import BATCH, rows, table
 from .tactics import PREDICTION
 
@@ -43,6 +44,16 @@ th { color:var(--dim); font-weight:500; } .bar { display:inline-block; height:8p
 .p i { display:block; height:8px; background:var(--accent); border-radius:2px; }
 button.by { font:inherit; font-size:12px; padding:2px 9px; border-radius:9px; border:1px solid var(--line); background:none; color:var(--ink); cursor:pointer; }
 button.by.on { border-color:var(--accent); color:var(--accent); }
+.cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(380px, 1fr)); gap:12px; align-items:start; }
+.card2 { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 16px; min-width:0; font-size:14px; line-height:1.5; }
+.card2 h3 { margin:0 0 2px; font-size:15px; } .card2 .who { color:var(--dim); font-size:12.5px; margin-bottom:10px; }
+.card2 h4 { margin:14px 0 4px; font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+.card2 dl { display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; margin:0; } .card2 dt { color:var(--dim); } .card2 dd { margin:0; overflow-wrap:anywhere; }
+.card2 ul { margin:0; padding-left:18px; } .card2 .big2 { font-size:17px; font-weight:600; }
+.card2 pre { margin:0; font:12.5px/1.2 ui-monospace, Menlo, monospace; background:var(--map); border:1px solid var(--line); border-radius:6px; padding:8px; overflow-x:auto; }
+.card2 .q { border-left:3px solid #e08a2c; padding:2px 0 2px 10px; margin:8px 0; } .card2 .q .a { font-weight:600; }
+.card2 .cols2 { columns:2; column-gap:18px; } .card2 details { margin-top:10px; } .card2 summary { cursor:pointer; color:var(--dim); font-size:12.5px; }
+.tree { margin:0; padding-left:0; list-style:none; } .tree .tree { padding-left:16px; border-left:1px solid var(--line); margin-left:4px; } .tree b { font-weight:500; color:var(--dim); }
 .flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:4px; font-size:12px; }
 .node { border:1px solid var(--line); border-radius:6px; padding:5px 8px; max-width:190px; } .node b { display:block; font-size:11px; color:var(--dim); font-weight:500; }
 .node.jev { border-color:#e08a2c; background:rgba(224,138,44,.12); } .arrow { align-self:center; color:var(--dim); }
@@ -82,6 +93,7 @@ function detail() {
     o.menu.map(t => `<span>${t === o.tactic ? '<b>' + esc(t) + '</b>' : esc(t)}</span><span>${esc(D.prediction[t])}${t === o.tactic ? ' · chosen' : ''}</span>`).join('') +
     o.omitted.map(t => `<span style="text-decoration:line-through">${esc(t.id)}</span><span class="sub">omitted: ${esc(t.reason)}</span>`).join('') + '</div>'
     : '<span class="sub">This tactic continued an earlier decision; the menu is recorded where a tactic starts.</span>';
+  brain(o);
   const node = (t, x, jev) => `<div class="node ${jev ? 'jev' : ''}"><b>${t}</b>${x}</div>`, arrow = '<span class="arrow">&rarr;</span>';
   $('#flow').innerHTML = [
     node('Observe', `${o.adjacent} adjacent, ${o.in_view} in view, HP ${o.hp}/${o.hpmax}`),
@@ -96,6 +108,55 @@ function detail() {
   history.replaceState(null, '', `#g=${D.games[game].name}&o=${pick}`);
   $('#probs').innerHTML = o.jev ? Object.entries(o.jev.p).map(([k, v]) => `<div class="p"><span>${esc(k)}</span><span><i style="width:${Math.round(v * 100)}%"></i></span><span>${v.toFixed(2)}</span></div>`).join('')
     : '<span class="sub">Jev was not asked at this decision.</span>';
+}
+const tree = (v) => Array.isArray(v) ? (v.length ? '<ul class="tree">' + v.map(x => `<li>${tree(x)}</li>`).join('') + '</ul>' : 'none')
+  : (v && typeof v === 'object') ? '<ul class="tree">' + Object.entries(v).map(([k, x]) => `<li><b>${esc(k.replace(/_/g, ' '))}:</b> ${tree(x)}</li>`).join('') + '</ul>' : esc(v);
+function sections(t) {  // the brief sent to a brain, split at its headings
+  const parts = t.split(/^(ESCALATION|CONSULT|EVENTS|STANDING ORDERS|CHECKS|STATUS|MESSAGES|INVENTORY|PROMPT|NOTABLE|RELEVANT MEMORY[^:]*|MAP):[ \t]?/m), out = {};
+  for (let k = 1; k < parts.length; k += 2) out[parts[k].split(' (')[0]] = parts[k + 1].trim();
+  return out;
+}
+function notable(t) {  // "object: gold piece at (3,4); ..." -> "gold piece x15", single things keep their square
+  const seen = new Map();
+  t.split('; ').forEach(x => { const m = /^(.*?): (.*) at (\\(.*\\))$/.exec(x); if (!m) return; const k = (m[1].includes('monster') ? m[1].replace('monster', '').replace(/[()]/g, '').trim() + ' ' : '') + m[2]; (seen.get(k) || seen.set(k, []).get(k)).push(m[3]); });
+  return [...seen].map(([k, at]) => at.length > 1 ? `${esc(k.trim())} &times;${at.length}` : `${esc(k.trim())} at ${at[0]}`).join(', ') || 'nothing';
+}
+function brain(o) {
+  const g = D.games[game], s = o.saw || {};
+  $('#saw').innerHTML = `<h3>What the pilot saw</h3><div class="who">The engine's own checks at turn ${o.turn}, before anything was asked.</div>` + (s.wounded === undefined ? '<span class="sub">Not recorded for this decision (it continued an earlier one).</span>' : `
+    <div class="big2">HP ${o.hp} of ${o.hpmax}: ${esc(s.wounded || 'fine')}</div>
+    <dl><dt>Level</dt><dd>Dungeon level ${o.dlvl}, ${esc(s.level)}</dd><dt>Experience, armor</dt><dd>XL ${o.xl}, AC ${s.ac}</dd>
+    <dt>Hunger</dt><dd>${esc(s.hunger)}</dd><dt>Prayer</dt><dd>${esc(s.prayer)}${s.trouble.length ? '; trouble: ' + esc(s.trouble.join(', ')) : ''}</dd>
+    <dt>Safe food</dt><dd>${s.food.length ? esc(s.food.join(', ')) : 'none'}</dd></dl>
+    <h4>Hostiles in view</h4>${s.hostiles.length ? '<ul>' + s.hostiles.map(h => `<li>${esc(h[0])}: ${h[1] === 1 ? 'adjacent' : h[1] + ' squares away'}, difficulty ${h[2]}</li>`).join('') + '</ul>' : 'none'}
+    ${s.unseen_attacker ? '<div>Something unseen is attacking.</div>' : ''}
+    <h4>The game just said</h4>${s.messages.length ? '<ul>' + s.messages.map(m => `<li>${esc(m)}</li>`).join('') + '</ul>' : 'nothing'}
+    <h4>The engine then chose</h4>${esc(s.note)}`);
+  const near = g.escs.filter(e => Math.abs(e.t - o.turn) <= 1), je = near.find(e => e.brief.startsWith('{')), le = near.find(e => !e.brief.startsWith('{'));
+  if (je) {
+    let st; try { st = JSON.parse(je.brief); } catch (e) { st = je.brief; }
+    const p = je.p || {};
+    $('#jevcard').innerHTML = `<h3>Jev: prompt and answers</h3><div class="who">One request at turn ${je.t}. Jev sees the state below and answers each question separately; it cannot see its other answers.</div>
+      <h4>State sent</h4>${tree(st)}
+      <h4>Questions and answers</h4>` + Object.entries(D.questions).map(([k, q]) => `<div class="q"><div>${esc(typeof q.instructions === 'string' ? q.instructions : JSON.stringify(q.instructions))}</div>
+        ${q.criteria && q.criteria.true ? `<div class="sub">Yes means: ${esc(q.criteria.true)} No means: ${esc(q.criteria.false)}</div>` : ''}
+        <div class="a">${p[k] === undefined ? 'not asked this time' : 'Answer: ' + Math.round(p[k] * 100) + '% yes'}</div></div>`).join('') + `
+      <h4>What code did with the answers</h4><div class="big2">${esc(je.routine)}</div>`;
+  } else $('#jevcard').innerHTML = `<h3>Jev: prompt and answers</h3><div class="who">${D.brain.startsWith('jev') ? 'Jev was not asked at this decision: the fight was not costing enough to ask.' : 'This run used the ' + esc(D.brain) + ' controller, so Jev was never asked. Run with --brain jevb to fill this card.'}</div>`;
+  if (le) {
+    const b = sections(le.brief); let ck = null; try { ck = JSON.parse(b.CHECKS); } catch (e) {}
+    $('#llmcard').innerHTML = `<h3>Brain: prompt and response</h3><div class="who">The engine asked the ${esc(D.brain === 'rules' ? 'rule brain (the stand-in that answers where an LLM would)' : D.brain + ' brain')} at turn ${le.t}. This is the brief it was sent.</div>
+      <h4>The question</h4><div class="big2">${esc(b.ESCALATION || b.CONSULT || b.EVENTS || le.ask)}</div>
+      <h4>Response</h4><div class="q"><div class="a">${esc(le.routine)}</div>${le.say ? `<div>${esc(le.say)}</div>` : ''}</div>
+      <h4>Status line</h4>${esc(b.STATUS || '')}
+      <h4>Messages</h4>${esc(b.MESSAGES || 'none')}
+      <h4>Inventory</h4><div class="cols2">${(b.INVENTORY || '').split('\\n').map(x => `<div>${esc(x)}</div>`).join('')}</div>
+      <h4>On the map</h4>${notable(b.NOTABLE || '')}
+      <h4>Map as sent</h4><pre>${esc(b.MAP || '')}</pre>
+      ${b['RELEVANT MEMORY'] ? `<h4>Memory included</h4>${esc(b['RELEVANT MEMORY'])}` : ''}
+      <details><summary>Standing orders and full checks as sent</summary><h4>Standing orders</h4>${(() => { try { return tree(JSON.parse(b['STANDING ORDERS'])); } catch (e) { return esc(b['STANDING ORDERS'] || ''); } })()}
+        <h4>Checks</h4>${ck ? tree(ck) : esc(b.CHECKS || '')}</details>`;
+  } else $('#llmcard').innerHTML = `<h3>Brain: prompt and response</h3><div class="who">No brain was asked at this decision: a standing order covered it. The engine asks only when a situation is outside its orders (for example badly hurt with a monster adjacent).</div>`;
 }
 function ledger(by) {
   document.querySelectorAll('button.by').forEach(b => b.classList.toggle('on', b.dataset.by === by));
@@ -151,7 +212,9 @@ def write(run: str, live: bool = False) -> str:
         "live": live, "orders": {k: v for k, v in DEFAULT_ORDERS.items() if k in ("retreat_below", "rest_below", "fight_up_to", "descend", "eat_at")},
         "prediction": PREDICTION,
         "games": [{"name": g["name"], "deepest": g["deepest"], "xl": g.get("xlvl"), "turn": g.get("turn"),
-                   "end": g.get("death") or g.get("stall") or "", "outcomes": g.get("outcomes") or []} for g in gs],
+                   "end": g.get("death") or g.get("stall") or "", "outcomes": g.get("outcomes") or [],
+                   "escs": g.get("escs") or []} for g in gs],
+        "questions": QUESTIONS, "brain": d.get("brain") or "rules",
         "ledger": {by: table(data, by) for by in ("symbol", "fast", "hp", "target")},
     }
     n = len(gs) or 1
@@ -184,6 +247,8 @@ def write(run: str, live: bool = False) -> str:
     <div class="panel" style="margin-top:12px"><h3>Raw probabilities (Jev)</h3><div id="probs"></div></div>
   </div>
 </div>
+<h2>What the pilot saw, what was asked, and what came back</h2>
+<div class="cards"><div class="card2" id="saw"></div><div class="card2" id="jevcard"></div><div class="card2" id="llmcard"></div></div>
 <h2>Composition of this decision</h2>
 <div class="sub" style="margin-bottom:8px">Orange nodes are Jev's judgments. Every other node is code: observation, the menu, routing, safety rules, the motor and the measurement.</div>
 <div class="panel"><div class="flow" id="flow"></div></div>
