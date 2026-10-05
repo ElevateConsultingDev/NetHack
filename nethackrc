@@ -1,0 +1,24 @@
+# Defaults for ./play (used unless NETHACKOPTIONS is already set).
+OPTIONS=windowtype:curses,symset:curses
+OPTIONS=color,hilite_pet,hilite_pile,lit_corridor,dark_room,!use_darkgray
+OPTIONS=showexp,time,!legacy,!autoquiver
+OPTIONS=autopickup,pickup_types:$?!/="+,pickup_burden:burdened
+OPTIONS=menucolors,statushilites:10
+
+# HP and Pw color as they drop; changes flash for a few turns
+OPTIONS=hilite_status:hitpoints/100%/green/<100%/yellow/<50%/orange/<25%/red&inverse
+OPTIONS=hilite_status:power/100%/cyan/<50%/blue
+OPTIONS=hilite_status:hunger/Hungry/yellow/Weak/red/Fainting/red&inverse
+OPTIONS=hilite_status:encumbrance/Burdened/yellow/Stressed/orange/Strained/red
+OPTIONS=hilite_status:condition/major_troubles/red&inverse
+OPTIONS=hilite_status:condition/minor_troubles/yellow
+
+# Item colors in menus and inventory (the last matching line wins)
+MENUCOLOR="(being worn|weapon in hand|wielded|on left|on right)"=cyan
+MENUCOLOR=" blessed "=green
+MENUCOLOR=" holy "=green
+MENUCOLOR=" uncursed "=white
+MENUCOLOR=" cursed "=red
+MENUCOLOR=" unholy "=red
+MENUCOLOR=" cursed .* \(being worn\)"=red&underline
+MENUCOLOR=" cursed .* \(weapon in hand"=red&underline

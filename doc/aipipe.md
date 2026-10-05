@@ -59,6 +59,11 @@ read as if typed. JSON escapes work (`"\u001b"` is Esc, `"\r"` is Enter).
 Keys typed at the terminal are always accepted too; `last_input` says who
 sent the key that produced the current state.
 
+Under the curses interface (the default in this fork) the channel is
+watch-only: `curses_read_char()` calls `aipipe_snapshot()`, which sends the
+state line, but keys from the controller are not read. `helper.py` uses it
+this way.
+
 ## Code
 
 - `src/aipipe.c`, `include/aipipe.h`: the channel.
