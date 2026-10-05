@@ -45,6 +45,7 @@ real dangers (low HP, hunger, cursed or unknown items, peaceful monsters, \
 shopkeepers, floating eyes, cockatrices). Do not spoil more than the player asks for. \
 Plain text only, no markdown: it is shown in a narrow terminal pane."""
 
+ASCII = str.maketrans("─│┌┐└┘├┤┬┴┼", "-|+++++++++")  # box drawing as plain ASCII, any font
 COLORS = {"black": 0, "red": 1, "green": 2, "brown": 3, "blue": 4,
           "magenta": 5, "cyan": 6, "white": 7}
 
@@ -228,7 +229,7 @@ class App:
                     attr |= curses.A_REVERSE
                 if c.underscore:
                     attr |= curses.A_UNDERLINE
-                self.put(y, x, c.data or " ", attr)
+                self.put(y, x, (c.data or " ").translate(ASCII), attr)
         self.screen.dirty.clear()
 
     def draw_helper(self):
@@ -237,7 +238,7 @@ class App:
         if w < 10:
             return
         for y in range(rows - 1):
-            self.put(y, self.gw, "│", curses.A_DIM)
+            self.put(y, self.gw, "|", curses.A_DIM)
         body = []
         for kind, text in self.helper.lines:
             attr = {"you": curses.A_BOLD, "dim": curses.A_DIM,
