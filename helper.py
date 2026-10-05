@@ -28,6 +28,7 @@ import termios
 import pyte
 
 import guard
+import palette
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.join(HERE, "playground")
@@ -45,6 +46,12 @@ FKEYS = {  # function key (two encodings each) -> extended command typed into th
 WHAT_NOW = b"\x1b[15~"  # F5: ask the helper what to do now
 SNAPSHOT = b"\x1b[17~"  # F6: snapshot the game now
 REWIND = b"\x1b[18~"    # F7: go back to the last snapshot
+SEARCH = b"\x1b[19~"    # F8: fuzzy search over commands, items and map things
+UP, DOWN = (b"\x1b[A", b"\x1bOA"), (b"\x1b[B", b"\x1bOB")
+COMMANDS = palette.load_commands(os.path.join(HERE, "src", "cmd.c"))
+EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [F5]", action=("fkey", WHAT_NOW)),
+          dict(label="snapshot", detail="save a snapshot to come back to  [F6]", action=("fkey", SNAPSHOT)),
+          dict(label="rewind", detail="go back to the last snapshot  [F7]", action=("fkey", REWIND))]
 SAVE_KEYS = b"Sy\r"     # save, yes, dismiss "Saving..." (the game then exits)
 MOUSE = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")  # SGR mouse report (mode 1006)
 MENU_ITEM = re.compile(r"(?:^|[ \u2502])([a-zA-Z$#*-])\) ")  # " a) a +1 long sword"
@@ -233,6 +240,7 @@ class App:
         self.warned = set()   # warnings already shown (each shows once while it applies)
         self.seq = 0
         self.popup = None     # actions for a clicked inventory item: x, y, w, letter, text, acts
+        self.search = None    # the F8 search: query, sel, items, results
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -430,7 +438,7 @@ class App:
     def draw_bar(self):
         rows, cols = self.scr.getmaxyx()
         where = "HELPER (Enter asks, Esc back)" if self.focus == "helper" else "GAME"
-        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
+        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  F8 search  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
                  curses.A_REVERSE)
 
     def redraw(self):
@@ -438,6 +446,8 @@ class App:
             self.draw_game()
             if self.popup:
                 self.draw_popup()
+            if self.search:
+                self.draw_search()
             self.draw_helper()
             self.draw_bar()
             if self.focus == "game":
@@ -489,9 +499,13 @@ class App:
         self.put(p["y"] + 1 + len(lines), p["x"], edge, curses.A_BOLD)
 
     def choose(self, key):
-        """Do an inventory popup action: the command key, then the item's letter."""
         p = self.popup
         self.close_popup()
+        self.item_action(key, p["letter"], p["text"])
+
+    def item_action(self, key, letter, text):
+        """Do an inventory action: the command key, then the item's letter."""
+        p = dict(letter=letter, text=text)
         if key == "?":
             self.ask(f"About my {p['text']} (inventory letter {p['letter']}): what is it, and what should I do with it?")
             return
@@ -513,9 +527,75 @@ class App:
         else:
             self.close_popup()
 
+    def open_search(self):
+        self.search = dict(query="", sel=0, items=palette.entries(self.watcher.state, COMMANDS, EXTRAS))
+        self.search["results"] = palette.search("", self.search["items"])
+
+    def close_search(self):
+        self.search = None
+        self.screen.dirty.update(range(self.gh))
+
+    def search_box(self):
+        return 1, 2, min(self.gw - 4, 90)  # y, x, width
+
+    def draw_search(self):
+        y, x, w = self.search_box()
+        q, res = self.search, self.search["results"]
+        edge = "+" + "-" * (w - 2) + "+"
+        self.put(y, x, edge, curses.A_BOLD)
+        self.put(y + 1, x, "|" + f" Search: {q['query']}_".ljust(w - 2)[:w - 2] + "|", curses.A_BOLD)
+        for i in range(12):
+            e = res[i] if i < len(res) else None
+            line = f" {e['label'][:30]:<30} {e['detail']}" if e else ""
+            attr = curses.A_REVERSE if e and i == q["sel"] else 0
+            self.put(y + 2 + i, x, "|" + line.ljust(w - 2)[:w - 2] + "|", attr)
+        self.put(y + 14, x, edge, curses.A_BOLD)
+
+    def run_entry(self, e):
+        self.close_search()
+        act = e["action"]
+        if act[0] == "keys":
+            self.send(act[1])
+        elif act[0] == "item":
+            self.item_action(*act[1:])
+        elif act[0] == "goto":
+            self.send(f"#goto\r{act[1]} {act[2]}\r".encode())
+        elif act[0] == "fkey":
+            self.handle_key(act[1])
+
+    def search_key(self, data):
+        q = self.search
+        if data == b"\x1b":
+            self.close_search()
+            return
+        if data in (b"\r", b"\n"):
+            if q["results"]:
+                self.run_entry(q["results"][q["sel"]])
+            return
+        if data in UP or data in DOWN:
+            q["sel"] = max(0, min(len(q["results"]) - 1, q["sel"] + (1 if data in DOWN else -1)))
+            return
+        for b in data:
+            if b in (8, 127):
+                q["query"] = q["query"][:-1]
+            elif b == 21:
+                q["query"] = ""
+            elif chr(b).isprintable():
+                q["query"] += chr(b)
+        q["sel"] = 0
+        q["results"] = palette.search(q["query"], q["items"])
+
     def click(self, x, y):
         """A left click: menu lines send their letter, inventory lines open their actions,
         the map gets the click, the pane takes focus."""
+        if self.search:
+            by, bx, w = self.search_box()
+            i = y - by - 2
+            if bx <= x < bx + w and 0 <= i < len(self.search["results"]):
+                self.run_entry(self.search["results"][i])
+            else:
+                self.close_search()
+            return
         if self.popup:
             p, i = self.popup, y - self.popup["y"] - 2
             if p["x"] <= x < p["x"] + p["w"] and 0 <= i < len(p["acts"]):
@@ -612,35 +692,44 @@ class App:
                     elif b in (64, 65):  # wheel up, down
                         self.wheel(x, b == 65)
                 data = MOUSE.sub(b"", data)
-                if self.over:  # dead: F7 rewinds, q quits, other keys are ignored
-                    if data == b"q":
-                        return
-                    if data != REWIND:
-                        continue
-                    self.over = False
-                    self.restore_snapshot()
-                    self.spawn()
-                elif self.popup and data:
-                    self.popup_key(data)
-                elif any(t == data or data.startswith(t) for t in TOGGLE):
-                    self.focus = "helper" if self.focus == "game" else "game"
-                elif data in FKEYS:
-                    self.send(FKEYS[data])
-                elif data == WHAT_NOW:
-                    self.ask("What should I do right now?")
-                elif data == SNAPSHOT:
-                    if not self.save_game("snapshot"):
-                        self.say("dim", "Snapshots happen at the command prompt; finish this first.")
-                elif data == REWIND:
-                    if not snapshots(self.save_name):
-                        self.say("dim", "No snapshot yet (one is made on each new level, or press F6).")
-                    elif not self.save_game("rewind"):
-                        self.say("dim", "Rewind works at the command prompt; finish this first.")
-                elif self.focus == "game":
-                    self.game_key(data)
-                else:
-                    self.helper_key(data)
+                if self.handle_key(data) is False:
+                    return
             self.redraw()
+
+    def handle_key(self, data):
+        """One chunk of keyboard input; False means quit."""
+        if self.over:  # dead: F7 rewinds, q quits, other keys are ignored
+            if data == b"q":
+                return False
+            if data != REWIND:
+                return
+            self.over = False
+            self.restore_snapshot()
+            self.spawn()
+        elif self.search and data:
+            self.search_key(data)
+        elif data == SEARCH:
+            self.open_search()
+        elif self.popup and data:
+            self.popup_key(data)
+        elif any(t == data or data.startswith(t) for t in TOGGLE):
+            self.focus = "helper" if self.focus == "game" else "game"
+        elif data in FKEYS:
+            self.send(FKEYS[data])
+        elif data == WHAT_NOW:
+            self.ask("What should I do right now?")
+        elif data == SNAPSHOT:
+            if not self.save_game("snapshot"):
+                self.say("dim", "Snapshots happen at the command prompt; finish this first.")
+        elif data == REWIND:
+            if not snapshots(self.save_name):
+                self.say("dim", "No snapshot yet (one is made on each new level, or press F6).")
+            elif not self.save_game("rewind"):
+                self.say("dim", "Rewind works at the command prompt; finish this first.")
+        elif self.focus == "game":
+            self.game_key(data)
+        else:
+            self.helper_key(data)
 
     def close(self):
         sys.stdout.write("\x1b[?1006l\x1b[?1000l")

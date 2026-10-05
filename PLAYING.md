@@ -24,6 +24,11 @@ NetHack (curses interface) on the left, a Claude helper on the right.
   turns that off.
 - `F3` / `F4` (or `#godown` / `#goup`) walk to the down / up stairs once you know where
   they are (with `F2` on, you always do). Anything interesting stops the walk; press again.
+- `F8` searches everything: type a few letters and pick with the arrows and Enter (or
+  click). It finds NetHack's commands (from the game's own command table, with their keys),
+  item actions ("quaff heal" quaffs your potion of healing), things on the map ("altar"
+  travels there, via `#goto`), and the wrapper's own actions (snapshot, rewind, what now).
+  Esc closes. Matching is fuzzy: words can be partial, letters can skip.
 - `F5` asks the helper "what should I do right now?" without typing.
 - Guard (`guard.py`, plain rules, no model): a dangerous key is held back with the
   reason in the helper pane; press it again to do it anyway. Covers eating cockatrice /

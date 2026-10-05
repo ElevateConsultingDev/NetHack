@@ -148,6 +148,8 @@ STATIC_PTR int NDECL(doreveal);
 STATIC_PTR int NDECL(dogodown);
 STATIC_PTR int NDECL(dogoup);
 STATIC_DCL int FDECL(gostairs, (BOOLEAN_P));
+STATIC_PTR int NDECL(dogoto);
+STATIC_DCL int FDECL(travel_to, (int, int));
 STATIC_PTR int NDECL(wiz_makemap);
 STATIC_PTR int NDECL(wiz_genesis);
 STATIC_PTR int NDECL(wiz_where);
@@ -939,7 +941,6 @@ STATIC_OVL int
 gostairs(up)
 boolean up;
 {
-    static char cmd[2];
     xchar x = up ? xupstair : xdnstair, y = up ? yupstair : ydnstair;
 
     if (!x)
@@ -954,6 +955,30 @@ boolean up;
         You("are already on them.");
         return 0;
     }
+    return travel_to(x, y);
+}
+
+/* #goto - travel to map coordinates typed as "x y" (for the helper's search) */
+STATIC_PTR int
+dogoto(VOID_ARGS)
+{
+    char buf[BUFSZ];
+    int x, y;
+
+    getlin("Travel to (x y)?", buf);
+    if (sscanf(buf, "%d %d", &x, &y) != 2 || !isok(x, y)) {
+        pline("Never mind.");
+        return 0;
+    }
+    return travel_to(x, y);
+}
+
+STATIC_OVL int
+travel_to(x, y)
+int x, y;
+{
+    static char cmd[2];
+
     iflags.travelcc.x = u.tx = x;
     iflags.travelcc.y = u.ty = y;
     cmd[0] = Cmd.spkeys[NHKF_TRAVEL];
@@ -3445,6 +3470,7 @@ struct ext_func_tab extcmdlist[] = {
     { ';', "glance", "show what type of thing a map symbol corresponds to",
             doquickwhatis, IFBURIED | GENERALCMD },
     { '\0', "godown", "travel to the down stairs", dogodown, AUTOCOMPLETE },
+    { '\0', "goto", "travel to a spot given as x y", dogoto, AUTOCOMPLETE },
     { '\0', "goup", "travel to the up stairs", dogoup, AUTOCOMPLETE },
     { '?', "help", "give a help message", dohelp, IFBURIED | GENERALCMD },
     { '\0', "herecmdmenu", "show menu of commands you can do here",
