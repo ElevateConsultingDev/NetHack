@@ -55,7 +55,8 @@ NetHack (curses interface) on the left, a Claude helper on the right.
   your location as x/y, stats, hunger and conditions, then your inventory. Click an item
   for what you can do with it (Wield, Wear, Put on, Quaff, Read, Zap, Eat, Apply, Throw,
   Drop, Ask the helper...); click an action or press its key, Esc closes. When the game
-  asks for an item, clicking one answers. Game menus open over this panel.
+  asks for an item, clicking one answers. The game's own two status lines are moved here
+  from under the map. Game menus open over this panel.
 - Axes: row numbers (y, 0 at the top) down the left and column numbers (x, 1 at the
   left) along the bottom, the same coordinates the helper uses; your row and column
   are highlighted.

@@ -259,6 +259,7 @@ class App:
         self.selecting = False  # F10: frozen screen, terminal selects text
         self.map_top = 1      # screen row of map row y=0 (found from the cursor on @)
         self.panel_items = {} # game-pane row -> inventory letter, for clicks
+        self.panel_on = False
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -397,10 +398,34 @@ class App:
         """put() in game-pane coordinates (right of the gutter)."""
         self.put(y, x + GX, s, attr)
 
+    def row_text(self, r):
+        return "".join(c.data or " " for c in (self.screen.buffer[r][i] for i in range(self.gw))).rstrip()
+
+    def status_rows(self):
+        """The game's two bottom status lines, if that's what the bottom rows hold now."""
+        rows = [self.gh - 2, self.gh - 1]
+        return rows if any(re.search(r"\bHP:-?\d", self.row_text(r)) for r in rows) else []
+
+    def panel_visible(self):
+        """The panel shows unless the game has something beside the map (a menu, a window)."""
+        if self.gw - MAP_W - 1 < 20 or not self.watcher.state.get("status"):
+            return False
+        skip, buf = self.status_rows(), self.screen.buffer
+        return not any(buf[r][c].data not in (" ", "") for r in range(PANEL_TOP, self.gh) if r not in skip
+                       for c in range(MAP_W, self.gw))
+
     def draw_game(self):
         buf = self.screen.buffer
+        on = self.panel_visible()
+        if on != self.panel_on:  # repaint what the panel covered, or uncovered
+            self.panel_on = on
+            self.screen.dirty.update(range(self.gh))
+        hide = self.status_rows() if on else []  # they're shown in the panel instead
         for y in sorted(self.screen.dirty):
             if y >= self.gh:
+                continue
+            if y in hide:
+                self.gput(y, 0, " " * self.gw)
                 continue
             line = buf[y]
             for x in range(self.gw):
@@ -437,14 +462,10 @@ class App:
     def draw_panel(self):
         """Status, location and inventory beside the map, unless the game has a menu there."""
         self.panel_items = {}
+        if not self.panel_on:
+            return
         w = self.gw - MAP_W - 1
         st, you = self.watcher.state.get("status"), self.watcher.state.get("player") or {}
-        if w < 20 or not st:
-            return
-        buf = self.screen.buffer
-        if any(buf[r][c].data not in (" ", "") for r in range(PANEL_TOP, self.gh)
-               for c in range(MAP_W, self.gw)):
-            return  # a menu or text window is open there
         hp, hpmax = st.get("hp", 0), st.get("hpmax", 1) or 1
         frac = hp / hpmax
         hp_col = "green" if frac >= 1 else "yellow" if frac >= .5 else "red"
@@ -464,6 +485,9 @@ class App:
         for i in self.watcher.state.get("inventory", []):
             worn = guard.WORN.search(i["text"]) or "weapon in hand" in i["text"]
             lines.append((f"{i['letter']}) {i['text']}", self.color("cyan", "default", False) if worn else 0, i["letter"]))
+        lines.append(("", 0, None))
+        for r in self.status_rows():  # the game's own status lines, moved up from under the map
+            lines += [(l, 0, None) for l in textwrap.wrap(re.sub(r"  +", "  ", self.row_text(r)), w)]
         for n, r in enumerate(range(PANEL_TOP, self.gh)):
             text, attr, letter = lines[n] if n < len(lines) else ("", 0, None)
             if r == self.gh - 1 and len(lines) > n + 1:
