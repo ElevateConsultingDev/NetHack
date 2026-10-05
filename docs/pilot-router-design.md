@@ -72,7 +72,7 @@ dying on a level. Armor class at arrival, in this cut, does not.
                      |
             hard safety rules (engine)        never delegated
                      |
-          is this a decision point?  -- no --> rule engine
+          is this a decision point?  (no: rule engine plays)
                      | yes
               Jev router (Nouls)
           /          |            \
