@@ -17,7 +17,8 @@ NetHack (curses interface) on the left, a Claude helper on the right.
   menu (same as `>` and `<`) or scrolls the helper's answers.
 - Cheat: `F2` (or `#reveal`) toggles seeing the whole level: every monster,
   item and wall, live as you play. Turn it off and your vision is normal again;
-  what you saw stays on your map.
+  what you saw stays on your map. While it is on, every item you carry or that
+  lies on the level is fully identified (and stays identified).
 - Cheat: the helper sees the whole level as it really is (every monster, every
   item truly identified, traps) and your inventory identified. `NETHACK_REVEAL= ./play`
   turns that off.

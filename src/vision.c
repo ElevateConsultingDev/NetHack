@@ -97,6 +97,7 @@ static char right_ptrs[ROWNO][COLNO];
 STATIC_DCL void FDECL(fill_point, (int, int));
 STATIC_DCL void FDECL(dig_point, (int, int));
 STATIC_DCL void NDECL(view_init);
+STATIC_DCL boolean FDECL(reveal_identify, (struct obj *));
 STATIC_DCL void FDECL(view_from, (int, int, char **, char *, char *, int,
                                   void (*)(int, int, genericptr_t),
                                   genericptr_t));
@@ -451,6 +452,29 @@ int row, col;
 
 #endif
 
+/* #reveal cheat: fully identify a chain of objects (and their contents);
+   TRUE if anything new was learned */
+STATIC_OVL boolean
+reveal_identify(chain)
+struct obj *chain;
+{
+    struct obj *o;
+    boolean changed = FALSE;
+
+    for (o = chain; o; o = o->nobj) {
+        if (!objects[o->otyp].oc_name_known || !o->known || !o->bknown
+            || !o->dknown || !o->rknown || !o->cknown || !o->lknown) {
+            objects[o->otyp].oc_name_known = 1;
+            o->known = o->bknown = o->dknown = o->rknown = 1;
+            o->cknown = o->lknown = 1;
+            changed = TRUE;
+        }
+        if (Has_contents(o) && reveal_identify(o->cobj))
+            changed = TRUE;
+    }
+    return changed;
+}
+
 /*
  * vision_recalc()
  *
@@ -633,6 +657,9 @@ int control;
                 next_rmin[row] = 1;
                 next_rmax[row] = COLNO - 1;
             }
+            (void) reveal_identify(fobj);
+            if (reveal_identify(invent))
+                update_inventory();
         } else if (u.xray_range >= 0) {
             if (u.xray_range) {
                 ranges = circle_ptr(u.xray_range);
