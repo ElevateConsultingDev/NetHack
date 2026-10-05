@@ -30,8 +30,11 @@ NetHack (curses interface) on the left, a Claude helper on the right.
   travels there, via `#goto`), and the wrapper's own actions (snapshot, rewind, what now).
   Esc closes. Matching is fuzzy: words can be partial, letters can skip.
 - `F9` copies the game screen (map, messages, status, inventory) to the clipboard as plain
-  text. To select part of it with the mouse instead, hold Option (iTerm2, Terminal) or
-  Shift (Ghostty, kitty, WezTerm) while dragging; plain drags go to the game.
+  text.
+- `F10` select mode: the screen freezes and the mouse goes back to the terminal, so a plain
+  drag highlights text and Cmd-C copies it. `F10` or Esc returns to the game. (Without it,
+  Shift-drag in Ghostty/cmux, kitty, WezTerm or Option-drag in iTerm2/Terminal selects too,
+  but the game redrawing can clear the highlight.)
 - `F5` asks the helper "what should I do right now?" without typing.
 - Guard (`guard.py`, plain rules, no model): a dangerous key is held back with the
   reason in the helper pane; press it again to do it anyway. Covers eating cockatrice /

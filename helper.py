@@ -48,6 +48,8 @@ SNAPSHOT = b"\x1b[17~"  # F6: snapshot the game now
 REWIND = b"\x1b[18~"    # F7: go back to the last snapshot
 SEARCH = b"\x1b[19~"    # F8: fuzzy search over commands, items and map things
 COPY = b"\x1b[20~"      # F9: copy the game screen to the clipboard as text
+SELECT = b"\x1b[21~"    # F10: select mode: screen frozen, mouse back to the terminal
+MOUSE_ON, MOUSE_OFF = "\x1b[?1000h\x1b[?1006h", "\x1b[?1006l\x1b[?1000l"
 UP, DOWN = (b"\x1b[A", b"\x1bOA"), (b"\x1b[B", b"\x1bOB")
 COMMANDS = palette.load_commands(os.path.join(HERE, "src", "cmd.c"))
 EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [F5]", action=("fkey", WHAT_NOW)),
@@ -243,6 +245,7 @@ class App:
         self.seq = 0
         self.popup = None     # actions for a clicked inventory item: x, y, w, letter, text, acts
         self.search = None    # the F8 search: query, sel, items, results
+        self.selecting = False  # F10: frozen screen, terminal selects text
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -440,10 +443,12 @@ class App:
     def draw_bar(self):
         rows, cols = self.scr.getmaxyx()
         where = "HELPER (Enter asks, Esc back)" if self.focus == "helper" else "GAME"
-        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  F8 search  F9 copy  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
+        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  F8 search  F9 copy  F10 select  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
                  curses.A_REVERSE)
 
     def redraw(self):
+        if self.selecting:  # frozen so the terminal's selection stays put
+            return
         with self.lock:
             self.draw_game()
             if self.popup:
@@ -673,7 +678,7 @@ class App:
             self.snap_dlvl = dlvl  # one automatic snapshot per level reached
 
     def run(self):
-        sys.stdout.write("\x1b[?1000h\x1b[?1006h")  # mouse clicks, SGR coordinates
+        sys.stdout.write(MOUSE_ON)  # mouse clicks, SGR coordinates
         sys.stdout.flush()
         self.redraw()
         while True:
@@ -709,6 +714,17 @@ class App:
 
     def handle_key(self, data):
         """One chunk of keyboard input; False means quit."""
+        if self.selecting or data == SELECT:  # F10 in, F10 or Esc out; other keys wait
+            if self.selecting and data not in (SELECT, b"\x1b"):
+                return
+            self.selecting = not self.selecting
+            sys.stdout.write(MOUSE_OFF if self.selecting else MOUSE_ON)
+            sys.stdout.flush()
+            if self.selecting:
+                self.put(self.scr.getmaxyx()[0] - 1, 0, " SELECT MODE: drag to select, Cmd-C copies.  F10 or Esc: back to the game "
+                         .ljust(self.scr.getmaxyx()[1] - 1), curses.A_REVERSE | curses.A_BOLD)
+                self.scr.refresh()
+            return
         if self.over:  # dead: F7 rewinds, q quits, other keys are ignored
             if data == b"q":
                 return False
@@ -745,7 +761,7 @@ class App:
             self.helper_key(data)
 
     def close(self):
-        sys.stdout.write("\x1b[?1006l\x1b[?1000l")
+        sys.stdout.write(MOUSE_OFF)
         sys.stdout.flush()
         self.watcher.close()
         try:
