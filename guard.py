@@ -94,6 +94,25 @@ def item_actions(cls, text):
     return acts + [("d", "Drop"), ("?", "Ask the helper")]
 
 
+def asked_letters(state):
+    """(question, letters) when the game is asking for an item, like
+    "What do you want to drink? [h or ?*]"; letters expands ranges like a-d."""
+    ctx = state.get("context") or {}
+    m = re.match(r"(.*?\?) \[([^\]]*?)(?: or \?\*)?\]", ctx.get("prompt") or "")
+    if ctx.get("kind") != "yn" or not m or "?*" not in ctx.get("prompt", ""):
+        return None
+    spec, letters, i = m.group(2), set(), 0
+    while i < len(spec):
+        if i + 2 < len(spec) and spec[i + 1] == "-" and spec[i].isalpha():
+            letters.update(chr(c) for c in range(ord(spec[i]), ord(spec[i + 2]) + 1))
+            i += 3
+        else:
+            if spec[i] != " ":
+                letters.add(spec[i])
+            i += 1
+    return m.group(1), letters
+
+
 def check(state, key):
     """Why `key` (bytes from the keyboard) is dangerous in this state, or None."""
     ctx = state.get("context") or {}
@@ -178,4 +197,8 @@ if __name__ == "__main__":
     assert ("w", "Wield") not in item_actions(")", "a +1 long sword (weapon in hand)")
     put_on = dict(base, context={"kind": "yn", "prompt": ITEM_PROMPTS["P"]})
     assert check(put_on, b"r")  # the popup's Put on is vetted like typing it
+    asked = lambda p: asked_letters({"context": {"kind": "yn", "prompt": p}})
+    assert asked("What do you want to drink? [h or ?*]") == ("What do you want to drink?", {"h"})
+    assert asked("What do you want to wield? [- a-cf or ?*]")[1] == {"-", "a", "b", "c", "f"}
+    assert asked("Really attack the gnome? [yn] (n)") is None
     print("guard ok")

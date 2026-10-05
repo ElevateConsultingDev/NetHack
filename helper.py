@@ -482,9 +482,18 @@ class App:
                   f"Wi {st.get('wis')} Ch {st.get('cha')}", 0, None),
                  (" ".join(flags), self.color("yellow", "default", True) | curses.A_BOLD, None),
                  ("Inventory (click an item)", curses.A_DIM, None)]
+        asked = guard.asked_letters(self.watcher.state)
+        if asked:  # the game wants an item: say so, and pick out the ones that fit
+            lines[-1] = (f"{asked[0]} Click one:", self.color("yellow", "default", True) | curses.A_BOLD, None)
         for i in self.watcher.state.get("inventory", []):
             worn = guard.WORN.search(i["text"]) or "weapon in hand" in i["text"]
-            lines.append((f"{i['letter']}) {i['text']}", self.color("cyan", "default", False) if worn else 0, i["letter"]))
+            attr = self.color("cyan", "default", False) if worn else 0
+            mark = ""
+            if asked:
+                fits = i["letter"] in asked[1]
+                attr = curses.A_BOLD if fits else curses.A_DIM
+                mark = "> " if fits else "  "
+            lines.append((f"{mark}{i['letter']}) {i['text']}", attr, i["letter"]))
         lines.append(("", 0, None))
         for r in self.status_rows():  # the game's own status lines, moved up from under the map
             lines += [(l, 0, None) for l in textwrap.wrap(re.sub(r"  +", "  ", self.row_text(r)), w)]
