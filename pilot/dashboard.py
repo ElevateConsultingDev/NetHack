@@ -237,12 +237,12 @@ def write(path: str, run: str, brain: str, games: list, batch_dir: str) -> None:
 {_north_star(batch_dir, jev=brain.startswith("jev"))}
 <details class="sub"><summary>{"Rule and LLM brains" if brain.startswith("jev") else "JEV mode"}: all-time panel</summary>{_north_star(batch_dir, jev=(brain != "jev"))}</details>
 <h1>NetHack pilot: run {html.escape(run)}</h1>
-<div class="sub"><a href="tactics.html">Tactics, predictions and outcomes</a> for the latest finished run</div>
+<p><a href="tactics.html" style="display:inline-block;padding:6px 14px;border:1px solid var(--accent);border-radius:6px;text-decoration:none;font-weight:600">Tactics, predictions and outcomes for this run &rarr;</a></p>
 <div class="sub">{len(games)} games · {brain} brain · {done_note} · updated {time.strftime('%H:%M:%S')}</div>
 <div class="stats">
-  <div class="stat"><b>{avg(depths)}</b><span>avg dungeon level</span></div>
+  <div class="stat"><b>{avg(depths)}</b><span>avg level when the game ended (deepest reached is in the panel above)</span></div>
   <div class="stat"><b>{avg(xls)}</b><span>avg experience level</span></div>
-  <div class="stat"><b>{avg(turns)}</b><span>avg turns</span></div>
+  <div class="stat"><b>{round(float(avg(turns) or 0)):,}</b><span>avg turns</span></div>
   <div class="stat"><b>{sum(1 for g in finished if g.result.get('death'))}</b><span>died</span></div>
   <div class="stat"><b>{sum(1 for g in finished if g.stall)}</b><span>stalled</span></div>
 </div>

@@ -600,7 +600,7 @@ def _pick_from_menu(v: View, memory: Memory) -> str:
                 cls == ")" and any(t in item["text"] for t in ("dagger", "dart", "knife", "shuriken"))) or (
                 cls == ")" and "long sword" in item["text"] and unarmed(v)) or (
                 cls == "[" and armor_needed(v, item["text"]))) \
-                and not any(w in item["text"] for w in NOT_CARRIED + ("corpse",)):
+                and not any(w in item["text"] for w in NOT_CARRIED + ("corpse",)) and not shed_here(v, item["text"]):
             keys += item["key"]
     memory.loot_classes = ""
     return keys + "\r"
@@ -960,7 +960,7 @@ def r_loot(v: View, memory: Memory, args: dict):
                 and (v.dlvl, x, y) not in memory.looted and (v.dlvl, x, y) not in memory.blocked:
             return True  # Safe armor (see SAFE_ARMOR).
         return (c is not None and c["kind"] == "object" and c.get("class", "") in classes
-                and not any(w in c["name"] for w in NOT_CARRIED + ("corpse",))
+                and not any(w in c["name"] for w in NOT_CARRIED + ("corpse",)) and not shed_here(v, c["name"])
                 and (v.dlvl, x, y) not in memory.looted and (v.dlvl, x, y) not in memory.blocked)
     if args.get("target") and tuple(args["target"]) == v.pos and here not in memory.looted:
         args["sent"] = True
@@ -1001,11 +1001,18 @@ def armor_slot(text: str) -> str | None:
     return None
 
 
-# Open or leave these. Tinning kits (100) and spellbooks (50) are weight the pilot never uses: 66 of
-# 128 games ended carrying one, and over 600 total a hero cannot squeeze between rock corners
-# (hack.c test_move), which shut 22 games out of part of a Mines level and stalled 3 (iteration 57).
-NOT_CARRIED = ("box", "chest", "boulder", "heavy iron ball", "iron chain", "tinning kit", "spellbook")
+NOT_CARRIED = ("box", "chest", "boulder", "heavy iron ball", "iron chain")  # open or leave these
+# Tinning kits (100) and spellbooks (50) have uses the pilot does not have yet (tins that never rot;
+# books sell for 100 gold a spell level), so they are carried, but they are the first weight to go:
+# over 600 total a hero cannot squeeze between rock corners (hack.c test_move), which shut 22 of 128
+# games out of part of a Mines level and stalled 3 (iteration 57). In the Mines, where the caves are
+# all tight corners, they are left behind and not picked up.
 DEAD_WEIGHT = ("tinning kit", "spellbook", " rock")
+
+
+def shed_here(v: View, name: str) -> bool:
+    """Dead weight is not worth its place in the Mines."""
+    return v.status.get("dungeon") == "The Gnomish Mines" and any(w in name for w in DEAD_WEIGHT)
 
 
 def r_probe_dark(v: View, memory: Memory, args: dict):
@@ -1282,15 +1289,18 @@ class Engine:
             self.memory.last_threat_turn = c["turn"]
         self._checkpoints(v, c)
 
-        if any("carrying too much to get through" in x for x in v.s.get("messages", [])) and not c["adjacent_hostiles"]:
+        stuck = any("carrying too much to get through" in x for x in v.s.get("messages", []))
+        if (stuck or v.status.get("dungeon") == "The Gnomish Mines") and not c["mobile_hostiles"]:
             junk = next((i for i in v.s.get("inventory", []) if any(w in i["text"] for w in DEAD_WEIGHT)
                          and not i.get("worn") and "(weapon in " not in i["text"]), None)
             if junk:
                 self.memory.pending_item = junk["letter"]
-                _count(self.memory, "dropped dead weight to squeeze through")
-                self.note = f"too heavy to squeeze through: drop the {junk['text']}"
+                self.memory.looted.add((v.dlvl, *v.pos))  # Not to be picked straight back up.
+                _count(self.memory, "dropped dead weight")
+                self.note = f"{'too heavy to squeeze through' if stuck else 'tight caves ahead'}: drop the {junk['text']}"
                 return self._stuck_guard(v, "d", self.note)
-            self.memory.no_squeeze = True  # Nothing to shed: route around tight corners from here on.
+            if stuck:
+                self.memory.no_squeeze = True  # Nothing to shed: route around tight corners from here on.
 
         standing = self._standing(v, c)
         if standing is not None:

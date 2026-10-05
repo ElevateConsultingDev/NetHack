@@ -30,6 +30,8 @@ EXTRA = """
 .panel h3 { margin:0 0 8px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
 .list { font-size:12.5px; }
 .stick { position:sticky; top:12px; }
+.gamegrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:0 14px; }
+.panels { grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important; }
 .row { display:flex; gap:8px; padding:4px 6px; border-radius:5px; cursor:pointer; font-variant-numeric:tabular-nums; }
 .row:hover { background:rgba(127,127,127,.12); } .row.on { outline:1px solid var(--accent); background:rgba(127,127,127,.12); }
 .row .t { color:var(--dim); width:54px; flex:none; } .grow { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -75,7 +77,12 @@ function games() {
 function decisions() {
   const g = D.games[game];
   $('#gname').innerHTML = `${esc(g.name)} · XL ${g.xl} · turn ${g.turn} · <a href="replay-${esc(g.name)}.html">step-by-step replay</a>`;
-  $('#decisions').innerHTML = g.outcomes.map((o, i) => `<div class="row ${i === pick ? 'on' : ''}" data-o="${i}">
+  // By default only the decisions worth a look: a prediction that failed or could not be checked,
+  // a fight started under half health, or one where a brain or Jev was asked.
+  const asked = new Set(g.escs.map(e => e.t)), all = $('#allrows').checked;
+  const keep = (o, i) => all || i === pick || o.status === 'not_met' || o.status === 'unknown' || o.hp * 2 < o.hpmax || o.jev || asked.has(o.turn) || asked.has(o.turn + 1) || asked.has(o.turn - 1);
+  $('#rowcount').textContent = `showing ${g.outcomes.filter(keep).length} of ${g.outcomes.length}`;
+  $('#decisions').innerHTML = g.outcomes.map((o, i) => !keep(o, i) ? '' : `<div class="row ${i === pick ? 'on' : ''}" data-o="${i}">
     <span class="t">T${o.turn}</span><span class="grow">${esc(o.tactic)}${o.target ? ' · ' + esc(o.target) : ''}</span>
     <span class="t">${o.hp}/${o.hpmax}</span><span class="tag ${o.status}">${label[o.status]}</span></div>`).join('') || '<span class="sub">No fight or escape tactics in this game.</span>';
 }
@@ -170,6 +177,7 @@ document.addEventListener('click', e => {
   if (o) { pick = +o.dataset.o; decisions(); detail(); }
   if (b) ledger(b.dataset.by);
 });
+$('#allrows').addEventListener('change', decisions);
 pick = Math.max(0, D.games[0] ? D.games[0].outcomes.length - 1 : 0);
 const h = /g=([^&]+)&o=(\d+)/.exec(location.hash);  // keep the selection across live refreshes
 if (h) { const k = D.games.findIndex(g => g.name === h[1]); if (k >= 0) { game = k; pick = Math.min(+h[2], D.games[k].outcomes.length - 1); } }
@@ -231,16 +239,18 @@ def write(run: str, live: bool = False) -> str:
   <div class="stat"><b>{sum(g["deepest"] for g in gs) / n:.2f}</b><span>avg deepest level</span></div>
   <div class="stat"><b>{len(data):,}</b><span>tactic outcomes</span></div>
   <div class="stat"><b>{100 * sum(o["status"] == "met" for o in data) / max(len(data), 1):.0f}%</b><span>predictions met</span></div>
-  <div class="stat"><b>{calls:,}</b><span>model calls</span></div>
+  <div class="stat"><b>{calls:,}</b><span>{'Jev calls' if str(d.get("brain") or "").startswith("jev") else 'questions to the rule brain (no model called)' if (d.get("brain") or "rules") == "rules" else 'model calls'}</span></div>
   <div class="stat"><b>{(secs / calls if calls else 0):.2f}s</b><span>per call</span></div>
   <div class="stat"><b>{tokens:,}</b><span>input tokens</span></div>
   <div class="stat"><b>${tokens * USD_PER_INPUT_TOKEN:.4f}</b><span>this run, estimated · ${spent():.4f} all runs</span></div>
 </div>
 {'<div class="sub" style="margin-top:8px">Run in progress: this page reloads every 20 seconds as games finish.</div>' if live else ''}
 <h2>What the pilot decided</h2>
+<div class="panel" style="margin-bottom:12px"><h3>Pick a game (deepest first) · how it ended · tactics recorded</h3><div class="list gamegrid" id="games"></div></div>
 <div class="panels">
-  <div class="panel"><h3>Games (deepest first) · tactics</h3><div class="list" id="games"></div></div>
-  <div class="panel"><h3>Decisions in this game</h3><div class="sub" id="gname"></div><div class="list" id="decisions"></div></div>
+  <div class="panel"><h3>Decisions in this game</h3><div class="sub" id="gname"></div>
+    <div class="sub" style="margin:6px 0"><label><input type="checkbox" id="allrows"> Show every decision</label> <span id="rowcount"></span></div>
+    <div class="list" id="decisions"></div></div>
   <div class="stick">
     <div class="panel"><h3>Tactic and measured outcome</h3><div id="outcome"></div></div>
     <div class="panel" style="margin-top:12px"><h3>Feasible menu and omitted candidates</h3><div id="menu"></div></div>
