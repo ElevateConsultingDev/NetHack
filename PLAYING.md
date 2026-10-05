@@ -15,6 +15,8 @@ NetHack (curses interface) on the left, a Claude helper on the right.
 - Mouse: click a menu line to pick it, click `--More--` to continue, click the map
   to travel there, click the helper pane to type in it. The wheel pages a game
   menu (same as `>` and `<`) or scrolls the helper's answers.
+- Cheat: `F2` (or `#reveal`) maps the current level and its traps, like a
+  scroll of magic mapping that also finds traps.
 - Closing the terminal saves the game (NetHack saves on hangup).
 
 Needs `uv` (runs the helper with `pyte`, a terminal emulator) and `claude` on PATH.

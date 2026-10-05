@@ -144,6 +144,7 @@ STATIC_PTR int NDECL(wiz_wish);
 STATIC_PTR int NDECL(wiz_identify);
 STATIC_PTR int NDECL(wiz_intrinsic);
 STATIC_PTR int NDECL(wiz_map);
+STATIC_PTR int NDECL(doreveal);
 STATIC_PTR int NDECL(wiz_makemap);
 STATIC_PTR int NDECL(wiz_genesis);
 STATIC_PTR int NDECL(wiz_where);
@@ -888,20 +889,28 @@ wiz_makemap(VOID_ARGS)
 STATIC_PTR int
 wiz_map(VOID_ARGS)
 {
-    if (wizard) {
-        struct trap *t;
-        long save_Hconf = HConfusion, save_Hhallu = HHallucination;
-
-        HConfusion = HHallucination = 0L;
-        for (t = ftrap; t != 0; t = t->ntrap) {
-            t->tseen = 1;
-            map_trap(t, TRUE);
-        }
-        do_mapping();
-        HConfusion = save_Hconf;
-        HHallucination = save_Hhallu;
-    } else
+    if (wizard)
+        (void) doreveal();
+    else
         pline(unavailcmd, visctrl((int) cmd_from_func(wiz_map)));
+    return 0;
+}
+
+/* #reveal - cheat: map the level and its traps, in any game mode */
+STATIC_PTR int
+doreveal(VOID_ARGS)
+{
+    struct trap *t;
+    long save_Hconf = HConfusion, save_Hhallu = HHallucination;
+
+    HConfusion = HHallucination = 0L;
+    for (t = ftrap; t != 0; t = t->ntrap) {
+        t->tseen = 1;
+        map_trap(t, TRUE);
+    }
+    do_mapping();
+    HConfusion = save_Hconf;
+    HHallucination = save_Hhallu;
     return 0;
 }
 
@@ -3442,6 +3451,8 @@ struct ext_func_tab extcmdlist[] = {
     { 'r', "read", "read a scroll or spellbook", doread },
     { C('r'), "redraw", "redraw screen", doredraw, IFBURIED | GENERALCMD },
     { 'R', "remove", "remove an accessory (ring, amulet, etc)", doremring },
+    { '\0', "reveal", "cheat: map this level and its traps",
+            doreveal, IFBURIED | AUTOCOMPLETE | GENERALCMD },
     { M('R'), "ride", "mount or dismount a saddled steed",
             doride, AUTOCOMPLETE },
     { M('r'), "rub", "rub a lamp or a stone", dorub, AUTOCOMPLETE },

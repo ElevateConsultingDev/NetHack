@@ -30,6 +30,7 @@ GAME = os.path.join(HERE, "playground")
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
 TOGGLE = (b"\x1d", b"\x1bOP", b"\x1b[11~")  # ^], F1 (two encodings)
+REVEAL = (b"\x1bOQ", b"\x1b[12~")  # F2: the #reveal cheat (src/cmd.c)
 MOUSE = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")  # SGR mouse report (mode 1006)
 MENU_ITEM = re.compile(r"(?:^|[ \u2502])([a-zA-Z$#*-])\) ")  # " a) a +1 long sword"
 MENU_PAGE = re.compile(r"\(Page \d+ of \d+\)")  # footer of a curses menu with more pages
@@ -264,7 +265,7 @@ class App:
     def draw_bar(self):
         rows, cols = self.scr.getmaxyx()
         where = "HELPER (Enter asks, Esc back)" if self.focus == "helper" else "GAME"
-        self.put(rows - 1, 0, f" ^]/F1 switch focus  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
+        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal map  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
                  curses.A_REVERSE)
 
     def redraw(self):
@@ -352,6 +353,8 @@ class App:
                 data = MOUSE.sub(b"", data)
                 if any(t == data or data.startswith(t) for t in TOGGLE):
                     self.focus = "helper" if self.focus == "game" else "game"
+                elif data in REVEAL:
+                    os.write(self.fd, b"#reveal\r")
                 elif self.focus == "game":
                     os.write(self.fd, data)
                 else:
