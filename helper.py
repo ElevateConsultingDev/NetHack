@@ -74,7 +74,23 @@ MAP_W = 80  # the map's width; the status/inventory panel starts right after it
 MAP_H = 21  # map rows, y = 0..20
 GX = 3      # gutter left of the game for row numbers (y)
 RULER = 2   # rows under the game for column numbers (x)
-ZOOMS = [(1, 1), (2, 1), (4, 2), (6, 3)]  # columns x rows per map square at each zoom level
+# kitty can draw text scaled up in place (its text-sizing protocol, OSC 66);
+# elsewhere a zoomed square is a block of its character
+KITTY = os.environ.get("TERM") == "xterm-kitty" or "KITTY_WINDOW_ID" in os.environ
+ZOOMS = ([(1, 1), (2, 2), (3, 3), (4, 4)] if KITTY  # columns x rows per map square
+         else [(1, 1), (2, 1), (4, 2), (6, 3)])
+SGR_FG = {"black": 30, "red": 31, "green": 32, "brown": 33, "blue": 34, "magenta": 35,
+          "cyan": 36, "white": 37}
+
+
+def big_char(row, col, scale, ch, c):
+    """kitty escape codes drawing one character `scale` times bigger at a screen cell,
+    in the colors of pyte cell c."""
+    code = SGR_FG.get(c.fg.removeprefix("bright"))
+    sgr = ["0"] + (["1"] if c.bold or c.fg.startswith("bright") else []) + (["7"] if c.reverse else [])
+    if code:
+        sgr.append(str(code + (60 if c.fg.startswith("bright") else 0)))
+    return f"\x1b[{row + 1};{col + 1}H\x1b[{';'.join(sgr)}m\x1b]66;s={scale};{ch}\x07"
 PANEL_TOP = 0  # messages stop at the map's edge (cursinit.c), so the panel can use every row
 MENU_PAGE = re.compile(r"\(Page \d+ of \d+\)")  # footer of a curses menu with more pages
 
@@ -273,6 +289,7 @@ class App:
         self.drag = None        # ("v", x) or ("h", y) while a divider is dragged
         self.zoom = 0           # index into ZOOMS
         self.zoom_view = None   # (x0, y0, bw, bh, top, bottom) of the zoomed map on screen
+        self.big = self.big_sent = None  # kitty: big-character escapes drawn / last sent
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -385,6 +402,7 @@ class App:
         self._winsize()
         os.kill(self.pid, signal.SIGWINCH)
         self.scr.clear()
+        self.big_sent = None  # kitty: the big characters were cleared too
         self.screen.dirty.update(range(self.gh))
 
     def color(self, fg, bg, bold):
@@ -453,6 +471,8 @@ class App:
             if self.zoom_view:
                 self.zoom_view = None
                 self.screen.dirty.update(range(self.gh))
+                if KITTY:
+                    self.scr.redrawwin()  # repaint every cell, so no big characters are left
             return
         bw, bh = ZOOMS[self.zoom]
         top, bottom = self.map_top, self.gh if self.panel_on else self.gh - 2
@@ -461,19 +481,26 @@ class App:
         x0 = max(1, min(MAP_W - ncols, you["x"] - ncols // 2))
         y0 = max(0, min(MAP_H - nrows, you["y"] - nrows // 2)) if nrows < MAP_H else 0
         self.zoom_view = (x0, y0, bw, bh, top, bottom)
-        buf = self.screen.buffer
+        buf, big = self.screen.buffer, []
         for r in range(top, bottom):
-            j, x_ = (r - top) // bh, 0
+            j, k = divmod(r - top, bh)
             y = y0 + j
             for i in range(ncols):
                 x = x0 + i
                 if j < nrows and y < MAP_H and x < MAP_W and top + y < self.gh:
                     c = buf[top + y][x - 1]
-                    self.gput(r, i * bw, (c.data or " ").translate(ASCII) * bw, self.cell_attr(c))
+                    ch = (c.data or " ").translate(ASCII)
+                    if KITTY:  # curses keeps the block blank; kitty draws the big character over it
+                        self.gput(r, i * bw, " " * bw)
+                        if k == 0:  # blanks too: they clear an old big character
+                            big.append(big_char(r, GX + i * bw, bw, ch, c))
+                    else:
+                        self.gput(r, i * bw, ch * bw, self.cell_attr(c))
                 else:
                     self.gput(r, i * bw, " " * bw)
             self.gput(r, ncols * bw, " " * (MAP_W - ncols * bw))
         self.screen.dirty.update(range(top, bottom))  # redraw normally when zoom ends
+        self.big = "".join(big)
 
     def draw_game(self):
         buf = self.screen.buffer
@@ -662,6 +689,11 @@ class App:
                 rows, _ = self.scr.getmaxyx()
                 self.scr.move(rows - 2, min(GX + self.gw + 3 + len(self.helper.input), self.scr.getmaxyx()[1] - 2))
             self.scr.refresh()
+            if KITTY and self.zoom_view and self.big != self.big_sent:
+                # after curses: save cursor and colors, draw the big characters, restore
+                sys.stdout.write("\x1b7" + self.big + "\x1b8")
+                sys.stdout.flush()
+            self.big_sent = self.big if self.zoom_view else None
 
     def helper_key(self, data):
         for b in data:

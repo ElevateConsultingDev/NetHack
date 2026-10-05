@@ -66,7 +66,9 @@ NetHack (curses interface) on the left, a Claude helper on the right.
 - Zoom: the wheel over the map (or `F11` / `F12`) zooms the map in and out: each square
   becomes a block of its character (2x, 4x, 6x), colors kept, centered on you; the axes
   number the part in view, and clicking a square travels there. Menus and cursor picks
-  show the normal map.
+  show the normal map. In kitty (`brew install --cask kitty`), zoom uses real 2x, 3x and
+  4x characters instead (kitty's text-sizing escape code); other terminals can't size
+  part of the screen.
 - Axes: row numbers (y, 0 at the top) down the left and column numbers (x, 1 at the
   left) along the bottom, the same coordinates the helper uses; your row and column
   are highlighted.
