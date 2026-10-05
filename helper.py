@@ -2,7 +2,7 @@
 """NetHack with a Claude helper on the same screen.
 
 The game runs in a pty on the left (drawn through pyte, a terminal emulator);
-a chat pane sits on the right. ^] (or ⌃⌥T) switches focus. Each question goes to
+a chat pane sits on the right. ^] (or ⌃G t) switches focus. Each question goes to
 `claude -p` along with what's on screen and, through the aipipe socket
 (src/aipipe.c, NETHACK_CONTROL), the inventory. Run it with ./play.
 """
@@ -43,8 +43,10 @@ def ctrl_opt(letter):
     return b"\x1b" + bytes([ord(letter) & 0x1f])
 
 
-# the wrapper's own shortcuts: Control-Option, which NetHack doesn't use
-TOGGLE = (b"\x1d", ctrl_opt("T"))  # ^] or ⌃⌥T: type into the helper / the game
+# the wrapper's own shortcuts: ⌃G, then a letter (internally each one is a
+# Control-Option code, which also works directly where nothing else takes it)
+LEADER = b"\x07"  # ⌃G: NetHack only uses it in debug mode
+TOGGLE = (b"\x1d", ctrl_opt("T"))  # ^] or ⌃G t: type into the helper / the game
 FKEYS = {ctrl_opt("F"): b"#fog\r",     # lift / bring back the fog of war
          ctrl_opt("D"): b"#godown\r",  # travel to the down stairs
          ctrl_opt("U"): b"#goup\r"}    # travel to the up stairs
@@ -55,22 +57,25 @@ SEARCH = ctrl_opt("K")     # search commands, items and map things
 COPY = ctrl_opt("C")       # copy the game screen to the clipboard as text
 SELECT = ctrl_opt("V")     # select mode: drag a rectangle to copy it
 ZOOM_IN, ZOOM_OUT = ctrl_opt("I"), ctrl_opt("O")  # (or the wheel over the map)
-BAR = ("⌃] helper  ⌃⌥F fog  ⌃⌥D/⌃⌥U stairs  ⌃⌥W what now?  ⌃⌥S snapshot  ⌃⌥R rewind  "
-       "⌃⌥K search  ⌃⌥C copy  ⌃⌥V select  ⌃⌥I/⌃⌥O zoom")
+LEADER_KEYS = {"t": "T", "f": "F", "d": "D", "u": "U", "w": "W", "s": "S", "r": "R",
+               "k": "K", "c": "C", "v": "V", "i": "I", "o": "O"}
+BAR = "⌃G: f fog  d/u stairs  w what now?  k search  s snapshot  r rewind  c copy  v select  i/o zoom  t helper"
+LEADER_BAR = (" ⌃G then: f fog of war  d down stairs  u up stairs  w what now?  k search  s snapshot  "
+              "r rewind  c copy screen  v select  i zoom in  o zoom out  t helper/game   (anything else cancels) ")
 MOUSE_ON = "\x1b[?1000h\x1b[?1002h\x1b[?1006h"   # clicks, drags (for resizing), SGR coordinates
 MOUSE_OFF = "\x1b[?1006l\x1b[?1002l\x1b[?1000l"
 UP, DOWN = (b"\x1b[A", b"\x1bOA"), (b"\x1b[B", b"\x1bOB")
 COMMANDS = palette.load_commands(os.path.join(HERE, "src", "cmd.c"))
-EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [⌃⌥W]", action=("fkey", WHAT_NOW)),
-          dict(label="snapshot", detail="save a snapshot to come back to  [⌃⌥S]", action=("fkey", SNAPSHOT)),
-          dict(label="rewind", detail="go back to the last snapshot  [⌃⌥R]", action=("fkey", REWIND)),
-          dict(label="copy screen", detail="copy the game screen as text  [⌃⌥C]", action=("fkey", COPY)),
-          dict(label="zoom in", detail="bigger map squares  [⌃⌥I, wheel up over the map]", action=("fkey", ZOOM_IN)),
-          dict(label="zoom out", detail="smaller map squares  [⌃⌥O, wheel down over the map]", action=("fkey", ZOOM_OUT)),
-          dict(label="select mode", detail="drag a rectangle to copy it  [⌃⌥V]", action=("fkey", SELECT)),
-          dict(label="switch focus", detail="type into the helper or the game  [⌃], ⌃⌥T]", action=("fkey", b"\x1d"))]
+EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [⌃G w]", action=("fkey", WHAT_NOW)),
+          dict(label="snapshot", detail="save a snapshot to come back to  [⌃G s]", action=("fkey", SNAPSHOT)),
+          dict(label="rewind", detail="go back to the last snapshot  [⌃G r]", action=("fkey", REWIND)),
+          dict(label="copy screen", detail="copy the game screen as text  [⌃G c]", action=("fkey", COPY)),
+          dict(label="zoom in", detail="bigger map squares  [⌃G i, wheel up over the map]", action=("fkey", ZOOM_IN)),
+          dict(label="zoom out", detail="smaller map squares  [⌃G o, wheel down over the map]", action=("fkey", ZOOM_OUT)),
+          dict(label="select mode", detail="drag a rectangle to copy it  [⌃G v]", action=("fkey", SELECT)),
+          dict(label="switch focus", detail="type into the helper or the game  [⌃], ⌃G t]", action=("fkey", b"\x1d"))]
 for _c in COMMANDS:  # the wrapper's shortcuts for game commands
-    _f = {"fog": "⌃⌥F", "godown": "⌃⌥D", "goup": "⌃⌥U"}.get(_c["label"])
+    _f = {"fog": "⌃G f", "godown": "⌃G d", "goup": "⌃G u"}.get(_c["label"])
     if _f:
         _c["detail"] = _c["detail"][:-1] + f", {_f}]"
 SAVE_KEYS = b"Sy\r"     # save, yes, dismiss "Saving..." (the game then exits)
@@ -114,8 +119,8 @@ The player has turned on a cheat: you also get the whole level as it really is, 
 Plain text only, no markdown: it is shown in a narrow terminal pane. \
 Write keys the Mac way: ⌃ is Control (⌃D kicks), ⌥ is Option, which is NetHack's Meta/Alt \
 (⌥L loots, ⌥P prays; never write M-l), ⇧ is Shift. Extended commands can always be typed \
-with # (#loot). This player's helper shortcuts: ⌃⌥F fog of war, ⌃⌥D / ⌃⌥U walk to the \
-down / up stairs, ⌃⌥K search, ⌃⌥S snapshot, ⌃⌥R rewind."""
+with # (#loot). This player's helper shortcuts: ⌃G f fog of war, ⌃G d / ⌃G u walk to the \
+down / up stairs, ⌃G k search, ⌃G s snapshot, ⌃G r rewind."""
 
 ASCII = str.maketrans("─│┌┐└┘├┤┬┴┼", "-|+++++++++")  # box drawing as plain ASCII, any font
 COLORS = {"black": 0, "red": 1, "green": 2, "brown": 3, "blue": 4,
@@ -288,9 +293,10 @@ class App:
         self.warned = set()   # warnings already shown (each shows once while it applies)
         self.seq = 0
         self.popup = None     # actions for a clicked inventory item: x, y, w, letter, text, acts
-        self.search = None    # the ⌃⌥K search: query, sel, items, results
-        self.selecting = False  # ⌃⌥V: frozen screen, drag a rectangle to copy
+        self.search = None    # the ⌃G k search: query, sel, items, results
+        self.selecting = False  # ⌃G v: frozen screen, drag a rectangle to copy
         self.sel = None         # (y0, x0, y1, x1) of the rectangle being dragged
+        self.leader = False     # ⌃G pressed, waiting for its letter
         self.map_top = 1      # screen row of map row y=0 (found from the cursor on @)
         self.panel_items = {} # game-pane row -> inventory letter, for clicks
         self.panel_on = False
@@ -382,7 +388,7 @@ class App:
                     SNAPS, f"{os.path.basename(save)}@{info.get('turn', 0):06d}-D{info.get('dlvl', 0)}"))
                 for old in snapshots(self.save_name)[:-KEEP_SNAPS]:
                     os.unlink(old)
-                self.say("dim", f"Snapshot saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')}). ⌃⌥R goes back to it.")
+                self.say("dim", f"Snapshot saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')}). ⌃G r goes back to it.")
             else:
                 self.restore_snapshot()
             self.spawn()
@@ -393,7 +399,7 @@ class App:
         if not snap:
             return False
         self.over = True
-        self.say("err", f"Game over. ⌃⌥R rewinds to your last snapshot ({snap_label(snap[0])}); q quits.")
+        self.say("err", f"Game over. ⌃G r rewinds to your last snapshot ({snap_label(snap[0])}); q quits.")
         return True
 
     def restore_snapshot(self):
@@ -429,6 +435,14 @@ class App:
             curses.init_pair(n, f, b)
             self.pairs[key] = n
         return curses.color_pair(self.pairs[key])
+
+    def move_cursor(self, y, x):
+        """Park the cursor, clamped to the screen (a narrow terminal can't fit the game)."""
+        rows, cols = self.scr.getmaxyx()
+        try:
+            self.scr.move(max(0, min(rows - 1, y)), max(0, min(cols - 1, x)))
+        except curses.error:
+            pass
 
     def put(self, y, x, s, attr=0):
         try:
@@ -580,14 +594,25 @@ class App:
         s_ = st.get("str", 0)
         strength = f"18/{s_ - 18:02d}" if 18 < s_ <= 117 else "18/**" if s_ == 118 else str(s_ - 100 if s_ > 118 else s_)
         flags = [f for f in [st.get("hunger"), st.get("encumbrance")] + st.get("conditions", []) if f]
-        lines = [(f"{st.get('race', '').capitalize()} {st.get('role', '')}, {st.get('alignment', '')}", curses.A_BOLD, None),
+        rev = self.watcher.state.get("reveal") or {}
+        pray = rev.get("prayer") or {}
+        more = [(f"Carrying {st.get('weight')}/{st.get('capacity')} wt   Speed {st.get('speed')}", 0, None),
+                (f"Next level at {st.get('next_exp')} xp   God: {st.get('god')}", 0, None)]
+        if pray:  # hidden numbers, from the cheat
+            more.append((f"Luck {pray.get('luck')}  Prayer timeout {pray.get('timeout')}  "
+                         f"Nutrition {rev.get('nutrition')}  Alignment {rev.get('align_record')}",
+                         self.color("magenta", "default", False), None))
+            more += [(l, self.color("magenta", "default", False), None)
+                     for l in textwrap.wrap("Intrinsics: " + (", ".join(rev.get("intrinsics", [])) or "none"), w)]
+        lines = [(f"{st.get('gender', '').capitalize()} {st.get('race', '')} {st.get('role', '')}, "
+                  f"{st.get('alignment', '')}", curses.A_BOLD, None),
                  (f"HP {hp}/{hpmax}", self.color(hp_col, "default", True) | curses.A_BOLD, None),
                  (f"Pw {st.get('pw')}/{st.get('pwmax')}   AC {st.get('ac')}", 0, None),
                  (f"Xp {st.get('xlvl')}/{st.get('exp')}   $ {st.get('gold')}   T {st.get('turn')}", 0, None),
                  (f"Dlvl {st.get('dlvl')}  {st.get('dungeon', '')}", 0, None),
                  (f"Location x={you.get('x')} y={you.get('y')}", curses.A_BOLD, None),
                  (f"St {strength} Dx {st.get('dex')} Co {st.get('con')} In {st.get('int')} "
-                  f"Wi {st.get('wis')} Ch {st.get('cha')}", 0, None),
+                  f"Wi {st.get('wis')} Ch {st.get('cha')}", 0, None)] + more + [
                  (" ".join(flags), self.color("yellow", "default", True) | curses.A_BOLD, None),
                  ("Inventory (click an item)", curses.A_DIM, None)]
         asked = guard.asked_letters(self.watcher.state)
@@ -674,7 +699,7 @@ class App:
             return
         self.paint()
 
-    SELECT_BAR = " SELECT: drag a rectangle, let go to copy it.  ⌃⌥V or Esc: back to the game "
+    SELECT_BAR = " SELECT: drag a rectangle, let go to copy it.  ⌃G v or Esc: back to the game "
 
     def select_mouse(self, b, x, y, press):
         """Select mode: drag a rectangle, release copies exactly that text."""
@@ -691,7 +716,7 @@ class App:
                              for r in range(top, bot + 1)) + "\n"
             subprocess.run(["pbcopy"], input=text, text=True)
             self.sel = None
-            self.paint(bar=f" Copied {right - left + 1}x{bot - top + 1} to the clipboard. Drag again, or ⌃⌥V/Esc: back to the game ")
+            self.paint(bar=f" Copied {right - left + 1}x{bot - top + 1} to the clipboard. Drag again, or ⌃G v/Esc: back to the game ")
             return
         else:
             return
@@ -702,6 +727,7 @@ class App:
         self.scr.refresh()
 
     def paint(self, bar=None):
+        bar = bar or (LEADER_BAR if self.leader else None)
         with self.lock:
             self.draw_game()
             self.draw_zoom()
@@ -726,12 +752,12 @@ class App:
             if self.focus == "game" and self.zoom_view:
                 x0, y0, bw, bh, top, _ = self.zoom_view
                 you = self.watcher.state["player"]
-                self.scr.move(min(top + (you["y"] - y0) * bh, self.gh - 1), GX + (you["x"] - x0) * bw)
+                self.move_cursor(min(top + (you["y"] - y0) * bh, self.gh - 1), GX + (you["x"] - x0) * bw)
             elif self.focus == "game":
-                self.scr.move(min(self.screen.cursor.y, self.gh - 1), GX + min(self.screen.cursor.x, self.gw - 1))
+                self.move_cursor(min(self.screen.cursor.y, self.gh - 1), GX + min(self.screen.cursor.x, self.gw - 1))
             else:
                 rows, _ = self.scr.getmaxyx()
-                self.scr.move(rows - 2, min(GX + self.gw + 3 + len(self.helper.input), self.scr.getmaxyx()[1] - 2))
+                self.move_cursor(rows - 2, min(GX + self.gw + 3 + len(self.helper.input), self.scr.getmaxyx()[1] - 2))
             self.scr.refresh()
             if KITTY and self.zoom_view and self.big != self.big_sent:
                 # after curses: save cursor and colors, draw the big characters, restore
@@ -1042,13 +1068,22 @@ class App:
 
     def handle_key(self, data):
         """One chunk of keyboard input; False means quit."""
-        if self.selecting or data == SELECT:  # ⌃⌥V in, ⌃⌥V or Esc out; other keys wait
+        if self.leader:  # the letter after ⌃G
+            self.leader = False
+            letter = LEADER_KEYS.get(data.decode("latin-1").lower())
+            if not letter:
+                return
+            data = ctrl_opt(letter)
+        elif data == LEADER:
+            self.leader = True
+            return
+        if self.selecting or data == SELECT:  # ⌃G v in, ⌃G v or Esc out; other keys wait
             if self.selecting and data not in (SELECT, b"\x1b"):
                 return
             self.selecting, self.sel = not self.selecting, None
             self.paint(bar=self.SELECT_BAR if self.selecting else None)
             return
-        if self.over:  # dead: ⌃⌥R rewinds, q quits, other keys are ignored
+        if self.over:  # dead: ⌃G r rewinds, q quits, other keys are ignored
             if data == b"q":
                 return False
             if data != REWIND:
@@ -1077,7 +1112,7 @@ class App:
                 self.say("dim", "Snapshots happen at the command prompt; finish this first.")
         elif data == REWIND:
             if not snapshots(self.save_name):
-                self.say("dim", "No snapshot yet (one is made on each new level, or press ⌃⌥S).")
+                self.say("dim", "No snapshot yet (one is made on each new level, or press ⌃G s).")
             elif not self.save_game("rewind"):
                 self.say("dim", "Rewind works at the command prompt; finish this first.")
         elif self.focus == "game":

@@ -8,11 +8,11 @@
 NetHack (curses interface) on the left, a Claude helper on the right.
 
 Keys are Mac-style: ⌃ Control, ⌥ Option, ⇧ Shift. NetHack's Meta commands are Option
-(⌥L loots, ⌥P prays); the wrapper's own shortcuts are ⌃⌥ (Control-Option), which NetHack
-doesn't use. Option has to send Alt: in Ghostty/cmux that's `macos-option-as-alt = true`
+(⌥L loots, ⌥P prays); the wrapper's own shortcuts are ⌃G followed by a letter (⌃G alone shows them in the bottom
+bar); NetHack only uses ⌃G in debug mode. Option has to send Alt: in Ghostty/cmux that's `macos-option-as-alt = true`
 in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
 
-- `⌃]` (or `⌃⌥T`) switches typing between the game and the helper.
+- `⌃]` (or `⌃G t`) switches typing between the game and the helper.
 - In the helper: Enter asks, Esc goes back to the game, `^U` clears the line.
 - Each question goes to `claude -p` (your Claude login, no tools) with the
   screen and your inventory, read from the game over the aipipe socket
@@ -20,27 +20,27 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
 - Mouse: click a menu line to pick it, click `--More--` to continue, click the map
   to travel there, click the helper pane to type in it. The wheel pages a game
   menu (same as `>` and `<`) or scrolls the helper's answers.
-- Cheat: `⌃⌥F` (or `#fog`) lifts the fog of war: every monster, item, trap and wall of the
-  level is drawn, live as you play. `⌃⌥F` again brings the fog back and you see only what
+- Cheat: `⌃G f` (or `#fog`) lifts the fog of war: every monster, item, trap and wall of the
+  level is drawn, live as you play. `⌃G f` again brings the fog back and you see only what
   you've actually explored (the lifted view is never written into your map memory).
   While the fog is lifted, every item you carry or that lies on the level is fully
-  identified (and stays identified), and `⌃⌥D`/`⌃⌥U` know where the stairs are.
+  identified (and stays identified), and `⌃G d`/`⌃G u` know where the stairs are.
 - Cheat: the helper sees the whole level as it really is (every monster, every
   item truly identified, traps) and your inventory identified. `NETHACK_REVEAL= ./play`
   turns that off.
-- `⌃⌥D` / `⌃⌥U` (or `#godown` / `#goup`) walk to the down / up stairs once you know where
+- `⌃G d` / `⌃G u` (or `#godown` / `#goup`) walk to the down / up stairs once you know where
   they are (with the fog lifted, you always do). Anything interesting stops the walk; press again.
-- `⌃⌥K` searches everything: type a few letters and pick with the arrows and Enter (or
+- `⌃G k` searches everything: type a few letters and pick with the arrows and Enter (or
   click). It finds NetHack's commands (from the game's own command table, with their keys),
   item actions ("quaff heal" quaffs your potion of healing), things on the map ("altar"
   travels there, via `#goto`), and the wrapper's own actions (snapshot, rewind, what now).
   Esc closes. Matching is fuzzy: words can be partial, letters can skip.
-- `⌃⌥C` copies the game screen (map, messages, status, inventory) to the clipboard as plain
+- `⌃G c` copies the game screen (map, messages, status, inventory) to the clipboard as plain
   text.
-- `⌃⌥V` select mode: the screen freezes; drag a rectangle (it highlights) and letting go
-  copies exactly that rectangle's text to the clipboard. Drag again for more; `⌃⌥V` or
+- `⌃G v` select mode: the screen freezes; drag a rectangle (it highlights) and letting go
+  copies exactly that rectangle's text to the clipboard. Drag again for more; `⌃G v` or
   Esc returns to the game.
-- `⌃⌥W` asks the helper "what should I do right now?" without typing.
+- `⌃G w` asks the helper "what should I do right now?" without typing.
 - Guard (`guard.py`, plain rules, no model): a dangerous key is held back with the
   reason in the helper pane; press it again to do it anyway. Covers eating cockatrice /
   chickatrice / Medusa / green slime corpses, eating while Satiated, praying when it
@@ -50,14 +50,16 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
 - Warnings appear in the helper pane (yellow) when they start to apply: low HP, Weak or
   Fainting, turning to stone or slime, strangling, deadly illness, and dangerous monsters
   within 7 squares.
-- Undo: a snapshot is taken on each new dungeon level (and with `⌃⌥S`); `⌃⌥R` rewinds to
-  the latest one. When you die, the helper offers `⌃⌥R` to rewind (`q` quits). A snapshot
+- Undo: a snapshot is taken on each new dungeon level (and with `⌃G s`); `⌃G r` rewinds to
+  the latest one. When you die, the helper offers `⌃G r` to rewind (`q` quits). A snapshot
   saves and restarts the game, so you'll see "Restoring save file..." for a moment. The
   last 10 per character are kept in `playground/snapshots/`.
 - Legend: the top of the helper pane lists every symbol on the map right now and what
   it is (monsters by name, items by class, doors, stairs, traps...).
 - Beside the map: status (HP colored by how hurt you are, Pw, AC, Xp, gold, turn, level),
-  your location as x/y, stats, hunger and conditions, then your inventory. Click an item
+  your location as x/y, stats, carried weight and capacity, speed, xp for the next level,
+  your god, hunger and conditions; with the cheat on (the default) also, in magenta, Luck,
+  prayer timeout, nutrition, alignment record and your intrinsics. Then your inventory. Click an item
   for what you can do with it (Wield, Wear, Put on, Quaff, Read, Zap, Eat, Apply, Throw,
   Drop, Ask the helper...); click an action or press its key, Esc closes. When the game
   asks for an item, clicking one answers. The game's own two status lines are moved here
@@ -67,7 +69,7 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   game | helper line left or right to resize them (the game redraws to fit), and the
   legend | chat line up or down. Messages and the game's status lines stay over the map
   (80 columns), so they never run into the panel.
-- Zoom: the wheel over the map (or `⌃⌥I` / `⌃⌥O`) zooms the map in and out: each square
+- Zoom: the wheel over the map (or `⌃G i` / `⌃G o`) zooms the map in and out: each square
   becomes a block of its character (2x, 4x, 6x), colors kept, centered on you; the axes
   number the part in view, and clicking a square travels there. Menus and cursor picks
   show the normal map. In kitty (`brew install --cask kitty`), zoom uses real 2x, 3x and

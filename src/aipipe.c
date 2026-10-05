@@ -223,6 +223,12 @@ put_status()
                : u.ualign.type == A_NEUTRAL ? "neutral" : "lawful", TRUE);
     put_kv_str("role", urole.name.m, TRUE);
     put_kv_str("race", urace.noun, TRUE);
+    put_kv_str("gender", flags.female ? "female" : "male", TRUE);
+    put_kv_str("god", u_gname(), TRUE);
+    put_kv_int("weight", (long) (inv_weight() + weight_cap()), TRUE);
+    put_kv_int("capacity", (long) weight_cap(), TRUE);
+    put_kv_int("next_exp", u.ulevel < MAXULEV ? newuexp(u.ulevel) : 0L, TRUE);
+    put_kv_int("speed", (long) youmonst.data->mmove, TRUE);
     put(",\"conditions\":[");
 #define COND(test, name) \
     if (test) {                   \
@@ -469,7 +475,38 @@ put_reveal()
     put_kv_int("timeout", (long) u.ublesscnt, FALSE);
     put_kv_int("luck", (long) Luck, TRUE);
     put_kv_int("anger", (long) u.ugangr, TRUE);
-    put("}}");
+    put("}");
+    put_kv_int("nutrition", (long) u.uhunger, TRUE);
+    put_kv_int("align_record", (long) u.ualign.record, TRUE);
+    put(",\"intrinsics\":[");
+    {
+        boolean first = TRUE;
+#define INTR(test, name) \
+    if (test) {                         \
+        if (!first)                     \
+            put(",");                   \
+        put_str(name);                  \
+        first = FALSE;                  \
+    }
+        INTR(Very_fast, "very fast") else INTR(Fast, "fast")
+        INTR(Fire_resistance, "fire res") INTR(Cold_resistance, "cold res")
+        INTR(Sleep_resistance, "sleep res") INTR(Shock_resistance, "shock res")
+        INTR(Poison_resistance, "poison res") INTR(Disint_resistance, "disint res")
+        INTR(Acid_resistance, "acid res") INTR(Stone_resistance, "stoning res")
+        INTR(Drain_resistance, "drain res") INTR(Sick_resistance, "sickness res")
+        INTR(Antimagic, "magic res") INTR(Reflecting, "reflection")
+        INTR(See_invisible, "see invisible") INTR(Blind_telepat, "telepathy")
+        INTR(Warning, "warning") INTR(Searching, "searching")
+        INTR(Infravision, "infravision") INTR(Invis, "invisible")
+        INTR(Stealth, "stealth") INTR(Regeneration, "regeneration")
+        INTR(Teleportation, "teleportitis") INTR(Teleport_control, "teleport control")
+        INTR(Polymorph, "polymorphitis") INTR(Polymorph_control, "polymorph control")
+        INTR(Free_action, "free action") INTR(Lifesaved, "life saving")
+        INTR(Protection, "protection") INTR(Clairvoyant, "clairvoyance")
+        INTR(Hunger, "fast hunger") INTR(Aggravate_monster, "aggravate")
+#undef INTR
+    }
+    put("]}");
 }
 
 static void
