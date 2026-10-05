@@ -570,6 +570,11 @@ def main() -> None:
         w.writeheader()
         w.writerows(sorted(results, key=lambda r: r["name"]))
     dashboard.write(board, run, args.brain, games, batch_dir)
+    try:  # The tactics page is a view of the saved run: a fault in it must not cost the summary below.
+        from . import tacticspage
+        tacticspage.write(run)
+    except Exception as e:
+        print(f"tactics page not written: {e!r}")
 
     def num(v):
         try:

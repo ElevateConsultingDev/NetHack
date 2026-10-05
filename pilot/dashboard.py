@@ -237,6 +237,7 @@ def write(path: str, run: str, brain: str, games: list, batch_dir: str) -> None:
 {_north_star(batch_dir, jev=brain.startswith("jev"))}
 <details class="sub"><summary>{"Rule and LLM brains" if brain.startswith("jev") else "JEV mode"}: all-time panel</summary>{_north_star(batch_dir, jev=(brain != "jev"))}</details>
 <h1>NetHack pilot: run {html.escape(run)}</h1>
+<div class="sub"><a href="tactics.html">Tactics, predictions and outcomes</a> for the latest finished run</div>
 <div class="sub">{len(games)} games · {brain} brain · {done_note} · updated {time.strftime('%H:%M:%S')}</div>
 <div class="stats">
   <div class="stat"><b>{avg(depths)}</b><span>avg dungeon level</span></div>

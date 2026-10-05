@@ -29,6 +29,12 @@ import re
 from .spoilers import spoiler
 
 BUDGET = {"melee": 10, "throw": 4, "elbereth": 6, "stairs": 14, "corridor": 8, "pray": 4, "back_off": 4}
+PREDICTION = {
+    "melee": "The target dies within 10 turns", "throw": "The target dies within 4 turns",
+    "elbereth": "No HP lost for 5 turns once it is written", "stairs": "Off this level within 14 turns",
+    "corridor": "At most one hostile adjacent, standing in the corridor, within 8 turns",
+    "pray": "HP back over half within 4 turns", "back_off": "Nothing hostile adjacent within 4 turns",
+}
 NOTES = [  # (tactic, pattern on the engine's note); first match wins
     ("pray", re.compile(r"standing order: pray")),
     ("stairs", re.compile(r"flee up the stairs|retreat to the stairs|flee by the stairs")),
@@ -64,7 +70,8 @@ class Tracker:
         self.outcomes: list = []
         self.open: dict | None = None
 
-    def observe(self, turn: int, dlvl: int, c: dict, note: str, messages: list, feasible: dict | None = None) -> None:
+    def observe(self, turn: int, dlvl: int, c: dict, note: str, messages: list, feasible: dict | None = None,
+                jev: tuple | None = None) -> None:
         """One command prompt: measure the open tactic, then start or continue from this turn's note."""
         got = classify(note)
         o = self.open
@@ -86,6 +93,8 @@ class Tracker:
                          "xl": c.get("xlvl"), "adjacent": len(adjacent), "in_view": len(c.get("mobile_hostiles") or []),
                          "symbol": sp.get("symbol", "?"), "fast": sp.get("speed", 12) > 12,
                          "low": c["hp"], "menu": offered, "omitted": omitted}
+            if jev and jev[0] == turn:  # Jev judged this moment: its answers and the route code took.
+                self.open["jev"] = {"route": jev[2]["choice"], "p": jev[2]["probabilities"]}
         elif self.open:
             self.open["low"] = min(self.open["low"], c["hp"])
 

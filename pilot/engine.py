@@ -1155,7 +1155,7 @@ class Engine:
         """Shadow record of the fight-or-escape tactic just chosen, its prediction and what came of
         it (pilot/tactics.py). Changes nothing about play."""
         feasible = None
-        if classify(self.note) and not self.tracker.open:  # A new tactic: note what else was on offer.
+        if classify(self.note):  # A tactic may start this turn: note what else was on offer.
             m = self.memory
             adj = [h["name"] for h in c["adjacent_hostiles"]]
             foes = [n for n in adj if n not in DONT_MELEE]
@@ -1172,7 +1172,8 @@ class Engine:
                 "pray": True if c["prayer_safe"] and c["major_trouble"] else "prayer gate closed, or no trouble a prayer fixes",
             }
         c["in_chokepoint"] = _chokepoint(v, *v.pos)
-        self.tracker.observe(c["turn"], v.dlvl, c, self.note, [x for x in v.s.get("messages", []) if x], feasible)
+        self.tracker.observe(c["turn"], v.dlvl, c, self.note, [x for x in v.s.get("messages", []) if x], feasible,
+                             getattr(self, "last_ask", None))
 
     def _remember_map(self, v: View) -> None:
         for (x, y), c in v.cells.items():
