@@ -1,7 +1,8 @@
 """Danger guard and warnings for helper.py: plain rules over an aipipe state.
 
 check(state, key) says why a key about to go to the game is dangerous (or None);
-warnings(state) lists what deserves a heads-up right now. No model calls.
+warnings(state) lists what deserves a heads-up right now; item_actions(cls, text)
+lists what can be done with an inventory item. No model calls.
 """
 import re
 
@@ -59,6 +60,38 @@ def prayer_unsafe(state):
     if p["timeout"] > limit:
         return f"your prayer timeout is {p['timeout']} (needs {limit} or less right now)."
     return None
+
+
+ITEM_PROMPTS = {"e": "What do you want to eat?", "P": "What do you want to put on?",
+                "W": "What do you want to wear?"}  # so check() can vet an action before it's sent
+WORN = re.compile(r"\((being worn|on left|on right|in use)")
+
+
+def item_actions(cls, text):
+    """(command key, label) for an inventory item of class `cls` (its map symbol)."""
+    worn = WORN.search(text)
+    acts = []
+    if cls == ")":
+        if "weapon in hand" not in text:
+            acts += [("w", "Wield"), ("Q", "Quiver")]
+        acts.append(("t", "Throw"))
+    elif cls == "[":
+        acts.append(("T", "Take off") if worn else ("W", "Wear"))
+    elif cls in '="' or (cls == "(" and re.search(r"blindfold|towel|lenses", text)):
+        acts.append(("R", "Remove") if worn else ("P", "Put on"))
+    elif cls == "(":
+        acts.append(("a", "Apply"))
+    elif cls == "!":
+        acts += [("q", "Quaff"), ("t", "Throw")]
+    elif cls in "?+":
+        acts.append(("r", "Read"))
+    elif cls == "/":
+        acts += [("z", "Zap"), ("E", "Engrave with")]
+    elif cls == "%":
+        acts.append(("e", "Eat"))
+    elif cls in "*`0_":
+        acts.append(("t", "Throw"))
+    return acts + [("d", "Drop"), ("?", "Ask the helper")]
 
 
 def check(state, key):
@@ -140,4 +173,9 @@ if __name__ == "__main__":
     w = warnings(base)
     assert any("HP is low" in x for x in w) and any("stone" in x for x in w)
     assert any("Floating eye nearby" in x for x in w)
+    assert [k for k, _ in item_actions("=", "a ring of teleportation")][:1] == ["P"]
+    assert [k for k, _ in item_actions("[", "a +0 small shield (being worn)")][:1] == ["T"]
+    assert ("w", "Wield") not in item_actions(")", "a +1 long sword (weapon in hand)")
+    put_on = dict(base, context={"kind": "yn", "prompt": ITEM_PROMPTS["P"]})
+    assert check(put_on, b"r")  # the popup's Put on is vetted like typing it
     print("guard ok")

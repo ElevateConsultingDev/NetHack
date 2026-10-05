@@ -48,6 +48,7 @@ REWIND = b"\x1b[18~"    # F7: go back to the last snapshot
 SAVE_KEYS = b"Sy\r"     # save, yes, dismiss "Saving..." (the game then exits)
 MOUSE = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")  # SGR mouse report (mode 1006)
 MENU_ITEM = re.compile(r"(?:^|[ \u2502])([a-zA-Z$#*-])\) ")  # " a) a +1 long sword"
+MAP_W = 80  # the map's width; the inventory panel starts right after it
 MENU_PAGE = re.compile(r"\(Page \d+ of \d+\)")  # footer of a curses menu with more pages
 
 SYSTEM = """You are a friendly NetHack 3.6 expert sitting next to the player, \
@@ -231,6 +232,7 @@ class App:
         self.held = None      # a dangerous key held back by the guard, sent if pressed again
         self.warned = set()   # warnings already shown (each shows once while it applies)
         self.seq = 0
+        self.popup = None     # actions for a clicked inventory item: x, y, w, letter, text, acts
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -434,6 +436,8 @@ class App:
     def redraw(self):
         with self.lock:
             self.draw_game()
+            if self.popup:
+                self.draw_popup()
             self.draw_helper()
             self.draw_bar()
             if self.focus == "game":
@@ -461,8 +465,64 @@ class App:
             elif ch.isprintable():
                 self.helper.input += ch
 
+    def open_popup(self, x, y, letter):
+        item = next((i for i in self.watcher.state.get("inventory", []) if i["letter"] == letter), None)
+        if not item:
+            return
+        acts = guard.item_actions(item.get("class", ""), item["text"])
+        title = f"{letter} - {item['text']}"
+        w = min(max(len(title), 18) + 2, MAP_W - 2)
+        self.popup = dict(x=max(0, MAP_W - w - 1), y=max(0, min(y, self.gh - len(acts) - 3)), w=w,
+                          letter=letter, text=item["text"], acts=acts)
+
+    def close_popup(self):
+        self.popup = None
+        self.screen.dirty.update(range(self.gh))  # repaint what it covered
+
+    def draw_popup(self):
+        p = self.popup
+        lines = [f"{p['letter']} - {p['text']}"[:p["w"] - 2]] + [f" {k} - {label}" for k, label in p["acts"]]
+        edge = "+" + "-" * (p["w"] - 2) + "+"
+        self.put(p["y"], p["x"], edge, curses.A_BOLD)
+        for i, l in enumerate(lines):
+            self.put(p["y"] + 1 + i, p["x"], "|" + l.ljust(p["w"] - 2) + "|", curses.A_BOLD if i == 0 else 0)
+        self.put(p["y"] + 1 + len(lines), p["x"], edge, curses.A_BOLD)
+
+    def choose(self, key):
+        """Do an inventory popup action: the command key, then the item's letter."""
+        p = self.popup
+        self.close_popup()
+        if key == "?":
+            self.ask(f"About my {p['text']} (inventory letter {p['letter']}): what is it, and what should I do with it?")
+            return
+        held = ("item", key, p["letter"])
+        if key in guard.ITEM_PROMPTS and self.held != held:
+            why = guard.check(dict(self.watcher.state, context={"kind": "yn", "prompt": guard.ITEM_PROMPTS[key]}),
+                              p["letter"].encode())
+            if why:
+                self.held = held
+                self.say("err", f"HELD: {why} Choose it again to do it anyway.")
+                return
+        self.held = None
+        self.send((key + p["letter"]).encode())
+
+    def popup_key(self, data):
+        keys = [k for k, _ in self.popup["acts"]]
+        if data.decode("latin-1") in keys:
+            self.choose(data.decode("latin-1"))
+        else:
+            self.close_popup()
+
     def click(self, x, y):
-        """A left click: menu lines send their letter, the map gets the click, the pane takes focus."""
+        """A left click: menu lines send their letter, inventory lines open their actions,
+        the map gets the click, the pane takes focus."""
+        if self.popup:
+            p, i = self.popup, y - self.popup["y"] - 2
+            if p["x"] <= x < p["x"] + p["w"] and 0 <= i < len(p["acts"]):
+                self.choose(p["acts"][i][0])
+            else:
+                self.close_popup()
+            return
         if x >= self.gw:
             self.focus = "helper"
             return
@@ -472,7 +532,10 @@ class App:
             self.send(b"\r")
             return
         hits = [m for m in MENU_ITEM.finditer(row) if m.start() <= x]
-        if hits:
+        if hits and (self.watcher.state.get("context") or {}).get("kind") == "command":
+            if x >= MAP_W:  # the inventory panel, while the game waits for a command
+                self.open_popup(x, y, hits[-1].group(1))
+        elif hits:  # a menu, or the game asking which item
             self.send(hits[-1].group(1).encode())
         elif (1000 << 5) in self.screen.mode:  # the game asked for xterm mouse reports
             pos = bytes([32 + x + 1, 32 + y + 1])
@@ -557,6 +620,8 @@ class App:
                     self.over = False
                     self.restore_snapshot()
                     self.spawn()
+                elif self.popup and data:
+                    self.popup_key(data)
                 elif any(t == data or data.startswith(t) for t in TOGGLE):
                     self.focus = "helper" if self.focus == "game" else "game"
                 elif data in FKEYS:
