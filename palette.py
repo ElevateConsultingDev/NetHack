@@ -24,9 +24,12 @@ def _key(k, name):
         return m.group(1).encode(), m.group(1)
     m = re.fullmatch(r"C\('(.)'\)", k)
     if m:
-        return bytes([ord(m.group(1).lower()) & 0x1f]), "^" + m.group(1).upper()
-    m = re.fullmatch(r"M\('(.)'\)", k)
-    return f"#{name}\r".encode(), ("M-" + m.group(1)) if m else "#" + name
+        return bytes([ord(m.group(1).lower()) & 0x1f]), "⌃" + m.group(1).upper()
+    m = re.fullmatch(r"M\('(.)'\)", k)  # Meta is Option on a Mac
+    if m:
+        c = m.group(1)
+        return f"#{name}\r".encode(), "⌥" + ("⇧" + c if c.isupper() else c.upper())
+    return f"#{name}\r".encode(), "#" + name
 
 
 def load_commands(cmd_c):
