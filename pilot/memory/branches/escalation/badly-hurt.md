@@ -1,1 +1,0 @@
-With 2+ hostiles adjacent (jackal/werejackal/coyote/kitten packs common), choose fight or flee only; never elbereth, it fails even mid-pack and while resting on it (6+ games this batch: werejackal packs x4, hobgoblin, giant ant).

@@ -1,1 +1,0 @@
-In the Mines, dwarves, hobgoblins, spiders, ponies, orcs, rats, and giant ants hit harder than difficulty suggests; retreat toward stairs at first sighting, don't loot/pick_up/eat while one is adjacent (5 deaths this batch, 20+ cumulative).

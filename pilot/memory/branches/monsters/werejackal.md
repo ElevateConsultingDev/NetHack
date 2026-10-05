@@ -1,1 +1,0 @@
-Flee (step_away/go_to away) at first sight, alone or in a pack with jackals/coyotes/kittens; if flight fails, fight, never elbereth: engraving while surrounded by a werejackal pack killed 4 games this batch (16+ cumulative).

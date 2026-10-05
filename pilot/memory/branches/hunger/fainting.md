@@ -1,1 +1,0 @@
-When Fainting, eat any corpse or food in inventory immediately, don't pick_up/loot/explore first; if none available keep heading to a known food source rather than idling through check-ins (3 games this batch).

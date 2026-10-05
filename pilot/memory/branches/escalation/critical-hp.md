@@ -1,1 +1,0 @@
-At critical or badly hurt HP with any monster adjacent: only fight or flee (step_away/go_to). Never eat, use, quaff, pray again, or engrave Elbereth: all four failed to stop the next hit in 15+ games this batch (small mimic, wererat, giant ant, rothe, werejackal, coyote, elf zombie, gecko, bat; 40+ cumulative).

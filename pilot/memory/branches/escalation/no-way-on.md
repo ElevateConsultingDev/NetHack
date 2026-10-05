@@ -1,1 +1,0 @@
-No way on after searching walls/dead ends, blocked by a peaceful or monster (red mold, yellow mold, dwarf zombie, homunculus, peaceful gnome): attack or push past it, or step around a peaceful; never loop wait/loot/probe (3 games this batch, 15+ cumulative).

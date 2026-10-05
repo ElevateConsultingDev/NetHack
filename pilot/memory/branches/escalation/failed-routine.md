@@ -1,1 +1,0 @@
-When step_away fails "nowhere further away to step," fight the adjacent threat immediately; explore/go_down fallback still occasionally happens (1 game this batch) and gets you swarmed instead (5 games this batch used fight correctly, 10+ cumulative).
