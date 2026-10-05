@@ -245,6 +245,10 @@ pre.brief { margin: 6px 0 0; font-family: var(--mono); font-size: 0.7rem; line-h
   function go(k) { i = Math.max(0, Math.min(n - 1, k)); draw(); if (i === n - 1) stop(); }
   function jump() { var m = /t=(\d+)/.exec(location.hash); if (!m) return; var k = 0; while (k < n - 1 && F[k][0] < +m[1]) k++; stop(); go(k); }
   window.addEventListener("hashchange", jump); setTimeout(jump, 0);
+  if (window.parent !== window) {  // Shown inside the tactics page: report our height so it needs no inner scrollbar.
+    var tell = function () { window.parent.postMessage({ replayHeight: document.documentElement.scrollHeight }, "*"); };
+    new ResizeObserver(tell).observe(document.body); setTimeout(tell, 50);
+  }
   function stop() { if (timer) { clearInterval(timer); timer = null; } $("play").textContent = i === n - 1 ? "Replay" : "Play"; }
   function start() { if (i === n - 1) i = 0; stop(); $("play").textContent = "Pause"; timer = setInterval(function () { go(i + 1); }, 1000 / Number($("speed").value)); }
   $("play").addEventListener("click", function () { timer ? stop() : start(); });

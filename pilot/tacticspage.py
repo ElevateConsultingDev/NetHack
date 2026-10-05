@@ -27,7 +27,8 @@ EXTRA = """
 @media (max-width: 1100px) { .panels { grid-template-columns:1fr; } }
 .panel { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; min-width:0; }
 .panel h3 { margin:0 0 8px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); }
-.list { max-height:560px; overflow:auto; font-size:12.5px; }
+.list { font-size:12.5px; }
+.stick { position:sticky; top:12px; }
 .row { display:flex; gap:8px; padding:4px 6px; border-radius:5px; cursor:pointer; font-variant-numeric:tabular-nums; }
 .row:hover { background:rgba(127,127,127,.12); } .row.on { outline:1px solid var(--accent); background:rgba(127,127,127,.12); }
 .row .t { color:var(--dim); width:54px; flex:none; } .grow { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -45,7 +46,7 @@ button.by.on { border-color:var(--accent); color:var(--accent); }
 .flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:4px; font-size:12px; }
 .node { border:1px solid var(--line); border-radius:6px; padding:5px 8px; max-width:190px; } .node b { display:block; font-size:11px; color:var(--dim); font-weight:500; }
 .node.jev { border-color:#e08a2c; background:rgba(224,138,44,.12); } .arrow { align-self:center; color:var(--dim); }
-iframe#view { width:100%; height:680px; border:1px solid var(--line); border-radius:8px; background:var(--card); }
+iframe#view { display:block; width:100%; height:2000px; border:1px solid var(--line); border-radius:8px; background:var(--card); }
 textarea, input.say { width:100%; font:12px/1.4 ui-monospace, Menlo, monospace; background:var(--map); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:6px; }
 button.go { font:inherit; padding:4px 12px; border-radius:6px; border:1px solid var(--accent); background:none; color:var(--accent); cursor:pointer; }
 """
@@ -66,7 +67,6 @@ function decisions() {
   $('#decisions').innerHTML = g.outcomes.map((o, i) => `<div class="row ${i === pick ? 'on' : ''}" data-o="${i}">
     <span class="t">T${o.turn}</span><span class="grow">${esc(o.tactic)}${o.target ? ' · ' + esc(o.target) : ''}</span>
     <span class="t">${o.hp}/${o.hpmax}</span><span class="tag ${o.status}">${label[o.status]}</span></div>`).join('') || '<span class="sub">No fight or escape tactics in this game.</span>';
-  const on = $('#decisions .on'); if (on) on.scrollIntoView({block: 'nearest'});
 }
 function detail() {
   const o = D.games[game].outcomes[pick];
@@ -114,6 +114,11 @@ const h = /g=([^&]+)&o=(\d+)/.exec(location.hash);  // keep the selection across
 if (h) { const k = D.games.findIndex(g => g.name === h[1]); if (k >= 0) { game = k; pick = Math.min(+h[2], D.games[k].outcomes.length - 1); } }
 games(); decisions(); detail(); ledger('symbol');
 if (D.live) setTimeout(() => location.reload(), 20000);
+// The game view is as tall as its content, so the page has one scrollbar: the replay reports its height,
+// and when both pages come from the same server the height is read directly.
+const fit = (h) => { if (h > 200) $('#view').style.height = Math.ceil(h) + 'px'; };
+window.addEventListener('message', e => { if (e.data && e.data.replayHeight) fit(e.data.replayHeight); });
+$('#view').addEventListener('load', () => { try { fit($('#view').contentDocument.documentElement.scrollHeight); } catch (e) {} });
 const served = location.protocol.startsWith('http');
 $('#orders').value = JSON.stringify(D.orders, null, 1);
 $('#ordernote').textContent = served ? 'Applies to games in flight within a turn; each game that takes them is marked "live orders applied" in its stats.'
@@ -173,7 +178,7 @@ def write(run: str, live: bool = False) -> str:
 <div class="panels">
   <div class="panel"><h3>Games (deepest first) · tactics</h3><div class="list" id="games"></div></div>
   <div class="panel"><h3>Decisions in this game</h3><div class="sub" id="gname"></div><div class="list" id="decisions"></div></div>
-  <div>
+  <div class="stick">
     <div class="panel"><h3>Tactic and measured outcome</h3><div id="outcome"></div></div>
     <div class="panel" style="margin-top:12px"><h3>Feasible menu and omitted candidates</h3><div id="menu"></div></div>
     <div class="panel" style="margin-top:12px"><h3>Raw probabilities (Jev)</h3><div id="probs"></div></div>
@@ -183,7 +188,7 @@ def write(run: str, live: bool = False) -> str:
 <div class="sub" style="margin-bottom:8px">Orange nodes are Jev's judgments. Every other node is code: observation, the menu, routing, safety rules, the motor and the measurement.</div>
 <div class="panel"><div class="flow" id="flow"></div></div>
 <h2>The game at this decision</h2>
-<iframe id="view" title="Game replay at the selected decision"></iframe>
+<iframe id="view" scrolling="no" title="Game replay at the selected decision"></iframe>
 <h2>Standing orders</h2>
 <div class="panel"><div class="sub" id="ordernote" style="margin-bottom:8px"></div>
   <textarea id="orders" rows="7" aria-label="Standing orders as JSON"></textarea>
