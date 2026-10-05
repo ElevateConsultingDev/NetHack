@@ -9,6 +9,7 @@
 #include "cursmisc.h"
 #include "func_tab.h"
 #include "dlb.h"
+#include "aipipe.h"
 
 #include <ctype.h>
 
@@ -48,6 +49,7 @@ curses_read_char()
     /* cancel message suppression; all messages have had a chance to be read */
     curses_got_input();
 
+    aipipe_snapshot(); /* external watcher, if NETHACK_CONTROL */
     ch = getch();
 #if defined(ALT_0) || defined(ALT_9) || defined(ALT_A) || defined(ALT_Z)
     tmpch = ch;

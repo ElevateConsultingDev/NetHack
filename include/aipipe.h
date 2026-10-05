@@ -8,6 +8,7 @@
 
 extern void NDECL(aipipe_install);
 extern int NDECL(aipipe_getch);
+extern void NDECL(aipipe_snapshot);
 extern void FDECL(aipipe_context, (const char *, const char *, const char *));
 extern void FDECL(aipipe_more, (BOOLEAN_P));
 

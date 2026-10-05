@@ -13,7 +13,8 @@
  * typed.  Keys typed at the terminal keep working, so control can pass back
  * and forth.  Without NETHACK_CONTROL the game is unchanged.
  *
- * Hooks: tty_nhgetch() reads keys through aipipe_getch(); xwaitforspace()
+ * Hooks: tty_nhgetch() reads keys through aipipe_getch() (curses_read_char()
+ * only calls aipipe_snapshot(), so under curses it is watch-only); xwaitforspace()
  * marks --More--; choose_windows() calls aipipe_install(), which wraps a few
  * window procedures (messages, y/n, text prompts, menus) to record context.
  */
@@ -526,6 +527,15 @@ aipipe_getch()
             return EOF;
         }
     }
+}
+
+/* send a snapshot without reading keys (window ports that read their own,
+   like curses; the controller then only watches) */
+void
+aipipe_snapshot()
+{
+    if (sock >= 0)
+        emit_state();
 }
 
 /* ---------- window procedure wrappers ---------- */
