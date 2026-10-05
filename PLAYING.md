@@ -52,7 +52,7 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   within 7 squares.
 - Checkpoints (saved copies of your game you can go back to): one is taken on each new
   dungeon level and with `⌃G s`; `⌃G r` goes back to the latest. A checkpoint saves and
-  restarts the game, so you'll see "Restoring save file..." for a moment. The newest 20
+  restarts the game behind the scenes (the screen holds still meanwhile). The newest 20
   per character are kept in `playground/snapshots/`.
 - Saves list (`⌃G l`): every saved game and checkpoint, all characters, newest first.
   Enter loads the selected one (the game you're in is checkpointed first, so nothing is

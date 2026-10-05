@@ -322,6 +322,7 @@ class App:
         self.over = False     # the game ended (died or quit); the saves list is up
         self.snap_dlvl = None # dungeon level of the last automatic checkpoint
         self.load_target = None  # what to load once the game has saved: a saves.listing() item
+        self.holding = False  # checkpoint/load in progress: don't draw the game restarting
         self.new_name = None  # the character to start for a new game
         self.saves_ui = None  # the ⌃G l list: items, sel, confirm, naming
         self.save_name = None # this character's save file name, once known
@@ -374,6 +375,8 @@ class App:
         if self.saving or (st.get("context") or {}).get("kind") != "command":
             return False
         self.saving = why
+        self.holding = True  # keep this screen up through the save and restart
+        self.started = time.time()
         self.snap_info = st.get("status") or {}
         self.send(SAVE_KEYS)
         return True
@@ -886,11 +889,15 @@ class App:
 
     def paint(self, bar=None):
         bar = bar or (LEADER_BAR if self.leader else None)
+        if self.holding and time.time() - self.started > 5:
+            self.holding = False  # the restart is taking long: show what's there
+            self.screen.dirty.update(range(self.gh))
         with self.lock:
-            self.draw_game()
-            self.draw_zoom()
-            self.draw_axes()
-            self.draw_panel()
+            if not self.holding:  # while the game saves and restarts, the last screen stays up
+                self.draw_game()
+                self.draw_zoom()
+                self.draw_axes()
+                self.draw_panel()
             if self.popup:
                 self.draw_popup()
             if self.search:
@@ -1176,6 +1183,9 @@ class App:
         if state.get("seq", 0) == self.seq:
             return
         self.seq = state.get("seq", 0)
+        if self.holding and (state.get("context") or {}).get("kind") == "command" and state.get("player"):
+            self.holding = False  # the restarted game is back at its prompt: show it
+            self.screen.dirty.update(range(self.gh))
         you, cur = state.get("player") or {}, self.screen.cursor
         if (state.get("context") or {}).get("kind") == "command" and cur.x == you.get("x", 0) - 1:
             self.map_top = cur.y - you.get("y", 0)  # curses parks the cursor on you
