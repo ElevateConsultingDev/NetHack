@@ -1,5 +1,5 @@
 # Defaults for ./play (used unless NETHACKOPTIONS is already set).
-OPTIONS=windowtype:curses,symset:curses
+OPTIONS=windowtype:curses,symset:default,windowborders:0
 OPTIONS=color,hilite_pet,hilite_pile,lit_corridor,dark_room,!use_darkgray
 OPTIONS=showexp,time,!legacy,!autoquiver
 OPTIONS=autopickup,pickup_types:$?!/="+,pickup_burden:burdened
