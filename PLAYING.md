@@ -63,10 +63,10 @@ NetHack (curses interface) on the left, a Claude helper on the right.
   game | helper line left or right to resize them (the game redraws to fit), and the
   legend | chat line up or down. Messages and the game's status lines stay over the map
   (80 columns), so they never run into the panel.
-- Big map: open another split (cmux/Ghostty: Cmd-D) and run `./play --map` there. It
-  mirrors the live map, with colors, axes and your position; Cmd + / Cmd - in that split
-  zooms just it. When it's zoomed past the whole map it shows a window that follows you,
-  and its axes number the part in view. ^C closes it.
+- Zoom: the wheel over the map (or `F11` / `F12`) zooms the map in and out: each square
+  becomes a block of its character (2x, 4x, 6x), colors kept, centered on you; the axes
+  number the part in view, and clicking a square travels there. Menus and cursor picks
+  show the normal map.
 - Axes: row numbers (y, 0 at the top) down the left and column numbers (x, 1 at the
   left) along the bottom, the same coordinates the helper uses; your row and column
   are highlighted.

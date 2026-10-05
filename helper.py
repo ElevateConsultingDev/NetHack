@@ -34,7 +34,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.join(HERE, "playground")
 SAVES = os.path.join(GAME, "save")
 SNAPS = os.path.join(GAME, "snapshots")
-MAPVIEW = os.path.join(GAME, "mapview.json")  # the live map, for ./play --map in another split
 KEEP_SNAPS = 10
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
@@ -49,6 +48,7 @@ SNAPSHOT = b"\x1b[17~"  # F6: snapshot the game now
 REWIND = b"\x1b[18~"    # F7: go back to the last snapshot
 SEARCH = b"\x1b[19~"    # F8: fuzzy search over commands, items and map things
 COPY = b"\x1b[20~"      # F9: copy the game screen to the clipboard as text
+ZOOM_IN, ZOOM_OUT = b"\x1b[23~", b"\x1b[24~"  # F11, F12 (or the wheel over the map)
 SELECT = b"\x1b[21~"    # F10: select mode: screen frozen, mouse back to the terminal
 MOUSE_ON = "\x1b[?1000h\x1b[?1002h\x1b[?1006h"   # clicks, drags (for resizing), SGR coordinates
 MOUSE_OFF = "\x1b[?1006l\x1b[?1002l\x1b[?1000l"
@@ -58,6 +58,8 @@ EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [F
           dict(label="snapshot", detail="save a snapshot to come back to  [F6]", action=("fkey", SNAPSHOT)),
           dict(label="rewind", detail="go back to the last snapshot  [F7]", action=("fkey", REWIND)),
           dict(label="copy screen", detail="copy the game screen as text  [F9]", action=("fkey", COPY)),
+          dict(label="zoom in", detail="bigger map squares  [F11, wheel up over the map]", action=("fkey", ZOOM_IN)),
+          dict(label="zoom out", detail="smaller map squares  [F12, wheel down over the map]", action=("fkey", ZOOM_OUT)),
           dict(label="select mode", detail="freeze the screen to select text with the mouse  [F10]",
                action=("fkey", SELECT)),
           dict(label="switch focus", detail="type into the helper or the game  [F1, ^]]", action=("fkey", b"\x1d"))]
@@ -72,6 +74,7 @@ MAP_W = 80  # the map's width; the status/inventory panel starts right after it
 MAP_H = 21  # map rows, y = 0..20
 GX = 3      # gutter left of the game for row numbers (y)
 RULER = 2   # rows under the game for column numbers (x)
+ZOOMS = [(1, 1), (2, 1), (4, 2), (6, 3)]  # columns x rows per map square at each zoom level
 PANEL_TOP = 0  # messages stop at the map's edge (cursinit.c), so the panel can use every row
 MENU_PAGE = re.compile(r"\(Page \d+ of \d+\)")  # footer of a curses menu with more pages
 
@@ -89,8 +92,6 @@ The player has turned on a cheat: you also get the whole level as it really is, 
 Plain text only, no markdown: it is shown in a narrow terminal pane."""
 
 ASCII = str.maketrans("─│┌┐└┘├┤┬┴┼", "-|+++++++++")  # box drawing as plain ASCII, any font
-SGR_FG = {"black": 30, "red": 31, "green": 32, "brown": 33, "blue": 34, "magenta": 35,
-          "cyan": 36, "white": 37}
 COLORS = {"black": 0, "red": 1, "green": 2, "brown": 3, "blue": 4,
           "magenta": 5, "cyan": 6, "white": 7}
 
@@ -270,6 +271,8 @@ class App:
         self.legend_max = None  # legend lines once dragged
         self.legend_div = None  # screen row of the legend/chat divider
         self.drag = None        # ("v", x) or ("h", y) while a divider is dragged
+        self.zoom = 0           # index into ZOOMS
+        self.zoom_view = None   # (x0, y0, bw, bh, top, bottom) of the zoomed map on screen
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -424,6 +427,54 @@ class App:
         return not any(buf[r][c].data not in (" ", "") for r in range(PANEL_TOP, self.gh) if r not in skip
                        for c in range(MAP_W, self.gw))
 
+    def cell_attr(self, c):
+        attr = self.color(c.fg, c.bg, c.bold)
+        if c.bold:
+            attr |= curses.A_BOLD
+        if c.reverse:
+            attr |= curses.A_REVERSE
+        if c.underscore:
+            attr |= curses.A_UNDERLINE
+        return attr
+
+    def zoom_active(self):
+        """Zoomed drawing only while the map is what's on screen (not menus, cursor picks...)."""
+        st = self.watcher.state
+        return (self.zoom > 0 and st.get("player")
+                and (st.get("context") or {}).get("kind") in ("command", "yn", "more"))
+
+    def set_zoom(self, step):
+        self.zoom = max(0, min(len(ZOOMS) - 1, self.zoom + step))
+        self.screen.dirty.update(range(self.gh))
+
+    def draw_zoom(self):
+        """The map region, each square drawn as a block of its character, around you."""
+        if not self.zoom_active():
+            if self.zoom_view:
+                self.zoom_view = None
+                self.screen.dirty.update(range(self.gh))
+            return
+        bw, bh = ZOOMS[self.zoom]
+        top, bottom = self.map_top, self.gh if self.panel_on else self.gh - 2
+        you = self.watcher.state["player"]
+        ncols, nrows = MAP_W // bw, (bottom - top) // bh
+        x0 = max(1, min(MAP_W - ncols, you["x"] - ncols // 2))
+        y0 = max(0, min(MAP_H - nrows, you["y"] - nrows // 2)) if nrows < MAP_H else 0
+        self.zoom_view = (x0, y0, bw, bh, top, bottom)
+        buf = self.screen.buffer
+        for r in range(top, bottom):
+            j, x_ = (r - top) // bh, 0
+            y = y0 + j
+            for i in range(ncols):
+                x = x0 + i
+                if j < nrows and y < MAP_H and x < MAP_W and top + y < self.gh:
+                    c = buf[top + y][x - 1]
+                    self.gput(r, i * bw, (c.data or " ").translate(ASCII) * bw, self.cell_attr(c))
+                else:
+                    self.gput(r, i * bw, " " * bw)
+            self.gput(r, ncols * bw, " " * (MAP_W - ncols * bw))
+        self.screen.dirty.update(range(top, bottom))  # redraw normally when zoom ends
+
     def draw_game(self):
         buf = self.screen.buffer
         on = self.panel_visible()
@@ -440,43 +491,28 @@ class App:
             line = buf[y]
             for x in range(self.gw):
                 c = line[x]
-                attr = self.color(c.fg, c.bg, c.bold)
-                if c.bold:
-                    attr |= curses.A_BOLD
-                if c.reverse:
-                    attr |= curses.A_REVERSE
-                if c.underscore:
-                    attr |= curses.A_UNDERLINE
-                self.gput(y, x, (c.data or " ").translate(ASCII), attr)
+                self.gput(y, x, (c.data or " ").translate(ASCII), self.cell_attr(c))
         self.screen.dirty.clear()
-
-    def write_mapview(self):
-        """The map region (characters and colors) and where you are, for ./play --map."""
-        you, st = self.watcher.state.get("player") or {}, self.watcher.state.get("status") or {}
-        rows, styles = [], []
-        for r in range(self.map_top, min(self.map_top + MAP_H, self.gh)):
-            line, sty = "", []
-            for x in range(MAP_W):
-                c = self.screen.buffer[r][x]
-                code = SGR_FG.get(c.fg.removeprefix("bright"))
-                parts = (["1"] if c.bold or c.fg.startswith("bright") else []) + (["7"] if c.reverse else [])
-                if code:
-                    parts.append(str(code))
-                line += (c.data or " ").translate(ASCII)
-                sty.append(";".join(parts))
-            rows.append(line)
-            styles.append(sty)
-        data = json.dumps({"x": you.get("x"), "y": you.get("y"), "dlvl": st.get("dlvl"),
-                           "rows": rows, "styles": styles})
-        if data != getattr(self, "_mapview", None):
-            self._mapview = data
-            with open(MAPVIEW + ".tmp", "w") as f:
-                f.write(data)
-            os.replace(MAPVIEW + ".tmp", MAPVIEW)
 
     def draw_axes(self):
         """Row numbers (y) in the gutter and column numbers (x) under the game."""
         you = self.watcher.state.get("player") or {}
+        if self.zoom_view:
+            x0, y0, bw, bh, top, bottom = self.zoom_view
+            for r in range(self.gh):
+                j, k = divmod(r - top, bh)
+                y = y0 + j
+                label = f"{y:2d} " if top <= r < bottom and k == 0 and y < MAP_H else "   "
+                self.put(r, 0, label, curses.A_REVERSE if label.strip() and y == you.get("y") else curses.A_DIM)
+            self.put(self.gh, 0, " " * (GX + MAP_W))
+            self.put(self.gh + 1, 0, " x ", curses.A_DIM)
+            for i in range(MAP_W // bw):
+                x = x0 + i
+                if x < MAP_W:
+                    self.gput(self.gh + 1, i * bw, str(x).ljust(bw)[:bw] if bw >= 2 or x % 5 == 0 else " ",
+                              curses.A_REVERSE if x == you.get("x") else curses.A_DIM)
+            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}  zoom {bw}x".ljust(24), curses.A_BOLD)
+            return
         for r in range(self.gh):
             y = r - self.map_top
             label = f"{y:2d} " if 0 <= y < MAP_H else "   "
@@ -491,7 +527,7 @@ class App:
             col = you["x"] - 1
             self.gput(self.gh, col, tens[col], curses.A_REVERSE)
             self.gput(self.gh + 1, col, units[col], curses.A_REVERSE)
-            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(16), curses.A_BOLD)
+            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(24), curses.A_BOLD)
 
     def draw_panel(self):
         """Status, location and inventory beside the map, unless the game has a menu there."""
@@ -592,7 +628,7 @@ class App:
     def draw_bar(self):
         rows, cols = self.scr.getmaxyx()
         where = "HELPER (Enter asks, Esc back)" if self.focus == "helper" else "GAME"
-        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 fog of war  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  F8 search  F9 copy  F10 select  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
+        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 fog of war  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  F8 search  F9 copy  F10 select  F11/F12 zoom  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
                  curses.A_REVERSE)
 
     def redraw(self):
@@ -600,7 +636,7 @@ class App:
             return
         with self.lock:
             self.draw_game()
-            self.write_mapview()
+            self.draw_zoom()
             self.draw_axes()
             self.draw_panel()
             if self.popup:
@@ -616,7 +652,11 @@ class App:
                         self.put(y, self.drag[1], "#", curses.A_REVERSE)
                 else:
                     self.put(self.drag[1], GX + self.gw + 1, "#" * (cols - GX - self.gw - 2), curses.A_REVERSE)
-            if self.focus == "game":
+            if self.focus == "game" and self.zoom_view:
+                x0, y0, bw, bh, top, _ = self.zoom_view
+                you = self.watcher.state["player"]
+                self.scr.move(min(top + (you["y"] - y0) * bh, self.gh - 1), GX + (you["x"] - x0) * bw)
+            elif self.focus == "game":
                 self.scr.move(min(self.screen.cursor.y, self.gh - 1), GX + min(self.screen.cursor.x, self.gw - 1))
             else:
                 rows, _ = self.scr.getmaxyx()
@@ -813,6 +853,12 @@ class App:
                 self.close_popup()
             return
         self.focus = "game"
+        if self.zoom_view and x < MAP_W and self.zoom_view[4] <= y < self.zoom_view[5]:
+            x0, y0, bw, bh, top, _ = self.zoom_view
+            tx, ty = x0 + x // bw, y0 + (y - top) // bh
+            if (self.watcher.state.get("context") or {}).get("kind") == "command" and tx < MAP_W and ty < MAP_H:
+                self.send(f"#goto\r{tx} {ty}\r".encode())  # travel to the square clicked
+            return
         letter = self.panel_items.get(y) if x >= MAP_W else None
         if letter:  # an item in the status/inventory panel
             if (self.watcher.state.get("context") or {}).get("kind") == "command":
@@ -837,6 +883,8 @@ class App:
             self.helper.scroll += -3 if down else 3
         elif any(MENU_PAGE.search(line) for line in self.screen.display):
             self.send(b">" if down else b"<")  # only in a menu: on the map > goes downstairs
+        elif GX <= x < GX + MAP_W:
+            self.set_zoom(-1 if down else 1)
 
     def ask(self, question):
         if not self.helper.busy:
@@ -938,6 +986,8 @@ class App:
             self.open_search()
         elif data == COPY:
             self.copy_screen()
+        elif data in (ZOOM_IN, ZOOM_OUT):
+            self.set_zoom(1 if data == ZOOM_IN else -1)
         elif self.popup and data:
             self.popup_key(data)
         elif any(t == data or data.startswith(t) for t in TOGGLE):
@@ -969,41 +1019,6 @@ class App:
             pass
 
 
-def mapview():
-    """./play --map: the live map alone, in its own split, so Cmd +/- sizes just it.
-    Follows you when the split is too small for the whole map. ^C quits."""
-    sys.stdout.write("\x1b[?25l")
-    last = None
-    try:
-        while True:
-            try:
-                stamp = (os.path.getmtime(MAPVIEW), os.get_terminal_size())
-            except OSError:
-                stamp = None
-            if stamp and stamp != last:
-                last = stamp
-                d = json.load(open(MAPVIEW))
-                cols, lines = stamp[1].columns - GX, stamp[1].lines - 1 - RULER  # room for the axes
-                x0 = max(0, min(MAP_W - 1 - cols, (d["x"] or 1) - 1 - cols // 2)) if cols < MAP_W - 1 else 0
-                y0 = max(0, min(len(d["rows"]) - lines, (d["y"] or 0) - lines // 2)) if lines < len(d["rows"]) else 0
-                hi = lambda text, on: f"\x1b[7m{text}\x1b[0m" if on else f"\x1b[2m{text}\x1b[0m"
-                out = ["\x1b[H\x1b[2J\x1b[7m" + f" Dlvl {d['dlvl']}  you: x={d['x']} y={d['y']}   (Cmd +/- zooms) "[:cols + GX] + "\x1b[0m"]
-                for y, (row, sty) in enumerate(list(zip(d["rows"], d["styles"]))[y0:y0 + lines], y0):
-                    out.append(hi(f"{y:2d} ", y == d["y"]) + "".join(
-                        f"\x1b[0;{s_}m{ch}" if s_ else f"\x1b[0m{ch}"
-                        for ch, s_ in list(zip(row, sty))[x0:x0 + cols]) + "\x1b[0m")
-                xs = range(x0 + 1, min(MAP_W, x0 + 1 + cols))  # map x of each visible column
-                out.append("   " + "".join(hi(str(x // 10) if x % 10 == 0 or (x == xs[0] and x0) else " ", x == d["x"]) for x in xs))
-                out.append(hi(" x ", False) + "".join(hi(str(x % 10), x == d["x"]) for x in xs))
-                sys.stdout.write("\n".join(out))
-                sys.stdout.flush()
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        sys.stdout.write("\x1b[0m\x1b[?25h\n")
-
-
 def main(scr):
     signal.signal(signal.SIGHUP, lambda *_: sys.exit())  # closed terminal: still save and clean up
     app = App(scr, sys.argv[1:])
@@ -1014,8 +1029,5 @@ def main(scr):
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--map"]:
-        mapview()
-        sys.exit()
     os.environ.setdefault("ESCDELAY", "25")
     curses.wrapper(main)
