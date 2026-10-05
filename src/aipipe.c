@@ -341,6 +341,73 @@ put_map()
     put("]");
 }
 
+/* The level as it really is: terrain, floor objects, monsters, seen or not.
+ * Only with NETHACK_TRUTH set, and only for the recorder's replay page: the
+ * pilot never reads it (it would be clairvoyance). Sent on arriving at a
+ * level and every 50 turns after. Nothing here draws a random number. */
+static void
+put_truth()
+{
+    static int last_dnum = -1, last_dlev = -1;
+    static long last_moves = -1000L;
+    static int wanted = -1;
+    int x, y, ch;
+    struct obj *otmp;
+    struct monst *mtmp;
+    struct trap *ttmp;
+    char row[COLNO + 1], tmp[80], sym[2];
+    boolean first = TRUE;
+
+    if (wanted < 0)
+        wanted = getenv("NETHACK_TRUTH") ? 1 : 0;
+    if (!wanted || (u.uz.dnum == last_dnum && u.uz.dlevel == last_dlev
+                    && moves - last_moves < 50L))
+        return;
+    last_dnum = u.uz.dnum, last_dlev = u.uz.dlevel, last_moves = moves;
+    sym[1] = '\0';
+    put(",\"truth\":{\"map\":[");
+    for (y = 0; y < ROWNO; y++) {
+        for (x = 1; x < COLNO; x++) {
+            ch = (int) showsyms[glyph_to_cmap(back_to_glyph(x, y))];
+            if ((ttmp = t_at(x, y)) != 0)
+                ch = '^';
+            row[x - 1] = (ch >= 0x20 && ch < 0x7f) ? (char) ch : '?';
+        }
+        row[COLNO - 1] = '\0';
+        if (y)
+            put(",");
+        put_str(row);
+    }
+    put("],\"objects\":[");
+    for (y = 0; y < ROWNO; y++)
+        for (x = 1; x < COLNO; x++) {
+            if (!(otmp = level.objects[x][y]))
+                continue;
+            Sprintf(tmp, "%s{\"x\":%d,\"y\":%d", first ? "" : ",", x, y);
+            put(tmp);
+            sym[0] = def_oc_syms[(int) otmp->oclass].sym;
+            put_kv_str("class", sym, TRUE);
+            put_kv_str("name", OBJ_NAME(objects[otmp->otyp]), TRUE);
+            put("}");
+            first = FALSE;
+        }
+    put("],\"monsters\":[");
+    first = TRUE;
+    for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
+        if (DEADMONSTER(mtmp))
+            continue;
+        Sprintf(tmp, "%s{\"x\":%d,\"y\":%d", first ? "" : ",", mtmp->mx, mtmp->my);
+        put(tmp);
+        sym[0] = def_monsyms[(int) mtmp->data->mlet].sym;
+        put_kv_str("sym", sym, TRUE);
+        put_kv_str("name", mtmp->data->mname, TRUE);
+        put_kv_int("peaceful", mtmp->mpeaceful ? 1L : 0L, TRUE);
+        put("}");
+        first = FALSE;
+    }
+    put("]}");
+}
+
 static void
 put_inventory()
 {
@@ -433,6 +500,7 @@ emit_state()
         put_status();
         put_map();
         put_inventory();
+        put_truth();
     }
     put("}");
     send_out();

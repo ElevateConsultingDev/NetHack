@@ -179,6 +179,8 @@ class Game:
         """An engine error ends the game as a harness error at once; it used
         to kill the channel thread and leave the game hanging to its time limit."""
         try:
+            if "truth" in s:  # For the recorder only: the pilot must not see what it has not seen.
+                self.frames.see_truth(s.pop("truth"), s)
             self.on_state(s)
         except Exception as e:
             import traceback
@@ -307,6 +309,7 @@ class Game:
         env = dict(os.environ, NETHACK_CONTROL=self.sock, NETHACKOPTIONS=OPTIONS, TERM="xterm-256color")
         if self.seed is not None:
             env.update(NETHACK_SEED=str(self.seed), NETHACK_NOW=str(NOW), NETHACKOPTIONS=OPTIONS + ",!bones")
+        env["NETHACK_TRUTH"] = "1"  # The real level for the replay page; taken out before the engine sees the snapshot.
         started = time.time()
         self.proc = subprocess.Popen(
             [os.path.join(PLAYGROUND, "nethack"), "-u", self.name, "-p", self.role],

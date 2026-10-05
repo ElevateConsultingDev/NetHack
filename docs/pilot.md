@@ -18,7 +18,7 @@ pilot that plays through it.
 | `pilot/dashboard.py` | `playground/batch/dashboard.html` (open it in a browser; self-refreshing, no server): all-time north-star stats and milestone ladder (from xlogfile achieve bits up to ASCENDED), current run, turns by activity, a card per game linking to a live 1s page (colored map, status, feed pinned to the newest line, inventory). |
 | `nh` | Launch this build connected to the pilot socket (`/tmp/nhpilot.sock`). |
 
-Build: `sh sys/unix/setup.sh sys/unix/hints/macosx10.14 && make WANT_SOURCE_INSTALL=1 all` (installs into `playground/`, gitignored; batch sets `MAXPLAYERS=0` in `playground/sysconf`). macOS socket paths must be under 104 bytes, so sockets live in `/tmp`.
+**Rebuild after a C change with `make -C src && cp src/nethack playground/nethack`. Never rerun `make all` or `make install` once runs exist: the install step is `rm -rf playground`, which deletes every recorded run, replay page and note under `playground/batch` (it did, on 2026-10-04).** First build only: `sh sys/unix/setup.sh sys/unix/hints/macosx10.14 && make WANT_SOURCE_INSTALL=1 all` (installs into `playground/`, gitignored; batch sets `MAXPLAYERS=0` in `playground/sysconf`). macOS socket paths must be under 104 bytes, so sockets live in `/tmp`.
 
 ## The design (Dave's engine vs brain)
 

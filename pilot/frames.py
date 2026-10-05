@@ -32,6 +32,7 @@ class Recorder:
         self.invs: list[list[str]] = []
         self.inv_ix: dict[tuple, int] = {}
         self.escs: list[dict] = []
+        self.truths: list = []  # the real level, on arrival and every 50 turns
         self.seen_escalations = 0
         self.seen_jev = 0
 
@@ -40,6 +41,13 @@ class Recorder:
             self.row_ix[r] = len(self.rows)
             self.rows.append(r)
         return self.row_ix[r]
+
+    def see_truth(self, t: dict, s: dict) -> None:
+        """The level as it really is (src/aipipe.c put_truth): kept beside the frames so the replay
+        can show what the pilot had not seen."""
+        self.truths.append({"t": (s.get("status") or {}).get("turn", 0), "m": [self._rid(r.rstrip()) for r in t["map"]],
+                            "o": [[o["x"], o["y"], o["class"], o["name"]] for o in t["objects"]],
+                            "n": [[m["x"], m["y"], m["sym"], m["name"], m["peaceful"]] for m in t["monsters"]]})
 
     def record(self, g, s: dict) -> None:
         """Call after the engine has handled snapshot s (g.engine.note and g.keys are current)."""
@@ -68,7 +76,7 @@ class Recorder:
              st.get("gold", 0), (st.get("hunger") or "").strip(), p.get("x", 0), p.get("y", 0),
              (g.engine.note or "")[:110], " ".join(msgs).split(" Do you want")[0][:220], m, key,
              st.get("pw", 0), st.get("pwmax", 0), chk, self.inv_ix[inv], g.engine.routine or "",
-             stats.get("kills", 0), len(g.escalations) + self.seen_jev]
+             stats.get("kills", 0), len(g.escalations) + self.seen_jev, len(self.truths) - 1]
         if self.frames and self.frames[-1][12] == m and self.frames[-1][0] == f[0]:
             prev = self.frames[-1]
             if f[11]:
@@ -99,7 +107,7 @@ class Recorder:
         turns = sorted(((k[7:], v) for k, v in st.items() if k.startswith("turns: ")), key=lambda kv: -kv[1])[:12]
         r = g.result or {}
         return {"name": g.name, "run": run, "brain": g.brain.name, "seed": g.seed, "death": r.get("death") or "",
-                "stall": g.stall or "", "deepest": g.deepest, "rows": self.rows, "frames": self.frames,
+                "stall": g.stall or "", "deepest": g.deepest, "rows": self.rows, "frames": self.frames, "truths": self.truths,
                 "invs": self.invs, "escs": self.escs, "orders": g.engine.orders, "turns": turns,
                 "totals": {"kills": st.get("kills", 0), "corpses eaten": st.get("corpses_eaten", 0),
                            "prayers": len(g.engine.memory.prayer_log), "keys sent": len(g.keys),
