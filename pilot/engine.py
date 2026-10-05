@@ -134,6 +134,7 @@ class Memory:
     dead_doors: set = field(default_factory=set)  # doors we gave up on
     locked: set = field(default_factory=set)      # (dlvl, x, y) doors the game told us are locked
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
+    no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     unlocking: bool = False                       # we applied a key or pick to a door: answer "Unlock it?"
     features: dict = field(default_factory=dict)  # (dlvl, x, y) -> feature name last seen there
     blocked: set = field(default_factory=set)     # (dlvl, x, y) targets that didn't work out
@@ -247,6 +248,9 @@ class View:
         if not self.walkable(*b):
             return False
         diagonal = a[0] != b[0] and a[1] != b[1]
+        if diagonal and self.memory and self.memory.no_squeeze \
+                and not self.walkable(a[0], b[1]) and not self.walkable(b[0], a[1]):
+            return False  # "You are carrying too much to get through."
         return not (diagonal and (self.feature(*a) in NO_DIAGONAL or self.feature(*b) in NO_DIAGONAL))
 
     def hostiles_adjacent(self, memory: Memory):
@@ -997,7 +1001,11 @@ def armor_slot(text: str) -> str | None:
     return None
 
 
-NOT_CARRIED = ("box", "chest", "boulder", "heavy iron ball", "iron chain")  # open or leave these
+# Open or leave these. Tinning kits (100) and spellbooks (50) are weight the pilot never uses: 66 of
+# 128 games ended carrying one, and over 600 total a hero cannot squeeze between rock corners
+# (hack.c test_move), which shut 22 games out of part of a Mines level and stalled 3 (iteration 57).
+NOT_CARRIED = ("box", "chest", "boulder", "heavy iron ball", "iron chain", "tinning kit", "spellbook")
+DEAD_WEIGHT = ("tinning kit", "spellbook", " rock")
 
 
 def r_probe_dark(v: View, memory: Memory, args: dict):
@@ -1273,6 +1281,16 @@ class Engine:
         if any(h["name"] not in self.orders["avoid"] or h["name"] in DANGEROUS_NEAR for h in c["mobile_hostiles"]):
             self.memory.last_threat_turn = c["turn"]
         self._checkpoints(v, c)
+
+        if any("carrying too much to get through" in x for x in v.s.get("messages", [])) and not c["adjacent_hostiles"]:
+            junk = next((i for i in v.s.get("inventory", []) if any(w in i["text"] for w in DEAD_WEIGHT)
+                         and not i.get("worn") and "(weapon in " not in i["text"]), None)
+            if junk:
+                self.memory.pending_item = junk["letter"]
+                _count(self.memory, "dropped dead weight to squeeze through")
+                self.note = f"too heavy to squeeze through: drop the {junk['text']}"
+                return self._stuck_guard(v, "d", self.note)
+            self.memory.no_squeeze = True  # Nothing to shed: route around tight corners from here on.
 
         standing = self._standing(v, c)
         if standing is not None:
