@@ -172,6 +172,28 @@ def snapshot(screen, state):
     return "\n\n".join(parts)
 
 
+OBJECT_CLASSES = {")": "weapon", "[": "armor", "!": "potion", "?": "scroll", "/": "wand",
+                  "=": "ring", '"': "amulet", "(": "tool", "%": "food", "*": "gem or rock",
+                  "$": "gold", "`": "boulder or statue", "+": "spellbook", "0": "iron ball",
+                  "_": "iron chain"}
+LEGEND_ORDER = ("you", "pet", "monster", "invisible", "object", "trap", "feature")
+
+
+def legend(state):
+    """'c name' for each distinct symbol on the map now (from aipipe's cells)."""
+    rows, seen, out = state.get("map") or [], set(), []
+    cells = sorted(state.get("cells", []),
+                   key=lambda c: LEGEND_ORDER.index(c["kind"]) if c["kind"] in LEGEND_ORDER else 99)
+    for c in cells:
+        row = rows[c["y"]] if c["y"] < len(rows) else ""
+        ch = row[c["x"] - 1] if 0 < c["x"] <= len(row) else "?"
+        name = OBJECT_CLASSES.get(c.get("class"), c["name"]) if c["kind"] == "object" else c["name"]
+        if (ch, name) not in seen:
+            seen.add((ch, name))
+            out.append(f"{ch} {name}")
+    return out
+
+
 def snapshots(save_name=None):
     """Snapshot files for one save file name (or all), oldest first."""
     if not os.path.isdir(SNAPS):
@@ -359,6 +381,22 @@ class App:
             return
         for y in range(rows - 1):
             self.put(y, self.gw, "|", curses.A_DIM)
+        top = 0
+        entries = legend(self.watcher.state)
+        if entries:  # the map legend, packed into lines across the pane
+            lines, cur = [], ""
+            for e in entries:
+                if cur and len(cur) + 2 + len(e) > w - 1:
+                    lines.append(cur)
+                    cur = ""
+                cur = f"{cur}  {e}" if cur else e
+            lines.append(cur)
+            lines = lines[:max(3, rows // 3)]
+            for y, l in enumerate(lines):
+                self.put(y, x0, l.ljust(w - 1)[:w - 1], curses.A_BOLD)
+            top = len(lines)
+            self.put(top, x0, "-" * (w - 1), curses.A_DIM)
+            top += 1
         body = []
         for kind, text in self.helper.lines:
             attr = {"you": curses.A_BOLD, "dim": curses.A_DIM,
@@ -369,12 +407,12 @@ class App:
             body.append((0, ""))
         if self.helper.busy:
             body.append((curses.A_DIM, "thinking..."))
-        h = rows - 3
+        h = rows - 3 - top
         self.helper.scroll = max(0, min(self.helper.scroll, len(body) - h))
         body = body[max(0, len(body) - h - self.helper.scroll):len(body) - self.helper.scroll]
         for y in range(h):
             attr, l = body[y] if y < len(body) else (0, "")
-            self.put(y, x0, l.ljust(w - 1)[:w - 1], attr)
+            self.put(top + y, x0, l.ljust(w - 1)[:w - 1], attr)
         mark = curses.A_REVERSE if self.focus == "helper" else curses.A_DIM
         self.put(rows - 2, x0, ("> " + self.helper.input)[-(w - 1):].ljust(w - 1), mark)
 

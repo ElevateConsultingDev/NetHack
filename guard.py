@@ -107,7 +107,7 @@ def warnings(state):
     """The set of heads-ups that apply right now."""
     out = set()
     st = state.get("status") or {}
-    if st.get("hpmax") and st["hp"] * 3 < st["hpmax"]:
+    if st.get("hpmax") and 0 < st["hp"] and st["hp"] * 3 < st["hpmax"]:  # -1 while restoring
         out.add(f"HP is low ({st['hp']}/{st['hpmax']}).")
     if st.get("hunger") in ("Weak", "Fainting"):
         out.add(f"You are {st['hunger']}: eat something now.")
