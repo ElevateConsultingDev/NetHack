@@ -58,6 +58,10 @@ NetHack (curses interface) on the left, a Claude helper on the right.
   asks for an item, clicking one answers. The game's own two status lines are moved here
   from under the map. Game menus open over this panel. When the game asks for an item
   ("What do you want to drink? [h or ?*]"), the panel says so and marks the items that fit.
+- Regions are outlined (game | helper, map | panel, legend | chat | input). Drag the
+  game | helper line left or right to resize them (the game redraws to fit), and the
+  legend | chat line up or down. Messages and the game's status lines stay over the map
+  (80 columns), so they never run into the panel.
 - Axes: row numbers (y, 0 at the top) down the left and column numbers (x, 1 at the
   left) along the bottom, the same coordinates the helper uses; your row and column
   are highlighted.

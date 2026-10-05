@@ -49,7 +49,8 @@ REWIND = b"\x1b[18~"    # F7: go back to the last snapshot
 SEARCH = b"\x1b[19~"    # F8: fuzzy search over commands, items and map things
 COPY = b"\x1b[20~"      # F9: copy the game screen to the clipboard as text
 SELECT = b"\x1b[21~"    # F10: select mode: screen frozen, mouse back to the terminal
-MOUSE_ON, MOUSE_OFF = "\x1b[?1000h\x1b[?1006h", "\x1b[?1006l\x1b[?1000l"
+MOUSE_ON = "\x1b[?1000h\x1b[?1002h\x1b[?1006h"   # clicks, drags (for resizing), SGR coordinates
+MOUSE_OFF = "\x1b[?1006l\x1b[?1002l\x1b[?1000l"
 UP, DOWN = (b"\x1b[A", b"\x1bOA"), (b"\x1b[B", b"\x1bOB")
 COMMANDS = palette.load_commands(os.path.join(HERE, "src", "cmd.c"))
 EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [F5]", action=("fkey", WHAT_NOW)),
@@ -70,7 +71,7 @@ MAP_W = 80  # the map's width; the status/inventory panel starts right after it
 MAP_H = 21  # map rows, y = 0..20
 GX = 3      # gutter left of the game for row numbers (y)
 RULER = 2   # rows under the game for column numbers (x)
-PANEL_TOP = 3  # the status/inventory panel starts under the message lines
+PANEL_TOP = 0  # messages stop at the map's edge (cursinit.c), so the panel can use every row
 MENU_PAGE = re.compile(r"\(Page \d+ of \d+\)")  # footer of a curses menu with more pages
 
 SYSTEM = """You are a friendly NetHack 3.6 expert sitting next to the player, \
@@ -236,12 +237,14 @@ def term_size():
     return rows, cols
 
 
-def layout(rows, cols):
+def layout(rows, cols, helper_w=None):
     """Game pane width and height; the helper gets the rest of the columns.
 
-    Curses menus open against the pane's right edge and the map is 80 wide,
-    so the game takes up to 130 columns (menus beside the map) before the
-    helper drops below HELPER_W, down to 25."""
+    By default the game takes up to 130 columns (room beside the 80-column map
+    for menus and the panel) before the helper drops below HELPER_W, down to 25.
+    helper_w is the width the player dragged the helper to."""
+    if helper_w:
+        return max(80, cols - GX - 1 - max(20, helper_w)), rows - 1 - RULER
     game_w = max(80, min(cols - 26 - GX, max(130, cols - HELPER_W - 1 - GX)))
     return game_w, rows - 1 - RULER
 
@@ -260,6 +263,10 @@ class App:
         self.map_top = 1      # screen row of map row y=0 (found from the cursor on @)
         self.panel_items = {} # game-pane row -> inventory letter, for clicks
         self.panel_on = False
+        self.helper_w = None    # helper width once dragged
+        self.legend_max = None  # legend lines once dragged
+        self.legend_div = None  # screen row of the legend/chat divider
+        self.drag = None        # ("v", x) or ("h", y) while a divider is dragged
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -367,7 +374,7 @@ class App:
         self.resized = False
         rows, cols = term_size()
         curses.resizeterm(rows, cols)
-        self.gw, self.gh = layout(rows, cols)
+        self.gw, self.gh = layout(rows, cols, self.helper_w)
         self.screen.resize(self.gh, self.gw)
         self._winsize()
         os.kill(self.pid, signal.SIGWINCH)
@@ -497,6 +504,8 @@ class App:
         lines.append(("", 0, None))
         for r in self.status_rows():  # the game's own status lines, moved up from under the map
             lines += [(l, 0, None) for l in textwrap.wrap(re.sub(r"  +", "  ", self.row_text(r)), w)]
+        for r in range(PANEL_TOP, self.gh):
+            self.gput(r, MAP_W, "|")  # map | panel
         for n, r in enumerate(range(PANEL_TOP, self.gh)):
             text, attr, letter = lines[n] if n < len(lines) else ("", 0, None)
             if r == self.gh - 1 and len(lines) > n + 1:
@@ -511,7 +520,7 @@ class App:
         if w < 10:
             return
         for y in range(rows - 1):
-            self.put(y, GX + self.gw, "|", curses.A_DIM)
+            self.put(y, GX + self.gw, "|")  # game | helper, drag to resize
         top = 0
         entries = legend(self.watcher.state)
         if entries:  # the map legend, packed into lines across the pane
@@ -522,12 +531,17 @@ class App:
                     cur = ""
                 cur = f"{cur}  {e}" if cur else e
             lines.append(cur)
-            lines = lines[:max(3, rows // 3)]
+            lines = lines[:self.legend_max or max(3, rows // 3)]
+            if self.legend_max:  # the height it was dragged to
+                lines += [""] * (self.legend_max - len(lines))
             for y, l in enumerate(lines):
                 self.put(y, x0, l.ljust(w - 1)[:w - 1], curses.A_BOLD)
             top = len(lines)
-            self.put(top, x0, "-" * (w - 1), curses.A_DIM)
+            self.put(top, x0 - 1, "+" + "-" * (w - 1))  # legend | chat, drag to resize
+            self.legend_div = top
             top += 1
+        else:
+            self.legend_div = None
         body = []
         for kind, text in self.helper.lines:
             attr = {"you": curses.A_BOLD, "dim": curses.A_DIM,
@@ -538,7 +552,8 @@ class App:
             body.append((0, ""))
         if self.helper.busy:
             body.append((curses.A_DIM, "thinking..."))
-        h = rows - 3 - top
+        h = rows - 4 - top
+        self.put(rows - 3, x0 - 1, "+" + "-" * (w - 1))  # chat | input
         self.helper.scroll = max(0, min(self.helper.scroll, len(body) - h))
         body = body[max(0, len(body) - h - self.helper.scroll):len(body) - self.helper.scroll]
         for y in range(h):
@@ -566,6 +581,13 @@ class App:
                 self.draw_search()
             self.draw_helper()
             self.draw_bar()
+            if self.drag:  # where the divider will go
+                rows, cols = self.scr.getmaxyx()
+                if self.drag[0] == "v":
+                    for y in range(rows - 1):
+                        self.put(y, self.drag[1], "#", curses.A_REVERSE)
+                else:
+                    self.put(self.drag[1], GX + self.gw + 1, "#" * (cols - GX - self.gw - 2), curses.A_REVERSE)
             if self.focus == "game":
                 self.scr.move(min(self.screen.cursor.y, self.gh - 1), GX + min(self.screen.cursor.x, self.gw - 1))
             else:
@@ -710,6 +732,34 @@ class App:
         q["sel"] = 0
         q["results"] = palette.search(q["query"], q["items"])
 
+    def drag_mouse(self, b, x, y, press):
+        """Dragging a divider resizes regions; True if this event was part of a drag."""
+        rows, cols = self.scr.getmaxyx()
+        if press and b == 0 and not self.drag:
+            if x == GX + self.gw and y < rows - 1:
+                self.drag = ("v", x)
+            elif self.legend_div is not None and y == self.legend_div and x > GX + self.gw:
+                self.drag = ("h", y)
+            return bool(self.drag)
+        if not self.drag:
+            return False
+        if press and b == 32:  # moved with the button held
+            if self.drag[0] == "v":
+                self.drag = ("v", max(GX + 80, min(cols - 21, x)))
+            else:
+                self.drag = ("h", max(1, min(rows - 8, y)))
+            return True
+        if not press:  # released: apply
+            kind, pos = self.drag
+            self.drag = None
+            if kind == "v":
+                self.helper_w = cols - pos - 1
+                self._resize()
+            else:
+                self.legend_max = pos
+            return True
+        return True
+
     def click(self, x, y):
         """A left click: menu lines send their letter, inventory lines open their actions,
         the map gets the click, the pane takes focus."""
@@ -822,6 +872,8 @@ class App:
                 data = os.read(0, 1024)
                 for m in MOUSE.finditer(data):
                     b, x, y = int(m.group(1)), int(m.group(2)) - 1, int(m.group(3)) - 1
+                    if self.drag_mouse(b, x, y, m.group(4) == b"M"):
+                        continue
                     if m.group(4) == b"M" and b == 0:  # left press
                         self.click(x, y)
                     elif b in (64, 65):  # wheel up, down

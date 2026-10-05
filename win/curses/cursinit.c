@@ -257,6 +257,12 @@ curses_create_main_windows()
             map_width = COLNO;
         if (map_height > ROWNO)
             map_height = ROWNO;
+        /* messages and status stay over the map; whatever is right of it is
+           left to menus and an external panel (helper.py) */
+        if (!msg_vertical && message_width > COLNO)
+            message_width = COLNO;
+        if (!status_vertical && status_width > COLNO)
+            status_width = COLNO;
 
         if (curses_get_nhwin(STATUS_WIN)) {
             curses_del_nhwin(STATUS_WIN);
