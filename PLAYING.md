@@ -34,6 +34,10 @@ NetHack (curses interface) on the left, a Claude helper on the right.
 - Warnings appear in the helper pane (yellow) when they start to apply: low HP, Weak or
   Fainting, turning to stone or slime, strangling, deadly illness, and dangerous monsters
   within 7 squares.
+- Undo: a snapshot is taken on each new dungeon level (and with `F6`); `F7` rewinds to
+  the latest one. When you die, the helper offers `F7` to rewind (`q` quits). A snapshot
+  saves and restarts the game, so you'll see "Restoring save file..." for a moment. The
+  last 10 per character are kept in `playground/snapshots/`.
 - Your inventory stays visible to the right of the map (`perm_invent`); menus open over it.
 - Don't die for good: `./play -X` (or `#exploremode` mid-game) is NetHack's explore mode;
   when you would die it asks `Die?` and you can say no. Explore games skip the high scores.

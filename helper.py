@@ -10,6 +10,8 @@ import curses
 import json
 import os
 import pty
+import shutil
+import time
 import re
 import select
 import signal
@@ -29,6 +31,9 @@ import guard
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.join(HERE, "playground")
+SAVES = os.path.join(GAME, "save")
+SNAPS = os.path.join(GAME, "snapshots")
+KEEP_SNAPS = 10
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
 TOGGLE = (b"\x1d", b"\x1bOP", b"\x1b[11~")  # ^], F1 (two encodings)
@@ -38,6 +43,9 @@ FKEYS = {  # function key (two encodings each) -> extended command typed into th
     b"\x1bOS": b"#goup\r", b"\x1b[14~": b"#goup\r",      # F4: travel to the up stairs
 }
 WHAT_NOW = b"\x1b[15~"  # F5: ask the helper what to do now
+SNAPSHOT = b"\x1b[17~"  # F6: snapshot the game now
+REWIND = b"\x1b[18~"    # F7: go back to the last snapshot
+SAVE_KEYS = b"Sy\r"     # save, yes, dismiss "Saving..." (the game then exits)
 MOUSE = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")  # SGR mouse report (mode 1006)
 MENU_ITEM = re.compile(r"(?:^|[ \u2502])([a-zA-Z$#*-])\) ")  # " a) a +1 long sword"
 MENU_PAGE = re.compile(r"\(Page \d+ of \d+\)")  # footer of a curses menu with more pages
@@ -72,12 +80,17 @@ class Watcher:
         threading.Thread(target=self._run, daemon=True).start()
 
     def _run(self):
-        conn, _ = self.srv.accept()
-        for line in conn.makefile("r", errors="replace"):
+        while True:  # a new connection each time the game restarts (snapshots)
             try:
-                self.state = json.loads(line)
-            except ValueError:
-                pass
+                conn, _ = self.srv.accept()
+            except OSError:
+                return
+            self.state = {}
+            for line in conn.makefile("r", errors="replace"):
+                try:
+                    self.state = json.loads(line)
+                except ValueError:
+                    pass
 
     def close(self):
         self.srv.close()
@@ -159,6 +172,20 @@ def snapshot(screen, state):
     return "\n\n".join(parts)
 
 
+def snapshots(save_name=None):
+    """Snapshot files for one save file name (or all), oldest first."""
+    if not os.path.isdir(SNAPS):
+        return []
+    files = [os.path.join(SNAPS, f) for f in os.listdir(SNAPS)
+             if save_name is None or f.split("@")[0] == save_name]
+    return sorted(files, key=os.path.getmtime)
+
+
+def snap_label(path):
+    turn, dlvl = os.path.basename(path).rsplit("@", 1)[-1].split("-D")
+    return f"Dlvl {dlvl}, turn {int(turn)}"
+
+
 def term_size():
     rows, cols = struct.unpack("hh", fcntl.ioctl(1, termios.TIOCGWINSZ, b"\0" * 4))
     return rows, cols
@@ -195,7 +222,19 @@ class App:
         self.screen = pyte.Screen(self.gw, self.gh)
         self.stream = pyte.ByteStream(self.screen)
         self.stream.use_utf8 = False  # the game sends ASCII + ACS line drawing, which pyte skips in UTF-8 mode
+        self.argv = argv
+        self.saving = None    # "snapshot" or "rewind" while the wrapper has the game saving
+        self.over = False     # the game ended (died or quit) and a rewind is on offer
+        self.snap_dlvl = None # dungeon level of the last automatic snapshot
+        self.save_name = None # this character's save file name, once known
+        self.spawn()
+        self.resized = False
+        signal.signal(signal.SIGWINCH, lambda *_: setattr(self, "resized", True))
 
+    def spawn(self):
+        """Start (or restart) the game; a saved game restores automatically."""
+        self.screen.reset()
+        self.started = time.time()
         pid, self.fd = pty.fork()
         if pid == 0:
             os.chdir(GAME)
@@ -203,11 +242,63 @@ class App:
             os.environ["NETHACK_CONTROL"] = self.watcher.path
             os.environ.setdefault("NETHACK_REVEAL", "1")  # the helper sees the whole level; NETHACK_REVEAL= turns it off
             os.environ.setdefault("NETHACKOPTIONS", "@" + os.path.join(HERE, "nethackrc"))
-            os.execv("./nethack", ["nethack"] + argv)
+            os.execv("./nethack", ["nethack"] + self.argv)
         self.pid = pid
         self._winsize()
-        self.resized = False
-        signal.signal(signal.SIGWINCH, lambda *_: setattr(self, "resized", True))
+
+    def say(self, kind, text):
+        self.helper.scroll = 0
+        self.helper.lines.append((kind, text))
+
+    def save_game(self, why):
+        """Have the game save and exit; game_exited() takes it from there."""
+        st = self.watcher.state
+        if self.saving or (st.get("context") or {}).get("kind") != "command":
+            return False
+        self.saving = why
+        self.snap_info = st.get("status") or {}
+        os.write(self.fd, SAVE_KEYS)
+        return True
+
+    def game_exited(self):
+        """The game process ended: finish a snapshot or rewind, or offer a rewind
+        after a death. False means the wrapper should quit."""
+        try:
+            os.waitpid(self.pid, 0)
+        except ChildProcessError:
+            pass
+        os.close(self.fd)
+        saves = sorted((os.path.join(SAVES, f) for f in os.listdir(SAVES)), key=os.path.getmtime)
+        fresh = [f for f in saves if os.path.getmtime(f) >= self.started]
+        why, self.saving = self.saving, None
+        if why and fresh:
+            save = fresh[-1]
+            self.save_name = os.path.basename(save)
+            if why == "snapshot":
+                os.makedirs(SNAPS, exist_ok=True)
+                info = self.snap_info
+                shutil.copy2(save, os.path.join(
+                    SNAPS, f"{os.path.basename(save)}@{info.get('turn', 0):06d}-D{info.get('dlvl', 0)}"))
+                for old in snapshots(self.save_name)[:-KEEP_SNAPS]:
+                    os.unlink(old)
+                self.say("dim", f"Snapshot saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')}). F7 goes back to it.")
+            else:
+                self.restore_snapshot()
+            self.spawn()
+            return True
+        if fresh:  # the player saved (S): done for now
+            return False
+        snap = snapshots(self.save_name)[-1:] if snapshots(self.save_name) else []
+        if not snap:
+            return False
+        self.over = True
+        self.say("err", f"Game over. F7 rewinds to your last snapshot ({snap_label(snap[0])}); q quits.")
+        return True
+
+    def restore_snapshot(self):
+        snap = snapshots(self.save_name)[-1]
+        shutil.copy2(snap, os.path.join(SAVES, os.path.basename(snap).split("@")[0]))
+        self.say("dim", f"Rewound to {snap_label(snap)}.")
 
     def _winsize(self):
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("hhhh", self.gh, self.gw, 0, 0))
@@ -290,7 +381,7 @@ class App:
     def draw_bar(self):
         rows, cols = self.scr.getmaxyx()
         where = "HELPER (Enter asks, Esc back)" if self.focus == "helper" else "GAME"
-        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
+        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
                  curses.A_REVERSE)
 
     def redraw(self):
@@ -376,6 +467,9 @@ class App:
             self.helper.scroll = 0
             self.helper.lines.append(("warn", "! " + w))
         self.warned = now
+        dlvl = (state.get("status") or {}).get("dlvl")
+        if dlvl and dlvl != self.snap_dlvl and self.save_game("snapshot"):
+            self.snap_dlvl = dlvl  # one automatic snapshot per level reached
 
     def run(self):
         sys.stdout.write("\x1b[?1000h\x1b[?1006h")  # mouse clicks, SGR coordinates
@@ -385,7 +479,7 @@ class App:
             if self.resized:
                 self._resize()
             try:
-                r, _, _ = select.select([self.fd, 0], [], [], 0.2)
+                r, _, _ = select.select([0] if self.over else [self.fd, 0], [], [], 0.2)
             except InterruptedError:
                 continue
             if self.fd in r:
@@ -394,7 +488,9 @@ class App:
                 except OSError:
                     data = b""
                 if not data:
-                    return
+                    if not self.game_exited():
+                        return
+                    continue
                 self.stream.feed(data)
             self.check_warnings()
             if 0 in r:
@@ -406,12 +502,28 @@ class App:
                     elif b in (64, 65):  # wheel up, down
                         self.wheel(x, b == 65)
                 data = MOUSE.sub(b"", data)
-                if any(t == data or data.startswith(t) for t in TOGGLE):
+                if self.over:  # dead: F7 rewinds, q quits, other keys are ignored
+                    if data == b"q":
+                        return
+                    if data != REWIND:
+                        continue
+                    self.over = False
+                    self.restore_snapshot()
+                    self.spawn()
+                elif any(t == data or data.startswith(t) for t in TOGGLE):
                     self.focus = "helper" if self.focus == "game" else "game"
                 elif data in FKEYS:
                     os.write(self.fd, FKEYS[data])
                 elif data == WHAT_NOW:
                     self.ask("What should I do right now?")
+                elif data == SNAPSHOT:
+                    if not self.save_game("snapshot"):
+                        self.say("dim", "Snapshots happen at the command prompt; finish this first.")
+                elif data == REWIND:
+                    if not snapshots(self.save_name):
+                        self.say("dim", "No snapshot yet (one is made on each new level, or press F6).")
+                    elif not self.save_game("rewind"):
+                        self.say("dim", "Rewind works at the command prompt; finish this first.")
                 elif self.focus == "game":
                     self.game_key(data)
                 else:
