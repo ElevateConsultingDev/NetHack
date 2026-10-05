@@ -279,7 +279,8 @@ class App:
         self.seq = 0
         self.popup = None     # actions for a clicked inventory item: x, y, w, letter, text, acts
         self.search = None    # the F8 search: query, sel, items, results
-        self.selecting = False  # F10: frozen screen, terminal selects text
+        self.selecting = False  # F10: frozen screen, drag a rectangle to copy
+        self.sel = None         # (y0, x0, y1, x1) of the rectangle being dragged
         self.map_top = 1      # screen row of map row y=0 (found from the cursor on @)
         self.panel_items = {} # game-pane row -> inventory letter, for clicks
         self.panel_on = False
@@ -592,8 +593,8 @@ class App:
                 mark = "> " if fits else "  "
             lines.append((f"{mark}{i['letter']}) {i['text']}", attr, i["letter"]))
         lines.append(("", 0, None))
-        for r in self.status_rows():  # the game's own status lines, moved up from under the map
-            lines += [(l, 0, None) for l in textwrap.wrap(re.sub(r"  +", "  ", self.row_text(r)), w)]
+        status = "  ".join(re.sub(r"  +", "  ", self.row_text(r)).strip() for r in self.status_rows())
+        lines += [(l, 0, None) for l in textwrap.wrap(status, w)]  # the game's status lines, as one
         for r in range(PANEL_TOP, self.gh):
             self.gput(r, MAP_W, "|")  # map | panel
         for n, r in enumerate(range(PANEL_TOP, self.gh)):
@@ -659,8 +660,38 @@ class App:
                  curses.A_REVERSE)
 
     def redraw(self):
-        if self.selecting:  # frozen so the terminal's selection stays put
+        if self.selecting:  # frozen while a rectangle is being selected
             return
+        self.paint()
+
+    SELECT_BAR = " SELECT: drag a rectangle, let go to copy it.  F10 or Esc: back to the game "
+
+    def select_mouse(self, b, x, y, press):
+        """Select mode: drag a rectangle, release copies exactly that text."""
+        rows, cols = self.scr.getmaxyx()
+        y, x = max(0, min(rows - 2, y)), max(0, min(cols - 1, x))  # stay on screen, above the bar
+        if press and b == 0:
+            self.sel = (y, x, y, x)
+        elif press and b == 32 and self.sel:
+            self.sel = self.sel[:2] + (y, x)
+        elif not press and self.sel:
+            y0, x0, y1, x1 = self.sel
+            top, bot, left, right = min(y0, y1), max(y0, y1), min(x0, x1), max(x0, x1)
+            text = "\n".join(self.scr.instr(r, left, right - left + 1).decode(errors="replace").rstrip()
+                             for r in range(top, bot + 1)) + "\n"
+            subprocess.run(["pbcopy"], input=text, text=True)
+            self.sel = None
+            self.paint(bar=f" Copied {right - left + 1}x{bot - top + 1} to the clipboard. Drag again, or F10/Esc: back to the game ")
+            return
+        else:
+            return
+        self.paint(bar=self.SELECT_BAR)
+        y0, x0, y1, x1 = self.sel
+        for r in range(min(y0, y1), max(y0, y1) + 1):
+            self.scr.chgat(r, min(x0, x1), abs(x1 - x0) + 1, curses.A_REVERSE)
+        self.scr.refresh()
+
+    def paint(self, bar=None):
         with self.lock:
             self.draw_game()
             self.draw_zoom()
@@ -672,6 +703,9 @@ class App:
                 self.draw_search()
             self.draw_helper()
             self.draw_bar()
+            if bar:
+                self.put(self.scr.getmaxyx()[0] - 1, 0, bar.ljust(self.scr.getmaxyx()[1] - 1),
+                         curses.A_REVERSE | curses.A_BOLD)
             if self.drag:  # where the divider will go
                 rows, cols = self.scr.getmaxyx()
                 if self.drag[0] == "v":
@@ -980,6 +1014,9 @@ class App:
                 data = os.read(0, 1024)
                 for m in MOUSE.finditer(data):
                     b, x, y = int(m.group(1)), int(m.group(2)) - 1, int(m.group(3)) - 1
+                    if self.selecting:
+                        self.select_mouse(b, x, y, m.group(4) == b"M")
+                        continue
                     if self.drag_mouse(b, x, y, m.group(4) == b"M"):
                         continue
                     if m.group(4) == b"M" and b == 0:  # left press
@@ -996,13 +1033,8 @@ class App:
         if self.selecting or data == SELECT:  # F10 in, F10 or Esc out; other keys wait
             if self.selecting and data not in (SELECT, b"\x1b"):
                 return
-            self.selecting = not self.selecting
-            sys.stdout.write(MOUSE_OFF if self.selecting else MOUSE_ON)
-            sys.stdout.flush()
-            if self.selecting:
-                self.put(self.scr.getmaxyx()[0] - 1, 0, " SELECT MODE: drag to select, Cmd-C copies.  F10 or Esc: back to the game "
-                         .ljust(self.scr.getmaxyx()[1] - 1), curses.A_REVERSE | curses.A_BOLD)
-                self.scr.refresh()
+            self.selecting, self.sel = not self.selecting, None
+            self.paint(bar=self.SELECT_BAR if self.selecting else None)
             return
         if self.over:  # dead: F7 rewinds, q quits, other keys are ignored
             if data == b"q":
