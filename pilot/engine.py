@@ -1607,7 +1607,10 @@ class Engine:
                 m.blocked.add((v.dlvl, v.pos[0] + d[0], v.pos[1] + d[1]))
                 if keys[0] in "o\x04":
                     m.dead_doors.add((v.dlvl, v.pos[0] + d[0], v.pos[1] + d[1]))
-            if not self.routine:  # The engine's own activity: pass a turn and pick another target.
+            # The engine's own activity: pass a turn and pick another target. So is a stuck 'e': the
+            # eat order runs over any routine, and a meal that won't start is not the routine's fault
+            # (an overloaded wererat that couldn't open its tin ended a game as "elbereth stuck").
+            if not self.routine or keys == "e":
                 return "s", f"stuck on {keys!r}: marked blocked, trying elsewhere"
             what = self.routine
             self._end_routine()
