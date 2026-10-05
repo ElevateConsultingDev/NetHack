@@ -10,6 +10,7 @@ import curses
 import json
 import os
 import pty
+import re
 import select
 import signal
 import socket
@@ -29,6 +30,9 @@ GAME = os.path.join(HERE, "playground")
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
 TOGGLE = (b"\x1d", b"\x1bOP", b"\x1b[11~")  # ^], F1 (two encodings)
+MOUSE = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")  # SGR mouse report (mode 1006)
+MENU_ITEM = re.compile(r"(?:^|[ \u2502])([a-zA-Z$#*-])\) ")  # " a) a +1 long sword"
+MENU_PAGE = re.compile(r"\(Page \d+ of \d+\)")  # footer of a curses menu with more pages
 
 SYSTEM = """You are a friendly NetHack 3.6 expert sitting next to the player, \
 who plays in a terminal with the standard keyboard commands (curses interface). \
@@ -78,6 +82,7 @@ class Helper:
         self.input = ""
         self.busy = False
         self.session = None
+        self.scroll = 0  # lines up from the bottom
 
     def ask(self, question, snapshot, redraw):
         self.lines.append(("you", "> " + question))
@@ -243,7 +248,8 @@ class App:
         if self.helper.busy:
             body.append((curses.A_DIM, "thinking..."))
         h = rows - 3
-        body = body[-h:]
+        self.helper.scroll = max(0, min(self.helper.scroll, len(body) - h))
+        body = body[max(0, len(body) - h - self.helper.scroll):len(body) - self.helper.scroll]
         for y in range(h):
             attr, l = body[y] if y < len(body) else (0, "")
             self.put(y, x0, l.ljust(w - 1)[:w - 1], attr)
@@ -278,6 +284,7 @@ class App:
                 q = self.helper.input.strip()
                 self.helper.input = ""
                 if q and not self.helper.busy:
+                    self.helper.scroll = 0
                     self.helper.ask(q, snapshot(self.screen, self.watcher.state), self.redraw)
             elif b in (8, 127):
                 self.helper.input = self.helper.input[:-1]
@@ -286,7 +293,33 @@ class App:
             elif ch.isprintable():
                 self.helper.input += ch
 
+    def click(self, x, y):
+        """A left click: menu lines send their letter, the map gets the click, the pane takes focus."""
+        if x >= self.gw:
+            self.focus = "helper"
+            return
+        self.focus = "game"
+        row = "".join(self.screen.buffer[y][i].data for i in range(self.gw))
+        if "--More--" in row:
+            os.write(self.fd, b"\r")
+            return
+        hits = [m for m in MENU_ITEM.finditer(row) if m.start() <= x]
+        if hits:
+            os.write(self.fd, hits[-1].group(1).encode())
+        elif (1000 << 5) in self.screen.mode:  # the game asked for xterm mouse reports
+            pos = bytes([32 + x + 1, 32 + y + 1])
+            os.write(self.fd, b"\x1b[M " + pos + b"\x1b[M#" + pos)  # press, release
+
+    def wheel(self, x, down):
+        """Wheel: scrolls the helper transcript, or pages a multi-page game menu."""
+        if x >= self.gw:
+            self.helper.scroll += -3 if down else 3
+        elif any(MENU_PAGE.search(line) for line in self.screen.display):
+            os.write(self.fd, b">" if down else b"<")  # only in a menu: on the map > goes downstairs
+
     def run(self):
+        sys.stdout.write("\x1b[?1000h\x1b[?1006h")  # mouse clicks, SGR coordinates
+        sys.stdout.flush()
         self.redraw()
         while True:
             if self.resized:
@@ -305,6 +338,13 @@ class App:
                 self.stream.feed(data)
             if 0 in r:
                 data = os.read(0, 1024)
+                for m in MOUSE.finditer(data):
+                    b, x, y = int(m.group(1)), int(m.group(2)) - 1, int(m.group(3)) - 1
+                    if m.group(4) == b"M" and b == 0:  # left press
+                        self.click(x, y)
+                    elif b in (64, 65):  # wheel up, down
+                        self.wheel(x, b == 65)
+                data = MOUSE.sub(b"", data)
                 if any(t == data or data.startswith(t) for t in TOGGLE):
                     self.focus = "helper" if self.focus == "game" else "game"
                 elif self.focus == "game":
@@ -314,6 +354,8 @@ class App:
             self.redraw()
 
     def close(self):
+        sys.stdout.write("\x1b[?1006l\x1b[?1000l")
+        sys.stdout.flush()
         self.watcher.close()
         try:
             os.kill(self.pid, signal.SIGHUP)  # NetHack saves on hangup
