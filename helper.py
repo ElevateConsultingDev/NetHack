@@ -268,6 +268,15 @@ class App:
         self.pid = pid
         self._winsize()
 
+    def send(self, data):
+        """Keys to the game; dropped when there is no game (ended, or restarting)."""
+        if self.over:
+            return
+        try:
+            os.write(self.fd, data)
+        except OSError:
+            pass
+
     def say(self, kind, text):
         self.helper.scroll = 0
         self.helper.lines.append((kind, text))
@@ -279,7 +288,7 @@ class App:
             return False
         self.saving = why
         self.snap_info = st.get("status") or {}
-        os.write(self.fd, SAVE_KEYS)
+        self.send(SAVE_KEYS)
         return True
 
     def game_exited(self):
@@ -460,21 +469,21 @@ class App:
         self.focus = "game"
         row = "".join(self.screen.buffer[y][i].data for i in range(self.gw))
         if "--More--" in row:
-            os.write(self.fd, b"\r")
+            self.send(b"\r")
             return
         hits = [m for m in MENU_ITEM.finditer(row) if m.start() <= x]
         if hits:
-            os.write(self.fd, hits[-1].group(1).encode())
+            self.send(hits[-1].group(1).encode())
         elif (1000 << 5) in self.screen.mode:  # the game asked for xterm mouse reports
             pos = bytes([32 + x + 1, 32 + y + 1])
-            os.write(self.fd, b"\x1b[M " + pos + b"\x1b[M#" + pos)  # press, release
+            self.send(b"\x1b[M " + pos + b"\x1b[M#" + pos)  # press, release
 
     def wheel(self, x, down):
         """Wheel: scrolls the helper transcript, or pages a multi-page game menu."""
         if x >= self.gw:
             self.helper.scroll += -3 if down else 3
         elif any(MENU_PAGE.search(line) for line in self.screen.display):
-            os.write(self.fd, b">" if down else b"<")  # only in a menu: on the map > goes downstairs
+            self.send(b">" if down else b"<")  # only in a menu: on the map > goes downstairs
 
     def ask(self, question):
         if not self.helper.busy:
@@ -493,7 +502,7 @@ class App:
                 self.helper.lines.append(("err", f"HELD: {why} Press the same key again to do it anyway."))
                 return
             self.held = None
-        os.write(self.fd, data)
+        self.send(data)
 
     def check_warnings(self):
         state = self.watcher.state
@@ -551,7 +560,7 @@ class App:
                 elif any(t == data or data.startswith(t) for t in TOGGLE):
                     self.focus = "helper" if self.focus == "game" else "game"
                 elif data in FKEYS:
-                    os.write(self.fd, FKEYS[data])
+                    self.send(FKEYS[data])
                 elif data == WHAT_NOW:
                     self.ask("What should I do right now?")
                 elif data == SNAPSHOT:
