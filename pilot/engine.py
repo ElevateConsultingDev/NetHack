@@ -132,6 +132,9 @@ class Memory:
     visited: set = field(default_factory=set)     # (dlvl, x, y) squares stood on
     kicks: dict = field(default_factory=dict)     # (dlvl, x, y) of a locked door -> kicks
     dead_doors: set = field(default_factory=set)  # doors we gave up on
+    locked: set = field(default_factory=set)      # (dlvl, x, y) doors the game told us are locked
+    pending_dir: str = ""                         # direction key for an "In what direction?" still to come
+    unlocking: bool = False                       # we applied a key or pick to a door: answer "Unlock it?"
     features: dict = field(default_factory=dict)  # (dlvl, x, y) -> feature name last seen there
     blocked: set = field(default_factory=set)     # (dlvl, x, y) targets that didn't work out
     last_move: tuple = ()                         # (keys, turn, pos) of the last move sent
@@ -463,8 +466,20 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
         if v.kind == "getlin" and "write" in prompt:
             memory.engraving = False
             return "Elbereth\r", "write Elbereth"
+    if memory.pending_dir and v.ctx.get("prompt", "").startswith("In what direction"):
+        key, memory.pending_dir = memory.pending_dir, ""
+        return key, "toward the door"
     if v.kind == "yn":
         prompt = v.ctx.get("prompt", "")
+        if memory.unlocking and prompt.startswith("There is ") and "lock" in prompt:
+            return "n", "not the box on this square: the door"
+        if memory.unlocking and prompt.endswith("Unlock it?"):
+            memory.unlocking = False
+            return "y", "unlock it"
+        if memory.unlocking and prompt.endswith("Lock it?"):  # It was not locked after all.
+            memory.unlocking = False
+            memory.locked.clear()
+            return "n", "already unlocked: leave it"
         if "trouble lifting" in prompt or "Continue?" in prompt and memory.loot_classes:
             return "n", "too heavy: leave it"
         if prompt.startswith(("Do you want your possessions identified", "Do you want to see", "Do you want an account")):
@@ -595,24 +610,53 @@ DOOR_NOT_CLOSED = ("This door is broken", "This door is already open", "You see 
                    "This doorway has no door")
 
 
+UNLOCKERS = ("key", "lock pick", "credit card")  # best first (lock.c: 70+Dex, 3xDex, 2xDex percent a turn)
+WATCH = ("watchman", "watch captain")
+
+
+def unlock_tool(v: View) -> dict | None:
+    for want in UNLOCKERS:
+        for i in v.s.get("inventory", []):
+            if i["class"] == "(" and want in i["text"] and "cursed" not in i["text"].replace("uncursed", ""):
+                return i
+    return None
+
+
 def r_explore(v: View, memory: Memory, args: dict):
     if any(m.startswith(DOOR_NOT_CLOSED) for m in v.s.get("messages", [])) and memory.last_door:
         memory.features[memory.last_door] = "broken door"  # Our picture was stale.
     if any(closed_for_inventory(m) for m in v.s.get("messages", [])):
         for dx, dy in DIRS.values():  # A shop door: kicking it angers the shopkeeper.
             memory.dead_doors.add((v.dlvl, v.pos[0] + dx, v.pos[1] + dy))
-    watched = v.dlvl in memory.watch or any("stop damaging that door" in m or "stop picking that lock" in m
-                                              for m in v.s.get("messages", []))
+    msgs = v.s.get("messages", [])
+    warned = any("stop damaging that door" in m or "stop picking that lock" in m for m in msgs)
+    in_town = v.dlvl in memory.watch or warned
+    # The watch acts only on what a watchman can see, and warns once per door before the arrest
+    # (monmove.c watch_on_duty, dokick.c): so work on a town door only with none of them in view,
+    # and never touch a door again after its warning.
+    watch_near = any(c["kind"] == "monster" and c["name"] in WATCH for c in v.cells.values())
+    memory.pending_dir, memory.unlocking = "", False
     for dx, dy in ORTHO:
         d = (v.dlvl, v.pos[0] + dx, v.pos[1] + dy)
         if v.feature(*d[1:]) == "closed door" and d not in memory.dead_doors:
-            if any("This door is locked" in m for m in v.s.get("messages", [])):
+            if any("This door is locked" in m for m in msgs):
+                memory.locked.add(d)
+            if any(m.startswith("You succeed in") for m in msgs) and d in memory.locked:
+                memory.locked.discard(d)
+                _count(memory, "doors unlocked")
+            if d in memory.locked:
+                tool = unlock_tool(v)
                 memory.kicks[d] = memory.kicks.get(d, 0) + 1
-                if memory.kicks[d] > 6 or watched:
-                    # Kicking a door with the Minetown watch about gets one
-                    # warning, then the whole watch attacks (10 of 102 deaths).
+                if warned or memory.kicks[d] > (14 if tool else 6):
                     memory.dead_doors.add(d)
                     continue
+                if in_town and watch_near:
+                    return "s", "wait for the watch to look away from the locked door"
+                if tool:
+                    # A locked door with a key in the pack ended a game in Minetown: the stairs were
+                    # behind it and the pilot searched the walls for 1,300 turns (B21451200).
+                    memory.pending_dir, memory.unlocking = KEY_FOR[(dx, dy)], True
+                    return "a" + tool["letter"] + KEY_FOR[(dx, dy)], f"unlock the door with the {next(u for u in UNLOCKERS if u in tool['text'])}"
                 return "\x04" + KEY_FOR[(dx, dy)], "kick the locked door"
             memory.last_door = d
             return "o" + KEY_FOR[(dx, dy)], "open the door"
@@ -1197,6 +1241,14 @@ class Engine:
             self.memory.visited.add((v.dlvl, *v.pos))
             for (x, y), c in v.cells.items():
                 if c["kind"] == "monster" and c["name"] in SESSILE:
+                    if spoiler(c["name"]).get("speed", 0) > 0:
+                        # Eyes, blobs and fungi do creep: seen here, it is no longer on the squares
+                        # nearby where we remembered one. (A floating eye left a temple doorway for
+                        # the altar and the doorway stayed barred: the pilot waited inside for 340
+                        # turns with the stairs known, B22013300.)
+                        for k in [k for k, n in self.memory.sessile.items() if n == c["name"] and k[0] == v.dlvl
+                                  and k[1:] != (x, y) and max(abs(k[1] - x), abs(k[2] - y)) <= 4]:
+                            del self.memory.sessile[k]
                     self.memory.sessile[(v.dlvl, x, y)] = c["name"]
                 if c["kind"] == "monster" and c["name"] in ("watchman", "watch captain"):
                     self.memory.watch.add(v.dlvl)
