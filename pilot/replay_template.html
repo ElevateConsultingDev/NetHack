@@ -29,21 +29,21 @@ header p { color: var(--ink2); max-width: 90ch; }
 .term pre { margin: 0; font-family: var(--mono); font-size: clamp(8px, 1.08vw, 13px); line-height: 1.22; white-space: pre; }
 .term .you { color: var(--term-gold); font-weight: 600; background: rgba(230, 184, 74, 0.2); }
 #status { border-top: 1px solid #2b2f36; margin-top: 6px; padding-top: 6px; }
-#msg { color: var(--term-dim); height: 3.66em; overflow: hidden; white-space: pre-wrap; margin-bottom: 4px; }
+#msg { color: var(--term-dim); min-height: 3.66em; white-space: pre-wrap; margin-bottom: 4px; }
 .side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .box { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-#note { font-family: var(--mono); font-size: 0.88rem; height: 2.9em; overflow: hidden; overflow-wrap: anywhere; }
-#keyline { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#note { font-family: var(--mono); font-size: 0.88rem; min-height: 2.9em; overflow-wrap: anywhere; }
+#keyline { overflow-wrap: anywhere; }
 .sub { font-family: var(--mono); font-size: 0.78rem; color: var(--ink2); overflow-wrap: anywhere; min-height: 1.45em; }
 .kv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 10px; }
 .kv div { display: flex; flex-direction: column; min-width: 0; }
 .kv span, dl.checks dt { font-size: 0.68rem; color: var(--muted); font-family: var(--mono); letter-spacing: 0.05em; text-transform: uppercase; }
-.kv b { font-family: var(--mono); font-size: 1.02rem; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kv b { font-family: var(--mono); font-size: 1.02rem; font-variant-numeric: tabular-nums; font-weight: 600; overflow-wrap: anywhere; }
 .hpbar { height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; }
 .hpbar i { display: block; height: 100%; background: var(--s1); border-radius: 3px; }
 dl.checks { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 0.86rem; align-items: baseline; }
-dl.checks dd { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-dl.checks dd#cm { white-space: normal; height: 2.9em; overflow: hidden; }
+dl.checks dd { margin: 0; overflow-wrap: anywhere; }
+dl.checks dd#cm { min-height: 2.9em; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 button, select { font-family: var(--mono); font-size: 0.82rem; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 6px 11px; cursor: pointer; }
 button:hover { border-color: var(--ink2); }
