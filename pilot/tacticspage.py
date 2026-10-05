@@ -62,7 +62,7 @@ textarea, input.say { width:100%; font:12px/1.4 ui-monospace, Menlo, monospace; 
 button.go { font:inherit; padding:4px 12px; border-radius:6px; border:1px solid var(--accent); background:none; color:var(--accent); cursor:pointer; }
 """
 
-JS = """
+JS = r"""
 const D = JSON.parse(document.getElementById('data').textContent);
 const $ = (s) => document.querySelector(s), esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const label = {met:'met', not_met:'not met', unknown:'unknown', ended_early:'ended early'};
@@ -112,13 +112,13 @@ function detail() {
 const tree = (v) => Array.isArray(v) ? (v.length ? '<ul class="tree">' + v.map(x => `<li>${tree(x)}</li>`).join('') + '</ul>' : 'none')
   : (v && typeof v === 'object') ? '<ul class="tree">' + Object.entries(v).map(([k, x]) => `<li><b>${esc(k.replace(/_/g, ' '))}:</b> ${tree(x)}</li>`).join('') + '</ul>' : esc(v);
 function sections(t) {  // the brief sent to a brain, split at its headings
-  const parts = t.split(/^(ESCALATION|CONSULT|EVENTS|STANDING ORDERS|CHECKS|STATUS|MESSAGES|INVENTORY|PROMPT|NOTABLE|RELEVANT MEMORY[^:]*|MAP):[ \t]?/m), out = {};
+  const parts = t.split(/^(ESCALATION|CONSULT|EVENTS|STANDING ORDERS|CHECKS|STATUS|MESSAGES|INVENTORY|PROMPT|NOTABLE|RELEVANT MEMORY[^:]*|MAP):[ 	]?/m), out = {};
   for (let k = 1; k < parts.length; k += 2) out[parts[k].split(' (')[0]] = parts[k + 1].trim();
   return out;
 }
 function notable(t) {  // "object: gold piece at (3,4); ..." -> "gold piece x15", single things keep their square
   const seen = new Map();
-  t.split('; ').forEach(x => { const m = /^(.*?): (.*) at (\\(.*\\))$/.exec(x); if (!m) return; const k = (m[1].includes('monster') ? m[1].replace('monster', '').replace(/[()]/g, '').trim() + ' ' : '') + m[2]; (seen.get(k) || seen.set(k, []).get(k)).push(m[3]); });
+  t.split('; ').forEach(x => { const m = /^(.*?): (.*) at (\(.*\))$/.exec(x); if (!m) return; const k = (m[1].includes('monster') ? m[1].replace('monster', '').replace(/[()]/g, '').trim() + ' ' : '') + m[2]; (seen.get(k) || seen.set(k, []).get(k)).push(m[3]); });
   return [...seen].map(([k, at]) => at.length > 1 ? `${esc(k.trim())} &times;${at.length}` : `${esc(k.trim())} at ${at[0]}`).join(', ') || 'nothing';
 }
 function brain(o) {
@@ -150,7 +150,7 @@ function brain(o) {
       <h4>Response</h4><div class="q"><div class="a">${esc(le.routine)}</div>${le.say ? `<div>${esc(le.say)}</div>` : ''}</div>
       <h4>Status line</h4>${esc(b.STATUS || '')}
       <h4>Messages</h4>${esc(b.MESSAGES || 'none')}
-      <h4>Inventory</h4><div class="cols2">${(b.INVENTORY || '').split('\\n').map(x => `<div>${esc(x)}</div>`).join('')}</div>
+      <h4>Inventory</h4><div class="cols2">${(b.INVENTORY || '').split('\n').map(x => `<div>${esc(x)}</div>`).join('')}</div>
       <h4>On the map</h4>${notable(b.NOTABLE || '')}
       <h4>Map as sent</h4><pre>${esc(b.MAP || '')}</pre>
       ${b['RELEVANT MEMORY'] ? `<h4>Memory included</h4>${esc(b['RELEVANT MEMORY'])}` : ''}
