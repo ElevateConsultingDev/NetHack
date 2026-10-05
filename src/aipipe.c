@@ -489,6 +489,7 @@ put_context()
     }
 #ifdef TTY_GRAPHICS
     if (ctx_kind && !strcmp(ctx_kind, "menu") && ctx_menu_win != WIN_ERR
+        && !strcmp(base.name, "tty") /* wins[] is tty's; curses menus differ */
         && wins[ctx_menu_win]) {
         tty_menu_item *mi;
 
