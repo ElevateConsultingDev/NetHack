@@ -69,6 +69,10 @@ input[type=range] { flex: 1 1 240px; min-width: 0; accent-color: var(--s1); }
 #dlog { font-family: var(--mono); font-size: 0.76rem; line-height: 1.45; display: flex; flex-direction: column; gap: 1px; }
 #dlog div { display: grid; grid-template-columns: 4.2rem 4.6rem minmax(0, 1fr); gap: 8px; padding: 1px 4px; border-radius: 3px; }
 #dlog div.cur { background: var(--hl); }
+#dlog div.asked { border-left: 3px solid #e08a2c; background: rgba(224, 138, 44, 0.12); grid-template-columns: 4.2rem minmax(0, 1fr); }
+#dlog div.asked b { color: #e08a2c; }
+#controller { font-family: var(--mono); font-size: 0.86rem; border: 1px solid var(--rule); border-left: 4px solid #e08a2c; border-radius: 6px; padding: 8px 12px; margin: 8px 0; }
+#controller b { font-size: 1rem; }
 #dlog .t { color: var(--muted); } #dlog .k { color: var(--gold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #dlog .g { color: var(--ink2); display: block; }
 #blog { display: flex; flex-direction: column; gap: 8px; }
@@ -96,6 +100,7 @@ pre.brief { margin: 6px 0 0; font-family: var(--mono); font-size: 0.7rem; line-h
     <div class="sub" style="margin-bottom:4px"><a href="dashboard.html" style="color:inherit">&larr; all games</a> · <a id="livelink" href="#" style="color:inherit">live page</a></div>
     <h1 id="h1">One Pilot Run</h1>
     <p id="intro"></p>
+    <div id="controller"></div>
   </header>
 
   <div class="stage">
@@ -188,6 +193,14 @@ pre.brief { margin: 6px 0 0; font-family: var(--mono); font-size: 0.7rem; line-h
     "), recorded as the pilot played it. It reaches dungeon level " + D.deepest + " in " + last[0] + " turns and ends " +
     (D.death || D.stall || "without dying") + ".";
   document.title = "Replay " + D.name;
+  // Who decides, stated once at the top: the commonest question about a replay.
+  var WHO = { rules: ["RULES ONLY", "No Jev and no language model were called in this game. Fixed rules made every decision. Where the rules hit a situation outside their standing orders they ask a \"brain\"; here that brain is another fixed rule, standing in where a model would answer."],
+    jev: ["JEV PICKS EVERY MOVE", "Jev chose the action each turn from a list the engine built."],
+    jevb: ["RULES, WITH JEV JUDGING FIGHTS", "Fixed rules play. In a fight that is costing health, Jev answers yes/no questions and code picks the move from its answers."],
+    haiku: ["RULES, WITH CLAUDE HAIKU AS THE BRAIN", "Fixed rules play. Where a situation is outside their standing orders, Claude Haiku is asked."] }[D.brain || "rules"] || [String(D.brain).toUpperCase(), ""];
+  var asked = {}; E.forEach(function (e) { (asked[e.i] = asked[e.i] || []).push(e); });
+  $("controller").innerHTML = "<b>Controller: " + WHO[0] + "</b><br>" + esc(WHO[1]) + "<br>The brain was asked " + E.length + " time" + (E.length === 1 ? "" : "s") +
+    " in " + last[0] + " turns. Each one is an orange row in the decision log, an orange tick on the charts, and an entry under Messages to the brain.";
   if (D.brain === "jev") $("footnote").textContent = "Every turn the engine sent Jev the state shown under each entry and asked which action to take; the entry shows Jev's probabilities and what the engine did. " + $("footnote").textContent;
   else if (D.brain === "rules") $("footnote").textContent = "This game was played by the rule brain, so no language model was called: each entry under Messages to the brain shows the brief a model would have received and the rule brain's answer. " + $("footnote").textContent; $("h1").textContent = D.name; $("livelink").href = "game-" + D.name + ".html";
   var scrub = $("scrub"); scrub.max = n - 1;
@@ -218,6 +231,9 @@ pre.brief { margin: 6px 0 0; font-family: var(--mono); font-size: 0.7rem; line-h
       var f = F[k];
       out.push('<div' + (k === i ? ' class="cur"' : "") + '><span class="t">T' + f[0] + '</span><span class="k">' + esc(f[13] || "") +
         '</span><span>' + esc(f[10] || "(answering a prompt)") + (f[11] ? '<span class="g">' + esc(f[11]) + "</span>" : "") + "</span></div>");
+      (asked[k] || []).forEach(function (e) {
+        out.push('<div class="asked"><span class="t">T' + e.t + '</span><span><b>ASKED THE BRAIN:</b> ' + esc(e.ask.slice(0, 140)) + ' <b>&rarr; ' + esc(e.routine) + "</b>" + (e.say ? " (" + esc(e.say.slice(0, 120)) + ")" : "") + "</span></div>");
+      });
     }
     $("dlog").innerHTML = out.join(""); var sc = $("dscroll"); sc.scrollTop = sc.scrollHeight;
   }
