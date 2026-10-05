@@ -323,6 +323,7 @@ class App:
         self.snap_dlvl = None # dungeon level of the last automatic checkpoint
         self.load_target = None  # what to load once the game has saved: a saves.listing() item
         self.holding = False  # checkpoint/load in progress: don't draw the game restarting
+        self.cursor_shown = True
         self.new_name = None  # the character to start for a new game
         self.saves_ui = None  # the ⌃G l list: items, sel, confirm, naming
         self.save_name = None # this character's save file name, once known
@@ -916,6 +917,13 @@ class App:
                         self.put(y, self.drag[1], "#", curses.A_REVERSE)
                 else:
                     self.put(self.drag[1], GX + self.gw + 1, "#" * (cols - GX - self.gw - 2), curses.A_REVERSE)
+            show = not (GRAPHICS and self.zoom_view and self.focus == "game")  # the big @ marks you
+            if show != self.cursor_shown:
+                self.cursor_shown = show
+                try:
+                    curses.curs_set(1 if show else 0)
+                except curses.error:
+                    pass
             if self.focus == "game" and self.zoom_view:
                 x0, y0, bw, bh, top, _ = self.zoom_view
                 you = self.watcher.state["player"]
