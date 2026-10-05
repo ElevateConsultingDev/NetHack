@@ -34,6 +34,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.join(HERE, "playground")
 SAVES = os.path.join(GAME, "save")
 SNAPS = os.path.join(GAME, "snapshots")
+MAPVIEW = os.path.join(GAME, "mapview.json")  # the live map, for ./play --map in another split
 KEEP_SNAPS = 10
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
@@ -88,6 +89,8 @@ The player has turned on a cheat: you also get the whole level as it really is, 
 Plain text only, no markdown: it is shown in a narrow terminal pane."""
 
 ASCII = str.maketrans("─│┌┐└┘├┤┬┴┼", "-|+++++++++")  # box drawing as plain ASCII, any font
+SGR_FG = {"black": 30, "red": 31, "green": 32, "brown": 33, "blue": 34, "magenta": 35,
+          "cyan": 36, "white": 37}
 COLORS = {"black": 0, "red": 1, "green": 2, "brown": 3, "blue": 4,
           "magenta": 5, "cyan": 6, "white": 7}
 
@@ -447,6 +450,30 @@ class App:
                 self.gput(y, x, (c.data or " ").translate(ASCII), attr)
         self.screen.dirty.clear()
 
+    def write_mapview(self):
+        """The map region (characters and colors) and where you are, for ./play --map."""
+        you, st = self.watcher.state.get("player") or {}, self.watcher.state.get("status") or {}
+        rows, styles = [], []
+        for r in range(self.map_top, min(self.map_top + MAP_H, self.gh)):
+            line, sty = "", []
+            for x in range(MAP_W):
+                c = self.screen.buffer[r][x]
+                code = SGR_FG.get(c.fg.removeprefix("bright"))
+                parts = (["1"] if c.bold or c.fg.startswith("bright") else []) + (["7"] if c.reverse else [])
+                if code:
+                    parts.append(str(code))
+                line += (c.data or " ").translate(ASCII)
+                sty.append(";".join(parts))
+            rows.append(line)
+            styles.append(sty)
+        data = json.dumps({"x": you.get("x"), "y": you.get("y"), "dlvl": st.get("dlvl"),
+                           "rows": rows, "styles": styles})
+        if data != getattr(self, "_mapview", None):
+            self._mapview = data
+            with open(MAPVIEW + ".tmp", "w") as f:
+                f.write(data)
+            os.replace(MAPVIEW + ".tmp", MAPVIEW)
+
     def draw_axes(self):
         """Row numbers (y) in the gutter and column numbers (x) under the game."""
         you = self.watcher.state.get("player") or {}
@@ -573,6 +600,7 @@ class App:
             return
         with self.lock:
             self.draw_game()
+            self.write_mapview()
             self.draw_axes()
             self.draw_panel()
             if self.popup:
@@ -941,6 +969,41 @@ class App:
             pass
 
 
+def mapview():
+    """./play --map: the live map alone, in its own split, so Cmd +/- sizes just it.
+    Follows you when the split is too small for the whole map. ^C quits."""
+    sys.stdout.write("\x1b[?25l")
+    last = None
+    try:
+        while True:
+            try:
+                stamp = (os.path.getmtime(MAPVIEW), os.get_terminal_size())
+            except OSError:
+                stamp = None
+            if stamp and stamp != last:
+                last = stamp
+                d = json.load(open(MAPVIEW))
+                cols, lines = stamp[1].columns - GX, stamp[1].lines - 1 - RULER  # room for the axes
+                x0 = max(0, min(MAP_W - 1 - cols, (d["x"] or 1) - 1 - cols // 2)) if cols < MAP_W - 1 else 0
+                y0 = max(0, min(len(d["rows"]) - lines, (d["y"] or 0) - lines // 2)) if lines < len(d["rows"]) else 0
+                hi = lambda text, on: f"\x1b[7m{text}\x1b[0m" if on else f"\x1b[2m{text}\x1b[0m"
+                out = ["\x1b[H\x1b[2J\x1b[7m" + f" Dlvl {d['dlvl']}  you: x={d['x']} y={d['y']}   (Cmd +/- zooms) "[:cols + GX] + "\x1b[0m"]
+                for y, (row, sty) in enumerate(list(zip(d["rows"], d["styles"]))[y0:y0 + lines], y0):
+                    out.append(hi(f"{y:2d} ", y == d["y"]) + "".join(
+                        f"\x1b[0;{s_}m{ch}" if s_ else f"\x1b[0m{ch}"
+                        for ch, s_ in list(zip(row, sty))[x0:x0 + cols]) + "\x1b[0m")
+                xs = range(x0 + 1, min(MAP_W, x0 + 1 + cols))  # map x of each visible column
+                out.append("   " + "".join(hi(str(x // 10) if x % 10 == 0 or (x == xs[0] and x0) else " ", x == d["x"]) for x in xs))
+                out.append(hi(" x ", False) + "".join(hi(str(x % 10), x == d["x"]) for x in xs))
+                sys.stdout.write("\n".join(out))
+                sys.stdout.flush()
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sys.stdout.write("\x1b[0m\x1b[?25h\n")
+
+
 def main(scr):
     signal.signal(signal.SIGHUP, lambda *_: sys.exit())  # closed terminal: still save and clean up
     app = App(scr, sys.argv[1:])
@@ -951,5 +1014,8 @@ def main(scr):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--map"]:
+        mapview()
+        sys.exit()
     os.environ.setdefault("ESCDELAY", "25")
     curses.wrapper(main)
