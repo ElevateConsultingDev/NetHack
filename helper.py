@@ -25,6 +25,8 @@ import termios
 
 import pyte
 
+import guard
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.join(HERE, "playground")
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
@@ -35,6 +37,7 @@ FKEYS = {  # function key (two encodings each) -> extended command typed into th
     b"\x1bOR": b"#godown\r", b"\x1b[13~": b"#godown\r",  # F3: travel to the down stairs
     b"\x1bOS": b"#goup\r", b"\x1b[14~": b"#goup\r",      # F4: travel to the up stairs
 }
+WHAT_NOW = b"\x1b[15~"  # F5: ask the helper what to do now
 MOUSE = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")  # SGR mouse report (mode 1006)
 MENU_ITEM = re.compile(r"(?:^|[ \u2502])([a-zA-Z$#*-])\) ")  # " a) a +1 long sword"
 MENU_PAGE = re.compile(r"\(Page \d+ of \d+\)")  # footer of a curses menu with more pages
@@ -176,6 +179,9 @@ class App:
         self.scr = scr
         self.watcher = Watcher()
         self.helper = Helper()
+        self.held = None      # a dangerous key held back by the guard, sent if pressed again
+        self.warned = set()   # warnings already shown (each shows once while it applies)
+        self.seq = 0
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -265,7 +271,8 @@ class App:
         body = []
         for kind, text in self.helper.lines:
             attr = {"you": curses.A_BOLD, "dim": curses.A_DIM,
-                    "err": self.color("red", "default", False)}.get(kind, 0)
+                    "err": self.color("red", "default", False),
+                    "warn": self.color("yellow", "default", True) | curses.A_BOLD}.get(kind, 0)
             for para in text.split("\n"):
                 body += [(attr, l) for l in (textwrap.wrap(para, w - 1) or [""])]
             body.append((0, ""))
@@ -283,7 +290,7 @@ class App:
     def draw_bar(self):
         rows, cols = self.scr.getmaxyx()
         where = "HELPER (Enter asks, Esc back)" if self.focus == "helper" else "GAME"
-        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
+        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
                  curses.A_REVERSE)
 
     def redraw(self):
@@ -307,9 +314,8 @@ class App:
             if ch in "\r\n":
                 q = self.helper.input.strip()
                 self.helper.input = ""
-                if q and not self.helper.busy:
-                    self.helper.scroll = 0
-                    self.helper.ask(q, snapshot(self.screen, self.watcher.state), self.redraw)
+                if q:
+                    self.ask(q)
             elif b in (8, 127):
                 self.helper.input = self.helper.input[:-1]
             elif b == 21:  # ^U clears the line
@@ -341,6 +347,36 @@ class App:
         elif any(MENU_PAGE.search(line) for line in self.screen.display):
             os.write(self.fd, b">" if down else b"<")  # only in a menu: on the map > goes downstairs
 
+    def ask(self, question):
+        if not self.helper.busy:
+            self.helper.scroll = 0
+            self.helper.ask(question, snapshot(self.screen, self.watcher.state), self.redraw)
+
+    def game_key(self, data):
+        """Send a key to the game, unless the guard holds it (then a second press sends it)."""
+        if data == self.held:
+            self.held = None
+        elif data:
+            why = guard.check(self.watcher.state, data)
+            if why:
+                self.held = data
+                self.helper.scroll = 0
+                self.helper.lines.append(("err", f"HELD: {why} Press the same key again to do it anyway."))
+                return
+            self.held = None
+        os.write(self.fd, data)
+
+    def check_warnings(self):
+        state = self.watcher.state
+        if state.get("seq", 0) == self.seq:
+            return
+        self.seq = state.get("seq", 0)
+        now = guard.warnings(state)
+        for w in sorted(now - self.warned):
+            self.helper.scroll = 0
+            self.helper.lines.append(("warn", "! " + w))
+        self.warned = now
+
     def run(self):
         sys.stdout.write("\x1b[?1000h\x1b[?1006h")  # mouse clicks, SGR coordinates
         sys.stdout.flush()
@@ -360,6 +396,7 @@ class App:
                 if not data:
                     return
                 self.stream.feed(data)
+            self.check_warnings()
             if 0 in r:
                 data = os.read(0, 1024)
                 for m in MOUSE.finditer(data):
@@ -373,8 +410,10 @@ class App:
                     self.focus = "helper" if self.focus == "game" else "game"
                 elif data in FKEYS:
                     os.write(self.fd, FKEYS[data])
+                elif data == WHAT_NOW:
+                    self.ask("What should I do right now?")
                 elif self.focus == "game":
-                    os.write(self.fd, data)
+                    self.game_key(data)
                 else:
                     self.helper_key(data)
             self.redraw()

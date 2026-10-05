@@ -6,6 +6,7 @@
 #include "curses.h"
 #include "hack.h"
 #include "wincurs.h"
+#include "aipipe.h"
 #include "cursmesg.h"
 #include <ctype.h>
 
@@ -220,6 +221,7 @@ curses_block(boolean noscroll) /* noscroll - blocking because of msgtype
 
     oldcrsr = curs_set(1);
     do {
+        aipipe_snapshot(); /* external watcher */
         ret = wgetch(win);
         if (ret == ERR || ret == '\0')
             ret = '\n';
@@ -592,8 +594,10 @@ curses_message_win_getline(const char *prompt, char *answer, int buffer)
         wrefresh(win);
         curses_got_input(); /* despite its name, before rather than after... */
 #ifdef PDCURSES
+        aipipe_snapshot(); /* external watcher */
         ch = wgetch(win);
 #else
+        aipipe_snapshot(); /* external watcher */
         ch = getch();
 #endif
         curs_set(0);

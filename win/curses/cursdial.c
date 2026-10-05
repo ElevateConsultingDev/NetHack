@@ -6,6 +6,7 @@
 #include "curses.h"
 #include "hack.h"
 #include "wincurs.h"
+#include "aipipe.h"
 #include "cursdial.h"
 #include "func_tab.h"
 #include <ctype.h>
@@ -293,8 +294,10 @@ curses_character_input_dialog(const char *prompt, const char *choices,
     curs_set(1);
     while (1) {
 #ifdef PDCURSES
+        aipipe_snapshot(); /* external watcher */
         answer = wgetch(message_window);
 #else
+        aipipe_snapshot(); /* external watcher */
         answer = getch();
 #endif
         if (answer == ERR) {
@@ -430,6 +433,7 @@ curses_ext_cmd()
 
         curs_set(1);
         wrefresh(extwin);
+        aipipe_snapshot(); /* external watcher */
         letter = getch();
         curs_set(0);
         prompt_width = (int) strlen(cur_choice);
@@ -1263,6 +1267,7 @@ menu_get_selections(WINDOW * win, nhmenu *menu, int how)
     menu_display_page(menu, win, curpage, selectors);
 
     while (!dismiss) {
+        aipipe_snapshot(); /* external watcher */
         curletter = getch();
 
         if (curletter == ERR) {
@@ -1315,6 +1320,7 @@ menu_get_selections(WINDOW * win, nhmenu *menu, int how)
                 count = curses_get_count(curletter - '0');
                 touchwin(win);
                 refresh();
+                aipipe_snapshot(); /* external watcher */
                 curletter = getch();
                 if (count > 0) {
                     count_letter = curletter;

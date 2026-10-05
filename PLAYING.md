@@ -24,6 +24,16 @@ NetHack (curses interface) on the left, a Claude helper on the right.
   turns that off.
 - `F3` / `F4` (or `#godown` / `#goup`) walk to the down / up stairs once you know where
   they are (with `F2` on, you always do). Anything interesting stops the walk; press again.
+- `F5` asks the helper "what should I do right now?" without typing.
+- Guard (`guard.py`, plain rules, no model): a dangerous key is held back with the
+  reason in the helper pane; press it again to do it anyway. Covers eating cockatrice /
+  chickatrice / Medusa / green slime corpses, eating while Satiated, praying when it
+  isn't safe (uses the cheat's prayer timeout, luck and anger), putting on or wearing
+  cursed or unknown-BUC items, and moving into a floating eye or bare-handed into a
+  cockatrice.
+- Warnings appear in the helper pane (yellow) when they start to apply: low HP, Weak or
+  Fainting, turning to stone or slime, strangling, deadly illness, and dangerous monsters
+  within 7 squares.
 - Your inventory stays visible to the right of the map (`perm_invent`); menus open over it.
 - Don't die for good: `./play -X` (or `#exploremode` mid-game) is NetHack's explore mode;
   when you would die it asks `Die?` and you can say no. Explore games skip the high scores.

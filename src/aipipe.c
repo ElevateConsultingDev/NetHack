@@ -465,7 +465,11 @@ put_reveal()
         put_kv_str("text", true_name(otmp), TRUE);
         put("}");
     }
-    put("]}");
+    put("],\"prayer\":{");
+    put_kv_int("timeout", (long) u.ublesscnt, FALSE);
+    put_kv_int("luck", (long) Luck, TRUE);
+    put_kv_int("anger", (long) u.ugangr, TRUE);
+    put("}}");
 }
 
 static void
