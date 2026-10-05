@@ -51,9 +51,14 @@ NetHack (curses interface) on the left, a Claude helper on the right.
   last 10 per character are kept in `playground/snapshots/`.
 - Legend: the top of the helper pane lists every symbol on the map right now and what
   it is (monsters by name, items by class, doors, stairs, traps...).
-- Your inventory stays visible to the right of the map (`perm_invent`); menus open over it.
-  Click an item there for what you can do with it (Wield, Wear, Put on, Quaff, Read, Zap,
-  Eat, Apply, Throw, Drop, Ask the helper...); click an action or press its key. Esc closes.
+- Beside the map: status (HP colored by how hurt you are, Pw, AC, Xp, gold, turn, level),
+  your location as x/y, stats, hunger and conditions, then your inventory. Click an item
+  for what you can do with it (Wield, Wear, Put on, Quaff, Read, Zap, Eat, Apply, Throw,
+  Drop, Ask the helper...); click an action or press its key, Esc closes. When the game
+  asks for an item, clicking one answers. Game menus open over this panel.
+- Axes: row numbers (y, 0 at the top) down the left and column numbers (x, 1 at the
+  left) along the bottom, the same coordinates the helper uses; your row and column
+  are highlighted.
 - Don't die for good: `./play -X` (or `#exploremode` mid-game) is NetHack's explore mode;
   when you would die it asks `Die?` and you can say no. Explore games skip the high scores.
 - Closing the terminal saves the game (NetHack saves on hangup).

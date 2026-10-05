@@ -55,11 +55,22 @@ COMMANDS = palette.load_commands(os.path.join(HERE, "src", "cmd.c"))
 EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [F5]", action=("fkey", WHAT_NOW)),
           dict(label="snapshot", detail="save a snapshot to come back to  [F6]", action=("fkey", SNAPSHOT)),
           dict(label="rewind", detail="go back to the last snapshot  [F7]", action=("fkey", REWIND)),
-          dict(label="copy screen", detail="copy the game screen as text  [F9]", action=("fkey", COPY))]
+          dict(label="copy screen", detail="copy the game screen as text  [F9]", action=("fkey", COPY)),
+          dict(label="select mode", detail="freeze the screen to select text with the mouse  [F10]",
+               action=("fkey", SELECT)),
+          dict(label="switch focus", detail="type into the helper or the game  [F1, ^]]", action=("fkey", b"\x1d"))]
+for _c in COMMANDS:  # the F-key shortcuts for game commands
+    _f = {"reveal": "F2", "godown": "F3", "goup": "F4"}.get(_c["label"])
+    if _f:
+        _c["detail"] = _c["detail"][:-1] + f", {_f}]"
 SAVE_KEYS = b"Sy\r"     # save, yes, dismiss "Saving..." (the game then exits)
 MOUSE = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")  # SGR mouse report (mode 1006)
 MENU_ITEM = re.compile(r"(?:^|[ \u2502])([a-zA-Z$#*-])\) ")  # " a) a +1 long sword"
-MAP_W = 80  # the map's width; the inventory panel starts right after it
+MAP_W = 80  # the map's width; the status/inventory panel starts right after it
+MAP_H = 21  # map rows, y = 0..20
+GX = 3      # gutter left of the game for row numbers (y)
+RULER = 2   # rows under the game for column numbers (x)
+PANEL_TOP = 3  # the status/inventory panel starts under the message lines
 MENU_PAGE = re.compile(r"\(Page \d+ of \d+\)")  # footer of a curses menu with more pages
 
 SYSTEM = """You are a friendly NetHack 3.6 expert sitting next to the player, \
@@ -231,8 +242,8 @@ def layout(rows, cols):
     Curses menus open against the pane's right edge and the map is 80 wide,
     so the game takes up to 130 columns (menus beside the map) before the
     helper drops below HELPER_W, down to 25."""
-    game_w = max(80, min(cols - 26, max(130, cols - HELPER_W - 1)))
-    return game_w, rows - 1
+    game_w = max(80, min(cols - 26 - GX, max(130, cols - HELPER_W - 1 - GX)))
+    return game_w, rows - 1 - RULER
 
 
 class App:
@@ -246,6 +257,8 @@ class App:
         self.popup = None     # actions for a clicked inventory item: x, y, w, letter, text, acts
         self.search = None    # the F8 search: query, sel, items, results
         self.selecting = False  # F10: frozen screen, terminal selects text
+        self.map_top = 1      # screen row of map row y=0 (found from the cursor on @)
+        self.panel_items = {} # game-pane row -> inventory letter, for clicks
         self.focus = "game"
         self.lock = threading.Lock()
         curses.start_color()
@@ -380,6 +393,10 @@ class App:
         except curses.error:  # the bottom-right cell; curses moves past it
             pass
 
+    def gput(self, y, x, s, attr=0):
+        """put() in game-pane coordinates (right of the gutter)."""
+        self.put(y, x + GX, s, attr)
+
     def draw_game(self):
         buf = self.screen.buffer
         for y in sorted(self.screen.dirty):
@@ -395,16 +412,73 @@ class App:
                     attr |= curses.A_REVERSE
                 if c.underscore:
                     attr |= curses.A_UNDERLINE
-                self.put(y, x, (c.data or " ").translate(ASCII), attr)
+                self.gput(y, x, (c.data or " ").translate(ASCII), attr)
         self.screen.dirty.clear()
+
+    def draw_axes(self):
+        """Row numbers (y) in the gutter and column numbers (x) under the game."""
+        you = self.watcher.state.get("player") or {}
+        for r in range(self.gh):
+            y = r - self.map_top
+            label = f"{y:2d} " if 0 <= y < MAP_H else "   "
+            self.put(r, 0, label, curses.A_REVERSE if y == you.get("y") else curses.A_DIM)
+        tens = "".join(str(x // 10) if x % 10 == 0 else " " for x in range(1, MAP_W))
+        units = "".join(str(x % 10) for x in range(1, MAP_W))
+        self.put(self.gh, 0, "   ", 0)
+        self.put(self.gh + 1, 0, " x ", curses.A_DIM)
+        self.gput(self.gh, 0, tens, curses.A_DIM)
+        self.gput(self.gh + 1, 0, units, curses.A_DIM)
+        if you.get("x"):
+            col = you["x"] - 1
+            self.gput(self.gh, col, tens[col], curses.A_REVERSE)
+            self.gput(self.gh + 1, col, units[col], curses.A_REVERSE)
+            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}", curses.A_BOLD)
+
+    def draw_panel(self):
+        """Status, location and inventory beside the map, unless the game has a menu there."""
+        self.panel_items = {}
+        w = self.gw - MAP_W - 1
+        st, you = self.watcher.state.get("status"), self.watcher.state.get("player") or {}
+        if w < 20 or not st:
+            return
+        buf = self.screen.buffer
+        if any(buf[r][c].data not in (" ", "") for r in range(PANEL_TOP, self.gh)
+               for c in range(MAP_W, self.gw)):
+            return  # a menu or text window is open there
+        hp, hpmax = st.get("hp", 0), st.get("hpmax", 1) or 1
+        frac = hp / hpmax
+        hp_col = "green" if frac >= 1 else "yellow" if frac >= .5 else "red"
+        s_ = st.get("str", 0)
+        strength = f"18/{s_ - 18:02d}" if 18 < s_ <= 117 else "18/**" if s_ == 118 else str(s_ - 100 if s_ > 118 else s_)
+        flags = [f for f in [st.get("hunger"), st.get("encumbrance")] + st.get("conditions", []) if f]
+        lines = [(f"{st.get('race', '').capitalize()} {st.get('role', '')}, {st.get('alignment', '')}", curses.A_BOLD, None),
+                 (f"HP {hp}/{hpmax}", self.color(hp_col, "default", True) | curses.A_BOLD, None),
+                 (f"Pw {st.get('pw')}/{st.get('pwmax')}   AC {st.get('ac')}", 0, None),
+                 (f"Xp {st.get('xlvl')}/{st.get('exp')}   $ {st.get('gold')}   T {st.get('turn')}", 0, None),
+                 (f"Dlvl {st.get('dlvl')}  {st.get('dungeon', '')}", 0, None),
+                 (f"Location x={you.get('x')} y={you.get('y')}", curses.A_BOLD, None),
+                 (f"St {strength} Dx {st.get('dex')} Co {st.get('con')} In {st.get('int')} "
+                  f"Wi {st.get('wis')} Ch {st.get('cha')}", 0, None),
+                 (" ".join(flags), self.color("yellow", "default", True) | curses.A_BOLD, None),
+                 ("Inventory (click an item)", curses.A_DIM, None)]
+        for i in self.watcher.state.get("inventory", []):
+            worn = guard.WORN.search(i["text"]) or "weapon in hand" in i["text"]
+            lines.append((f"{i['letter']}) {i['text']}", self.color("cyan", "default", False) if worn else 0, i["letter"]))
+        for n, r in enumerate(range(PANEL_TOP, self.gh)):
+            text, attr, letter = lines[n] if n < len(lines) else ("", 0, None)
+            if r == self.gh - 1 and len(lines) > n + 1:
+                text, letter = "...", None
+            self.gput(r, MAP_W + 1, text[:w].ljust(w), attr)
+            if letter:
+                self.panel_items[r] = letter
 
     def draw_helper(self):
         rows, cols = self.scr.getmaxyx()
-        x0, w = self.gw + 1, cols - self.gw - 1
+        x0, w = GX + self.gw + 1, cols - GX - self.gw - 1
         if w < 10:
             return
         for y in range(rows - 1):
-            self.put(y, self.gw, "|", curses.A_DIM)
+            self.put(y, GX + self.gw, "|", curses.A_DIM)
         top = 0
         entries = legend(self.watcher.state)
         if entries:  # the map legend, packed into lines across the pane
@@ -451,6 +525,8 @@ class App:
             return
         with self.lock:
             self.draw_game()
+            self.draw_axes()
+            self.draw_panel()
             if self.popup:
                 self.draw_popup()
             if self.search:
@@ -458,10 +534,10 @@ class App:
             self.draw_helper()
             self.draw_bar()
             if self.focus == "game":
-                self.scr.move(min(self.screen.cursor.y, self.gh - 1), min(self.screen.cursor.x, self.gw - 1))
+                self.scr.move(min(self.screen.cursor.y, self.gh - 1), GX + min(self.screen.cursor.x, self.gw - 1))
             else:
                 rows, _ = self.scr.getmaxyx()
-                self.scr.move(rows - 2, min(self.gw + 3 + len(self.helper.input), self.scr.getmaxyx()[1] - 2))
+                self.scr.move(rows - 2, min(GX + self.gw + 3 + len(self.helper.input), self.scr.getmaxyx()[1] - 2))
             self.scr.refresh()
 
     def helper_key(self, data):
@@ -500,10 +576,10 @@ class App:
         p = self.popup
         lines = [f"{p['letter']} - {p['text']}"[:p["w"] - 2]] + [f" {k} - {label}" for k, label in p["acts"]]
         edge = "+" + "-" * (p["w"] - 2) + "+"
-        self.put(p["y"], p["x"], edge, curses.A_BOLD)
+        self.gput(p["y"], p["x"], edge, curses.A_BOLD)
         for i, l in enumerate(lines):
-            self.put(p["y"] + 1 + i, p["x"], "|" + l.ljust(p["w"] - 2) + "|", curses.A_BOLD if i == 0 else 0)
-        self.put(p["y"] + 1 + len(lines), p["x"], edge, curses.A_BOLD)
+            self.gput(p["y"] + 1 + i, p["x"], "|" + l.ljust(p["w"] - 2) + "|", curses.A_BOLD if i == 0 else 0)
+        self.gput(p["y"] + 1 + len(lines), p["x"], edge, curses.A_BOLD)
 
     def choose(self, key):
         p = self.popup
@@ -558,14 +634,14 @@ class App:
         y, x, w = self.search_box()
         q, res = self.search, self.search["results"]
         edge = "+" + "-" * (w - 2) + "+"
-        self.put(y, x, edge, curses.A_BOLD)
-        self.put(y + 1, x, "|" + f" Search: {q['query']}_".ljust(w - 2)[:w - 2] + "|", curses.A_BOLD)
+        self.gput(y, x, edge, curses.A_BOLD)
+        self.gput(y + 1, x, "|" + f" Search: {q['query']}_".ljust(w - 2)[:w - 2] + "|", curses.A_BOLD)
         for i in range(12):
             e = res[i] if i < len(res) else None
             line = f" {e['label'][:30]:<30} {e['detail']}" if e else ""
             attr = curses.A_REVERSE if e and i == q["sel"] else 0
-            self.put(y + 2 + i, x, "|" + line.ljust(w - 2)[:w - 2] + "|", attr)
-        self.put(y + 14, x, edge, curses.A_BOLD)
+            self.gput(y + 2 + i, x, "|" + line.ljust(w - 2)[:w - 2] + "|", attr)
+        self.gput(y + 14, x, edge, curses.A_BOLD)
 
     def run_entry(self, e):
         self.close_search()
@@ -604,6 +680,12 @@ class App:
     def click(self, x, y):
         """A left click: menu lines send their letter, inventory lines open their actions,
         the map gets the click, the pane takes focus."""
+        if x >= GX + self.gw:
+            self.focus = "helper"
+            return
+        x -= GX  # game-pane coordinates from here on
+        if x < 0 or y >= self.gh:
+            return
         if self.search:
             by, bx, w = self.search_box()
             i = y - by - 2
@@ -619,19 +701,20 @@ class App:
             else:
                 self.close_popup()
             return
-        if x >= self.gw:
-            self.focus = "helper"
-            return
         self.focus = "game"
+        letter = self.panel_items.get(y) if x >= MAP_W else None
+        if letter:  # an item in the status/inventory panel
+            if (self.watcher.state.get("context") or {}).get("kind") == "command":
+                self.open_popup(x, y, letter)
+            else:  # the game is asking which item
+                self.send(letter.encode())
+            return
         row = "".join(self.screen.buffer[y][i].data for i in range(self.gw))
         if "--More--" in row:
             self.send(b"\r")
             return
         hits = [m for m in MENU_ITEM.finditer(row) if m.start() <= x]
-        if hits and (self.watcher.state.get("context") or {}).get("kind") == "command":
-            if x >= MAP_W:  # the inventory panel, while the game waits for a command
-                self.open_popup(x, y, hits[-1].group(1))
-        elif hits:  # a menu, or the game asking which item
+        if hits:  # a menu
             self.send(hits[-1].group(1).encode())
         elif (1000 << 5) in self.screen.mode:  # the game asked for xterm mouse reports
             pos = bytes([32 + x + 1, 32 + y + 1])
@@ -639,7 +722,7 @@ class App:
 
     def wheel(self, x, down):
         """Wheel: scrolls the helper transcript, or pages a multi-page game menu."""
-        if x >= self.gw:
+        if x >= GX + self.gw:
             self.helper.scroll += -3 if down else 3
         elif any(MENU_PAGE.search(line) for line in self.screen.display):
             self.send(b">" if down else b"<")  # only in a menu: on the map > goes downstairs
@@ -668,6 +751,9 @@ class App:
         if state.get("seq", 0) == self.seq:
             return
         self.seq = state.get("seq", 0)
+        you, cur = state.get("player") or {}, self.screen.cursor
+        if (state.get("context") or {}).get("kind") == "command" and cur.x == you.get("x", 0) - 1:
+            self.map_top = cur.y - you.get("y", 0)  # curses parks the cursor on you
         now = guard.warnings(state)
         for w in sorted(now - self.warned):
             self.helper.scroll = 0
