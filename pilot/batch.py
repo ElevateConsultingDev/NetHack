@@ -383,6 +383,11 @@ def _play_one(spec: dict) -> dict:
     if spec["brain"] == "jev":  # Jev picks every action; the rules only answer stray prompts.
         from .jev import JevEngine, JevFallback
         engine, brain = JevEngine(), JevFallback()
+    elif spec["brain"] == "jevb":  # The rules play; Jev judges fights that are going badly.
+        from .jev import JevFallback
+        from .jevb import JevJudge
+        engine, brain = JevJudge(), JevFallback()
+        brain.name = "jevb"
     else:
         brain = (HaikuBrain(log_path=os.path.join(PLAYGROUND, "pilot-brain.log"), **kw)
                  if spec["brain"] == "haiku" else QwenBrain(**kw) if spec["brain"] == "qwen"
@@ -450,7 +455,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Run unattended NetHack games with the pilot")
     p.add_argument("--games", type=int, default=8)
     p.add_argument("--parallel", type=int, default=4)
-    p.add_argument("--brain", choices=("rules", "haiku", "qwen", "jev"), default="rules")
+    p.add_argument("--brain", choices=("rules", "haiku", "qwen", "jev", "jevb"), default="rules")
     p.add_argument("--model", help="model for the brain (haiku alias, or an Ollama tag such as qwen3.5:9b)")
     p.add_argument("--role", default="Valkyrie")
     p.add_argument("--max-turns", type=int, default=20000)

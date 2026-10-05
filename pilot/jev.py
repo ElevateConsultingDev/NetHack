@@ -167,9 +167,10 @@ class JevEngine(Engine):
         return bool(a.get("sent")) and v.pos == tuple(a.get("at") or ()) and (self._hit(c) or c["under_attack"])
 
     # ---------- the call ----------
-    def ask(self, state: dict) -> dict | None:
-        """Jev's probabilities over the actions, or None when the API is unavailable."""
-        body = {"model": MODEL, "state": state, "questions": QUESTIONS}
+    def ask(self, state: dict, questions: dict | None = None) -> dict | None:
+        """Jev's probabilities over the actions (or, given `questions`, every answer), or None
+        when the API is unavailable."""
+        body = {"model": MODEL, "state": state, "questions": questions or QUESTIONS}
         started = time.time()
         for attempt in range(4):
             try:
@@ -184,7 +185,7 @@ class JevEngine(Engine):
                 break
             self.calls += 1
             self.seconds += time.time() - started
-            return r.json()["answers"]["action"]
+            return r.json()["answers"] if questions else r.json()["answers"]["action"]
         self.failures += 1
         self.seconds += time.time() - started
         return None
