@@ -72,3 +72,13 @@ this way.
 - `src/windows.c` (`choose_windows`): calls `aipipe_install()`, which wraps
   the message, y/n, getlin, menu and extended-command window procedures to
   record context.
+
+## Reveal (a cheat)
+
+With `NETHACK_REVEAL=1` as well, each state line also has a `reveal` object:
+the level as it really is, whether or not the player has seen it. `map` rows
+(same shape as `map`, with `@`, monsters, top objects and `^` traps drawn over
+the terrain), `monsters` (`x`, `y`, `name`, `hp`, `peaceful`, `tame`),
+`objects` on the floor and `inventory`, both with fully identified `text`
+(names, blessed/cursed, enchantment; the game's own knowledge is left
+unchanged), and `traps`. `./play` turns it on for the helper.

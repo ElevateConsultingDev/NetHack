@@ -17,6 +17,9 @@ NetHack (curses interface) on the left, a Claude helper on the right.
   menu (same as `>` and `<`) or scrolls the helper's answers.
 - Cheat: `F2` (or `#reveal`) maps the current level and its traps, like a
   scroll of magic mapping that also finds traps.
+- Cheat: the helper sees the whole level as it really is (every monster, every
+  item truly identified, traps) and your inventory identified. `NETHACK_REVEAL= ./play`
+  turns that off.
 - Closing the terminal saves the game (NetHack saves on hangup).
 
 Needs `uv` (runs the helper with `pyte`, a terminal emulator) and `claude` on PATH.

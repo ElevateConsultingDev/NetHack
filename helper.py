@@ -43,7 +43,9 @@ is asking, then the player's question.
 Answer briefly and practically: a few sentences or a short list, under about \
 120 words, about what is on screen now. Name the exact keys to press. Warn about \
 real dangers (low HP, hunger, cursed or unknown items, peaceful monsters, \
-shopkeepers, floating eyes, cockatrices). Do not spoil more than the player asks for. \
+shopkeepers, floating eyes, cockatrices).
+
+The player has turned on a cheat: you also get the whole level as it really is, every monster, every item (truly identified, with blessed/cursed status), every trap, and the inventory fully identified. Use it freely, spoilers are wanted, but say so when you are telling them something they could not have seen. Coordinates are x=column (1 is the left edge of the map), y=row (0 is the top). \
 Plain text only, no markdown: it is shown in a narrow terminal pane."""
 
 ASCII = str.maketrans("─│┌┐└┘├┤┬┴┼", "-|+++++++++")  # box drawing as plain ASCII, any font
@@ -136,6 +138,17 @@ def snapshot(screen, state):
     ctx = state.get("context") or {}
     if ctx.get("prompt"):
         parts.append(f"The game is asking: {ctx['prompt']}")
+    rev = state.get("reveal")
+    if rev:
+        you = state.get("player", {})
+        parts.append(f"CHEAT, the whole level as it really is (you are @ at x={you.get('x')} y={you.get('y')}):\n"
+                     + "\n".join(r.rstrip() for r in rev["map"]).strip("\n"))
+        parts.append("Monsters:\n" + "\n".join(
+            f"x={m['x']} y={m['y']} {m['name']} hp={m['hp']}" + (" tame" if m["tame"] else " peaceful" if m["peaceful"] else "")
+            for m in rev["monsters"]))
+        parts.append("Items on the floor:\n" + "\n".join(f"x={o['x']} y={o['y']} {o['text']}" for o in rev["objects"]))
+        parts.append("Traps:\n" + "\n".join(f"x={t['x']} y={t['y']} {t['name']}" for t in rev["traps"]))
+        parts.append("Inventory, truly identified:\n" + "\n".join(f"{i['letter']} - {i['text']}" for i in rev["inventory"]))
     return "\n\n".join(parts)
 
 
@@ -178,6 +191,7 @@ class App:
             os.chdir(GAME)
             os.environ["TERM"] = "xterm"
             os.environ["NETHACK_CONTROL"] = self.watcher.path
+            os.environ.setdefault("NETHACK_REVEAL", "1")  # the helper sees the whole level; NETHACK_REVEAL= turns it off
             os.environ.setdefault("NETHACKOPTIONS", "@" + os.path.join(HERE, "nethackrc"))
             os.execv("./nethack", ["nethack"] + argv)
         self.pid = pid

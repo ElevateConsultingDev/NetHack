@@ -53,6 +53,7 @@ static char ctx_prompt[BUFSZ], ctx_choices[BUFSZ];
 static int ctx_menu_how = 0;
 static winid ctx_menu_win = WIN_ERR;
 static boolean more_pending = FALSE; /* a --More-- is waiting (maybe in a menu) */
+static boolean reveal = FALSE; /* NETHACK_REVEAL: also send the whole level, as it really is */
 
 /* messages printed since the last snapshot */
 #define AI_MAXMSG 30
@@ -366,6 +367,107 @@ put_inventory()
     put("]");
 }
 
+/* ---------- reveal (a cheat for the helper) ---------- */
+
+/* doname() with everything about the object known; the flags are put back */
+static char *
+true_name(obj)
+struct obj *obj;
+{
+    struct objclass *oc = &objects[obj->otyp];
+    unsigned nk = oc->oc_name_known, kn = obj->known, bk = obj->bknown,
+             dk = obj->dknown, rk = obj->rknown, ck = obj->cknown;
+    char *s;
+
+    oc->oc_name_known = obj->known = obj->bknown = obj->dknown = 1;
+    obj->rknown = obj->cknown = 1;
+    s = doname(obj);
+    oc->oc_name_known = nk;
+    obj->known = kn, obj->bknown = bk, obj->dknown = dk;
+    obj->rknown = rk, obj->cknown = ck;
+    return s;
+}
+
+static void
+put_reveal()
+{
+    int x, y, glyph, ch, color;
+    unsigned special;
+    char row[COLNO + 1], tmp[64];
+    struct monst *mtmp;
+    struct obj *otmp;
+    struct trap *t;
+    boolean first;
+
+    put(",\"reveal\":{\"map\":[");
+    for (y = 0; y < ROWNO; y++) {
+        for (x = 1; x < COLNO; x++) {
+            mtmp = m_at(x, y);
+            if (x == u.ux && y == u.uy)
+                ch = '@';
+            else if (mtmp)
+                ch = def_monsyms[(int) mtmp->data->mlet].sym;
+            else if (level.objects[x][y])
+                ch = def_oc_syms[(int) level.objects[x][y]->oclass].sym;
+            else if (t_at(x, y))
+                ch = '^';
+            else {
+                glyph = back_to_glyph(x, y);
+                (void) mapglyph(glyph, &ch, &color, &special, x, y, 0);
+            }
+            row[x - 1] = (ch >= 0x20 && ch < 0x7f) ? (char) ch : '?';
+        }
+        row[COLNO - 1] = '\0';
+        if (y)
+            put(",");
+        put_str(row);
+    }
+    put("],\"monsters\":[");
+    first = TRUE;
+    for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
+        if (DEADMONSTER(mtmp))
+            continue;
+        Sprintf(tmp, "%s{\"x\":%d,\"y\":%d", first ? "" : ",", mtmp->mx, mtmp->my);
+        put(tmp);
+        put_kv_str("name", mtmp->data->mname, TRUE);
+        put_kv_int("hp", (long) mtmp->mhp, TRUE);
+        put_kv_int("peaceful", (long) mtmp->mpeaceful, TRUE);
+        put_kv_int("tame", (long) mtmp->mtame, TRUE);
+        put("}");
+        first = FALSE;
+    }
+    put("],\"objects\":[");
+    first = TRUE;
+    for (otmp = fobj; otmp; otmp = otmp->nobj) {
+        Sprintf(tmp, "%s{\"x\":%d,\"y\":%d", first ? "" : ",", otmp->ox, otmp->oy);
+        put(tmp);
+        put_kv_str("text", true_name(otmp), TRUE);
+        put("}");
+        first = FALSE;
+    }
+    put("],\"traps\":[");
+    first = TRUE;
+    for (t = ftrap; t; t = t->ntrap) {
+        Sprintf(tmp, "%s{\"x\":%d,\"y\":%d", first ? "" : ",", t->tx, t->ty);
+        put(tmp);
+        put_kv_str("name", defsyms[trap_to_defsym(t->ttyp)].explanation, TRUE);
+        put("}");
+        first = FALSE;
+    }
+    put("],\"inventory\":[");
+    for (otmp = invent; otmp; otmp = otmp->nobj) {
+        if (otmp != invent)
+            put(",");
+        tmp[0] = otmp->invlet;
+        tmp[1] = '\0';
+        put("{");
+        put_kv_str("letter", tmp, FALSE);
+        put_kv_str("text", true_name(otmp), TRUE);
+        put("}");
+    }
+    put("]}");
+}
+
 static void
 put_context()
 {
@@ -434,6 +536,8 @@ emit_state()
         put_status();
         put_map();
         put_inventory();
+        if (reveal)
+            put_reveal();
     }
     put("}");
     send_out();
@@ -633,6 +737,7 @@ aipipe_install()
             return;
         }
     }
+    reveal = (getenv("NETHACK_REVEAL") && *getenv("NETHACK_REVEAL"));
     base = windowprocs;
     windowprocs.win_putstr = ai_putstr;
     windowprocs.win_yn_function = ai_yn_function;
