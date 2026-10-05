@@ -8,11 +8,17 @@ import re
 
 import guard
 
-CMD_RE = re.compile(r'\{\s*([^,{}]+?),\s*"([^"]+)",((?:\s*"(?:[^"\\]|\\.)*")+)\s*,\s*(\w+)\s*(?:,\s*([^}]*?))?\s*\}', re.S)
+CMD_RE = re.compile(r'\{\s*(\'(?:[^\'\\]|\\.)*\'|[A-Z]\(\'(?:[^\'\\]|\\.)\'\)|[A-Z_]+_SYM),\s*"([^"]+)",((?:\s*"(?:[^"\\]|\\.)*")+)\s*,\s*(\w+)\s*(?:,\s*([^}]*?))?\s*\}', re.S)
+
+
+SYMS = {"AMULET_SYM": '"', "ARMOR_SYM": "[", "GOLD_SYM": "$", "RING_SYM": "=",
+        "SPBOOK_SYM": "+", "TOOL_SYM": "(", "WEAPON_SYM": ")"}  # keys cmd.c names by symbol
 
 
 def _key(k, name):
     """(bytes to send, key as shown) for a command's key in cmd.c notation."""
+    if k in SYMS:
+        return SYMS[k].encode(), SYMS[k]
     m = re.fullmatch(r"'(.)'", k)
     if m and m.group(1) not in "#\\":
         return m.group(1).encode(), m.group(1)
@@ -91,6 +97,13 @@ if __name__ == "__main__":
     assert by["pray"]["action"] == ("keys", b"#pray\r")
     assert by["eat"]["action"] == ("keys", b"e")
     assert by["kick"]["action"] == ("keys", b"\x04")
+    assert by["pickup"]["action"] == ("keys", b",")  # a comma key once broke the parse
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", "cmd.c")).read()
+    table = src[src.index("extcmdlist[] = {"):]
+    table = table[:table.index("\n};")]
+    names = {n for n, rest in re.findall(r'\{\s*\S.*?,\s*"([^"]+)",(.*?)\}', table, re.S)
+             if "WIZMODECMD" not in rest and n not in ("#", "?")}
+    assert names == set(by), sorted(names ^ set(by))  # every command in the table is searchable
     assert "wizmap" not in by and len(cmds) > 80
     assert search("pra", cmds)[0]["label"] == "pray"
     state = {"player": {"x": 5, "y": 5},
