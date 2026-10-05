@@ -15,8 +15,10 @@ NetHack (curses interface) on the left, a Claude helper on the right.
 - Mouse: click a menu line to pick it, click `--More--` to continue, click the map
   to travel there, click the helper pane to type in it. The wheel pages a game
   menu (same as `>` and `<`) or scrolls the helper's answers.
-- Cheat: `F2` (or `#reveal`) maps the current level and its traps, like a
-  scroll of magic mapping that also finds traps.
+- Cheat: `F2` (or `#reveal`) opens a menu: Map, Items, Monsters, Traps. The
+  picks are drawn over your view as the level really is; move the cursor to
+  look at things, Esc hides it all again. "Keep the map" maps the level for
+  good, like a scroll of magic mapping that also finds traps.
 - Cheat: the helper sees the whole level as it really is (every monster, every
   item truly identified, traps) and your inventory identified. `NETHACK_REVEAL= ./play`
   turns that off.

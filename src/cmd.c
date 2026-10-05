@@ -145,6 +145,7 @@ STATIC_PTR int NDECL(wiz_identify);
 STATIC_PTR int NDECL(wiz_intrinsic);
 STATIC_PTR int NDECL(wiz_map);
 STATIC_PTR int NDECL(doreveal);
+STATIC_DCL void NDECL(keep_map);
 STATIC_PTR int NDECL(wiz_makemap);
 STATIC_PTR int NDECL(wiz_genesis);
 STATIC_PTR int NDECL(wiz_where);
@@ -890,15 +891,15 @@ STATIC_PTR int
 wiz_map(VOID_ARGS)
 {
     if (wizard)
-        (void) doreveal();
+        keep_map();
     else
         pline(unavailcmd, visctrl((int) cmd_from_func(wiz_map)));
     return 0;
 }
 
-/* #reveal - cheat: map the level and its traps, in any game mode */
-STATIC_PTR int
-doreveal(VOID_ARGS)
+/* map the level and its traps for good (^F in wizard mode, #reveal's Keep) */
+STATIC_OVL void
+keep_map()
 {
     struct trap *t;
     long save_Hconf = HConfusion, save_Hhallu = HHallucination;
@@ -911,6 +912,51 @@ doreveal(VOID_ARGS)
     do_mapping();
     HConfusion = save_Hconf;
     HHallucination = save_Hhallu;
+}
+
+/* #reveal - cheat, in any game mode: show the level as it really is
+   (map, objects, monsters, traps) until a key is pressed, or keep the map */
+STATIC_PTR int
+doreveal(VOID_ARGS)
+{
+    static const struct { char let; int what; const char *txt; } opts[] = {
+        { 'm', TER_MAP, "Map" },
+        { 'i', TER_OBJ, "Items" },
+        { 'c', TER_MON, "Monsters" },
+        { 't', TER_TRP, "Traps" },
+        { 'k', 0, "Keep the map (stays, like magic mapping)" },
+    };
+    winid win;
+    anything any;
+    menu_item *pick = (menu_item *) 0;
+    int i, n, what = 0;
+    boolean keep = FALSE;
+
+    win = create_nhwindow(NHW_MENU);
+    start_menu(win);
+    any = zeroany;
+    for (i = 0; i < SIZE(opts); i++) {
+        any.a_int = i + 1;
+        add_menu(win, NO_GLYPH, &any, opts[i].let, 0, ATR_NONE, opts[i].txt,
+                 opts[i].what ? MENU_SELECTED : MENU_UNSELECTED);
+    }
+    end_menu(win, "Reveal what?  (shown until you press Esc)");
+    n = select_menu(win, PICK_ANY, &pick);
+    destroy_nhwindow(win);
+    for (i = 0; i < n; i++) {
+        int k = pick[i].item.a_int - 1;
+
+        what |= opts[k].what;
+        if (!opts[k].what)
+            keep = TRUE;
+    }
+    if (n > 0)
+        free((genericptr_t) pick);
+
+    if (keep)
+        keep_map();
+    if (what)
+        reveal_level(what);
     return 0;
 }
 
@@ -3451,7 +3497,7 @@ struct ext_func_tab extcmdlist[] = {
     { 'r', "read", "read a scroll or spellbook", doread },
     { C('r'), "redraw", "redraw screen", doredraw, IFBURIED | GENERALCMD },
     { 'R', "remove", "remove an accessory (ring, amulet, etc)", doremring },
-    { '\0', "reveal", "cheat: map this level and its traps",
+    { '\0', "reveal", "cheat: show the level as it really is",
             doreveal, IFBURIED | AUTOCOMPLETE | GENERALCMD },
     { M('R'), "ride", "mount or dismount a saddled steed",
             doride, AUTOCOMPLETE },
