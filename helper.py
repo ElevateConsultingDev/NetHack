@@ -47,11 +47,13 @@ WHAT_NOW = b"\x1b[15~"  # F5: ask the helper what to do now
 SNAPSHOT = b"\x1b[17~"  # F6: snapshot the game now
 REWIND = b"\x1b[18~"    # F7: go back to the last snapshot
 SEARCH = b"\x1b[19~"    # F8: fuzzy search over commands, items and map things
+COPY = b"\x1b[20~"      # F9: copy the game screen to the clipboard as text
 UP, DOWN = (b"\x1b[A", b"\x1bOA"), (b"\x1b[B", b"\x1bOB")
 COMMANDS = palette.load_commands(os.path.join(HERE, "src", "cmd.c"))
 EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [F5]", action=("fkey", WHAT_NOW)),
           dict(label="snapshot", detail="save a snapshot to come back to  [F6]", action=("fkey", SNAPSHOT)),
-          dict(label="rewind", detail="go back to the last snapshot  [F7]", action=("fkey", REWIND))]
+          dict(label="rewind", detail="go back to the last snapshot  [F7]", action=("fkey", REWIND)),
+          dict(label="copy screen", detail="copy the game screen as text  [F9]", action=("fkey", COPY))]
 SAVE_KEYS = b"Sy\r"     # save, yes, dismiss "Saving..." (the game then exits)
 MOUSE = re.compile(rb"\x1b\[<(\d+);(\d+);(\d+)([Mm])")  # SGR mouse report (mode 1006)
 MENU_ITEM = re.compile(r"(?:^|[ \u2502])([a-zA-Z$#*-])\) ")  # " a) a +1 long sword"
@@ -438,7 +440,7 @@ class App:
     def draw_bar(self):
         rows, cols = self.scr.getmaxyx()
         where = "HELPER (Enter asks, Esc back)" if self.focus == "helper" else "GAME"
-        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  F8 search  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
+        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  F8 search  F9 copy  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
                  curses.A_REVERSE)
 
     def redraw(self):
@@ -526,6 +528,15 @@ class App:
             self.choose(data.decode("latin-1"))
         else:
             self.close_popup()
+
+    def copy_screen(self):
+        """The game pane as plain text on the macOS clipboard."""
+        text = "\n".join(r.translate(ASCII).rstrip() for r in self.screen.display).strip("\n") + "\n"
+        try:
+            subprocess.run(["pbcopy"], input=text, text=True, check=True)
+            self.say("dim", f"Copied the game screen ({text.count(chr(10))} lines) to the clipboard.")
+        except (OSError, subprocess.CalledProcessError) as e:
+            self.say("err", f"Copy failed: {e}")
 
     def open_search(self):
         self.search = dict(query="", sel=0, items=palette.entries(self.watcher.state, COMMANDS, EXTRAS))
@@ -710,6 +721,8 @@ class App:
             self.search_key(data)
         elif data == SEARCH:
             self.open_search()
+        elif data == COPY:
+            self.copy_screen()
         elif self.popup and data:
             self.popup_key(data)
         elif any(t == data or data.startswith(t) for t in TOGGLE):
