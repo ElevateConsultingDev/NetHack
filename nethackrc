@@ -3,7 +3,7 @@ OPTIONS=windowtype:curses,symset:default,windowborders:0
 OPTIONS=color,hilite_pet,hilite_pile,lit_corridor,dark_room,!use_darkgray
 OPTIONS=showexp,time,!legacy,!autoquiver
 OPTIONS=autopickup,pickup_types:$?!/="+,pickup_burden:burdened
-OPTIONS=menucolors,statushilites:10,mouse_support
+OPTIONS=menucolors,statushilites:10,mouse_support,perm_invent
 
 # HP and Pw color as they drop; changes flash for a few turns
 OPTIONS=hilite_status:hitpoints/100%/green/<100%/yellow/<50%/orange/<25%/red&inverse
