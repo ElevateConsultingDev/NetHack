@@ -253,6 +253,14 @@ curses_create_main_windows()
                                 &map_x, &map_y, &map_width, &map_height,
                                 border_space, -1, -25);
 
+        /* a tall terminal gives the message window every spare row and
+           pushes the map down to the status lines; keep it to 4 lines and
+           the map right under it */
+        if (message_orientation == ALIGN_TOP && message_height > 4) {
+            map_y -= message_height - 4;
+            map_height += message_height - 4;
+            message_height = 4;
+        }
         if (map_width > COLNO)
             map_width = COLNO;
         if (map_height > ROWNO)

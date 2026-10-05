@@ -911,16 +911,21 @@ wiz_map(VOID_ARGS)
     return 0;
 }
 
-/* #reveal - cheat, in any game mode: toggle seeing the whole level live */
+/* #fog - cheat, in any game mode: lift the fog of war (see the whole level,
+   live) or bring it back (see only what you've explored) */
 STATIC_PTR int
 doreveal(VOID_ARGS)
 {
     iflags.reveal_all = !iflags.reveal_all;
     vision_full_recalc = 1;
     vision_recalc(0);
-    flush_screen(1);
-    pline(iflags.reveal_all ? "You see the whole level."
-                            : "Your vision returns to normal.");
+    if (iflags.reveal_all)
+        flush_screen(1);
+    else
+        docrt(); /* back to the hero's own memory of the level */
+    pline(iflags.reveal_all
+              ? "The fog of war lifts: you see the whole level."
+              : "The fog of war returns: you see only what you've explored.");
     return 0;
 }
 
@@ -947,7 +952,7 @@ boolean up;
         x = up ? xupladder : xdnladder, y = up ? yupladder : ydnladder;
     if (!x && sstairs.sx && (boolean) sstairs.up == up)
         x = sstairs.sx, y = sstairs.sy;
-    if (!x || !levl[x][y].seenv) {
+    if (!x || (!levl[x][y].seenv && !iflags.reveal_all)) {
         You("don't know where the %s are.", up ? "up stairs" : "down stairs");
         return 0;
     }
@@ -3466,6 +3471,8 @@ struct ext_func_tab extcmdlist[] = {
     { '\0', "exploremode", "enter explore (discovery) mode",
             enter_explore_mode, IFBURIED },
     { 'f', "fire", "fire ammunition from quiver", dofire },
+    { '\0', "fog", "cheat: lift or bring back the fog of war",
+            doreveal, IFBURIED | AUTOCOMPLETE | GENERALCMD },
     { M('f'), "force", "force a lock", doforce, AUTOCOMPLETE },
     { ';', "glance", "show what type of thing a map symbol corresponds to",
             doquickwhatis, IFBURIED | GENERALCMD },
@@ -3527,8 +3534,7 @@ struct ext_func_tab extcmdlist[] = {
     { 'r', "read", "read a scroll or spellbook", doread },
     { C('r'), "redraw", "redraw screen", doredraw, IFBURIED | GENERALCMD },
     { 'R', "remove", "remove an accessory (ring, amulet, etc)", doremring },
-    { '\0', "reveal", "cheat: toggle seeing the whole level",
-            doreveal, IFBURIED | AUTOCOMPLETE | GENERALCMD },
+
     { M('R'), "ride", "mount or dismount a saddled steed",
             doride, AUTOCOMPLETE },
     { M('r'), "rub", "rub a lamp or a stone", dorub, AUTOCOMPLETE },

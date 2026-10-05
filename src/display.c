@@ -1633,6 +1633,38 @@ cls()
     in_cls = FALSE;
 }
 
+/* fog of war lifted (#fog cheat): draw what's really on every square the
+   hero can't see, without putting it in the hero's memory; with the fog
+   back, docrt() shows only what was actually explored */
+STATIC_OVL void
+fog_overlay()
+{
+    int x, y, glyph;
+    unsigned char sv;
+    struct monst *mtmp;
+    struct obj *otmp;
+    struct trap *t;
+
+    for (x = 1; x < COLNO; x++)
+        for (y = 0; y < ROWNO; y++) {
+            if (cansee(x, y) || (x == u.ux && y == u.uy))
+                continue;
+            if ((mtmp = m_at(x, y)) != 0 && !DEADMONSTER(mtmp))
+                glyph = mon_to_glyph(mtmp, rn2_on_display_rng);
+            else if ((otmp = level.objects[x][y]) != 0)
+                glyph = obj_to_glyph(otmp, rn2_on_display_rng);
+            else if ((t = t_at(x, y)) != 0)
+                glyph = trap_to_glyph(t, rn2_on_display_rng);
+            else {
+                sv = levl[x][y].seenv; /* walls draw by the angles seen */
+                levl[x][y].seenv = SVALL;
+                glyph = back_to_glyph(x, y);
+                levl[x][y].seenv = sv;
+            }
+            show_glyph(x, y, glyph);
+        }
+}
+
 /*
  * Synch the third screen with the display.
  */
@@ -1658,6 +1690,8 @@ int cursor_on_u;
     if (program_state.done_hup)
         return;
 #endif
+    if (iflags.reveal_all && program_state.in_moveloop)
+        fog_overlay();
 
     for (y = 0; y < ROWNO; y++) {
         register gbuf_entry *gptr = &gbuf[y][x = gbuf_start[y]];

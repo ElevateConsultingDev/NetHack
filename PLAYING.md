@@ -15,15 +15,16 @@ NetHack (curses interface) on the left, a Claude helper on the right.
 - Mouse: click a menu line to pick it, click `--More--` to continue, click the map
   to travel there, click the helper pane to type in it. The wheel pages a game
   menu (same as `>` and `<`) or scrolls the helper's answers.
-- Cheat: `F2` (or `#reveal`) toggles seeing the whole level: every monster,
-  item and wall, live as you play. Turn it off and your vision is normal again;
-  what you saw stays on your map. While it is on, every item you carry or that
-  lies on the level is fully identified (and stays identified).
+- Cheat: `F2` (or `#fog`) lifts the fog of war: every monster, item, trap and wall of the
+  level is drawn, live as you play. `F2` again brings the fog back and you see only what
+  you've actually explored (the lifted view is never written into your map memory).
+  While the fog is lifted, every item you carry or that lies on the level is fully
+  identified (and stays identified), and `F3`/`F4` know where the stairs are.
 - Cheat: the helper sees the whole level as it really is (every monster, every
   item truly identified, traps) and your inventory identified. `NETHACK_REVEAL= ./play`
   turns that off.
 - `F3` / `F4` (or `#godown` / `#goup`) walk to the down / up stairs once you know where
-  they are (with `F2` on, you always do). Anything interesting stops the walk; press again.
+  they are (with the fog lifted, you always do). Anything interesting stops the walk; press again.
 - `F8` searches everything: type a few letters and pick with the arrows and Enter (or
   click). It finds NetHack's commands (from the game's own command table, with their keys),
   item actions ("quaff heal" quaffs your potion of healing), things on the map ("altar"

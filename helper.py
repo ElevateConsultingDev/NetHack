@@ -39,7 +39,7 @@ MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
 TOGGLE = (b"\x1d", b"\x1bOP", b"\x1b[11~")  # ^], F1 (two encodings)
 FKEYS = {  # function key (two encodings each) -> extended command typed into the game
-    b"\x1bOQ": b"#reveal\r", b"\x1b[12~": b"#reveal\r",  # F2: see-everything cheat
+    b"\x1bOQ": b"#fog\r", b"\x1b[12~": b"#fog\r",  # F2: lift / bring back the fog of war
     b"\x1bOR": b"#godown\r", b"\x1b[13~": b"#godown\r",  # F3: travel to the down stairs
     b"\x1bOS": b"#goup\r", b"\x1b[14~": b"#goup\r",      # F4: travel to the up stairs
 }
@@ -61,7 +61,7 @@ EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [F
                action=("fkey", SELECT)),
           dict(label="switch focus", detail="type into the helper or the game  [F1, ^]]", action=("fkey", b"\x1d"))]
 for _c in COMMANDS:  # the F-key shortcuts for game commands
-    _f = {"reveal": "F2", "godown": "F3", "goup": "F4"}.get(_c["label"])
+    _f = {"fog": "F2", "godown": "F3", "goup": "F4"}.get(_c["label"])
     if _f:
         _c["detail"] = _c["detail"][:-1] + f", {_f}]"
 SAVE_KEYS = b"Sy\r"     # save, yes, dismiss "Saving..." (the game then exits)
@@ -464,7 +464,7 @@ class App:
             col = you["x"] - 1
             self.gput(self.gh, col, tens[col], curses.A_REVERSE)
             self.gput(self.gh + 1, col, units[col], curses.A_REVERSE)
-            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}", curses.A_BOLD)
+            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(16), curses.A_BOLD)
 
     def draw_panel(self):
         """Status, location and inventory beside the map, unless the game has a menu there."""
@@ -565,7 +565,7 @@ class App:
     def draw_bar(self):
         rows, cols = self.scr.getmaxyx()
         where = "HELPER (Enter asks, Esc back)" if self.focus == "helper" else "GAME"
-        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 reveal  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  F8 search  F9 copy  F10 select  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
+        self.put(rows - 1, 0, f" ^]/F1 switch focus  F2 fog of war  F3/F4 stairs dn/up  F5 what now?  F6 snapshot  F7 rewind  F8 search  F9 copy  F10 select  |  typing goes to: {where} ".ljust(cols - 1)[:cols - 1],
                  curses.A_REVERSE)
 
     def redraw(self):
