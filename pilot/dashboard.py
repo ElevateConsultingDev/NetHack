@@ -242,7 +242,7 @@ def write(path: str, run: str, brain: str, games: list, batch_dir: str) -> None:
 <div class="stats">
   <div class="stat"><b>{avg(depths)}</b><span>avg level when the game ended (deepest reached is in the panel above)</span></div>
   <div class="stat"><b>{avg(xls)}</b><span>avg experience level</span></div>
-  <div class="stat"><b>{round(float(avg(turns) or 0)):,}</b><span>avg turns</span></div>
+  <div class="stat"><b>{f"{round(sum(turns) / len(turns)):,}" if turns else "-"}</b><span>avg turns</span></div>
   <div class="stat"><b>{sum(1 for g in finished if g.result.get('death'))}</b><span>died</span></div>
   <div class="stat"><b>{sum(1 for g in finished if g.stall)}</b><span>stalled</span></div>
 </div>
