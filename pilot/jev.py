@@ -17,6 +17,7 @@ The API key is the Keychain entry typesafe/jev (account elevate).
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 
@@ -30,6 +31,25 @@ from .engine import (DONT_MELEE, KEY_FOR, ORTHO, SESSILE, Engine, View, bfs, che
 URL = "https://api.typesafe.ai/v1/systemone"
 MODEL = "jev-latest"
 TIMEOUT_S = 20
+# Estimate only: the launch price per input token as quoted in statico/jev-nethack's client; responses carry no cost.
+USD_PER_INPUT_TOKEN = 0.042e-6
+BUDGET_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "playground", "batch", "jev-budget.json")
+
+
+def spent() -> float:
+    try:
+        with open(BUDGET_FILE) as f:
+            return float(json.load(f)["cost_usd"])
+    except (OSError, ValueError, KeyError):
+        return 0.0
+
+
+def add_spend(usd: float) -> float:
+    """Add a finished run's estimated cost to the ledger that persists across runs."""
+    total = spent() + usd
+    with open(BUDGET_FILE, "w") as f:
+        json.dump({"cost_usd": round(total, 6), "usd_per_input_token": USD_PER_INPUT_TOKEN}, f)
+    return total
 
 ACTIONS = {
     "pray": "Pray to the god. Right only when `prayer.safe` is true and `prayer.trouble` is not empty "
@@ -100,7 +120,10 @@ class JevEngine(Engine):
         self.key = _api_key()
         self.client = httpx.Client(timeout=TIMEOUT_S)
         self.jev_args: dict[str, dict] = {}
-        self.calls, self.seconds, self.failures = 0, 0.0, 0
+        self.calls, self.seconds, self.failures, self.tokens = 0, 0.0, 0, 0
+        # ponytail: the cap is read once per game, so 16 games at once can overshoot it by their own
+        # few cents; a shared counter if runs ever cost dollars.
+        self.budget_left = float(os.environ.get("JEV_BUDGET_USD", 5)) - spent()
         self.last_ask = None
         self.prev_hp: tuple = (None, None)  # (turn, hp) of the previous command prompt
         self.loot_quiet_until = 0           # turn until which loot is reported absent (a loot just failed)
@@ -171,6 +194,9 @@ class JevEngine(Engine):
         """Jev's probabilities over the actions (or, given `questions`, every answer), or None
         when the API is unavailable."""
         body = {"model": MODEL, "state": state, "questions": questions or QUESTIONS}
+        if self.tokens * USD_PER_INPUT_TOKEN >= self.budget_left:  # Spend cap reached: the rules decide.
+            self.failures += 1
+            return None
         started = time.time()
         for attempt in range(4):
             try:
@@ -184,6 +210,7 @@ class JevEngine(Engine):
             if r.status_code >= 400:
                 break
             self.calls += 1
+            self.tokens += (r.json().get("usage") or {}).get("input_tokens") or len(json.dumps(body)) // 4
             self.seconds += time.time() - started
             return r.json()["answers"] if questions else r.json()["answers"]["action"]
         self.failures += 1

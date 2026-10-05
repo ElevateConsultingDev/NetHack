@@ -150,11 +150,30 @@ class Game:
         self.brain_calls = 0
         self.brain_seconds = 0.0
         self.brain_failures = 0  # calls that fell back to rules (timeout, crash)
+        self._orders_seen = time.time()  # orders.json written before this game started is not for it
         self.stall: str | None = None
         self.proc: subprocess.Popen | None = None
         self.result: dict | None = None  # Set when the game is over.
         self.feed: collections.deque = collections.deque(maxlen=100)  # recent (turn, kind, text) for the live page
         self._last_note = ""
+
+    def _live_orders(self) -> None:
+        """Standing orders from the tactics page (pilot/serve.py writes orders.json): applied to
+        games in flight, once per change. A game that took any is marked in its stats."""
+        path = os.path.join(PLAYGROUND, "batch", "orders.json")
+        try:
+            mtime = os.stat(path).st_mtime
+            if mtime <= self._orders_seen:
+                return
+            self._orders_seen = mtime
+            with open(path) as f:
+                o = json.load(f)
+        except (OSError, ValueError):
+            return
+        self.engine.set_orders(o.get("orders") or {})
+        self.engine.standing_order = str(o.get("say") or "")
+        self.engine.memory.stats["live orders applied"] = self.engine.memory.stats.get("live orders applied", 0) + 1
+        self.feed.append((s_turn(self.last), "brain", f"operator orders: {o.get('orders') or ''} {o.get('say') or ''}"))
 
     def _on_state_safe(self, s: dict) -> None:
         """An engine error ends the game as a harness error at once; it used
@@ -203,6 +222,7 @@ class Game:
             self.escalations.append((turn, "; ".join(events), order.routine))
             self.feed.append((turn, "brain", f"{'; '.join(events)} -> {order.routine or 'carry on'} "
                               f"{order.orders or ''} {order.say}"))
+        self._live_orders()
         for _ in range(4):
             keys, events = self.engine.step(s)
             if keys:
@@ -315,6 +335,7 @@ class Game:
             "brain_calls": self.brain_calls + getattr(self.engine, "calls", 0),
             "brain_seconds": round(self.brain_seconds + getattr(self.engine, "seconds", 0.0)),
             "brain_failures": self.brain_failures, "stall": self.stall or "",
+            "brain_tokens": getattr(self.engine, "tokens", 0),
             "dlvl": st.get("dlvl"), "xlvl": st.get("xlvl"), "turn": st.get("turn"),
             "hp": f"{st.get('hp')}/{st.get('hpmax')}", "gold": st.get("gold"),
             "stats": dict(self.engine.memory.stats), "deepest": self.deepest,
@@ -374,6 +395,10 @@ def _live_proxy(name: str, batch_dir: str):
         d = {}
     return NS(name=name, last=d.get("last"), result=d.get("result"), stall=d.get("stall"), feed=[],
               engine=NS(note=d.get("note") or "", routine=d.get("routine"), memory=NS(stats=d.get("stats") or {})))
+
+
+def s_turn(s: dict | None) -> int:
+    return int(((s or {}).get("status") or {}).get("turn") or 0)
 
 
 def _play_one(spec: dict) -> dict:
@@ -552,6 +577,11 @@ def main() -> None:
                 r = _error_result(futures[fut]["name"], f"{type(e).__name__}: {e}")
             results.append(r)
             save_json()  # After every game, so a batch that dies early keeps its records.
+            try:  # The tactics page follows the run as games finish.
+                from . import tacticspage
+                tacticspage.write(run, live=len(results) < len(specs))
+            except Exception as e:
+                print(f"tactics page not written: {e!r}")
             print(f"  {r['name']}: Dlvl {r['dlvl']} XL {r['xlvl']} T{r['turn']} "
                   f"{r['death'] or r['stall']}", flush=True)
     stop.set()
@@ -570,11 +600,11 @@ def main() -> None:
         w.writeheader()
         w.writerows(sorted(results, key=lambda r: r["name"]))
     dashboard.write(board, run, args.brain, games, batch_dir)
-    try:  # The tactics page is a view of the saved run: a fault in it must not cost the summary below.
-        from . import tacticspage
-        tacticspage.write(run)
-    except Exception as e:
-        print(f"tactics page not written: {e!r}")
+    tokens = sum(r.get("brain_tokens") or 0 for r in results)
+    if tokens:
+        from .jev import USD_PER_INPUT_TOKEN, add_spend
+        total = add_spend(tokens * USD_PER_INPUT_TOKEN)
+        print(f"Jev: {tokens:,} input tokens, about ${tokens * USD_PER_INPUT_TOKEN:.4f} this run, ${total:.4f} all runs (estimate)")
 
     def num(v):
         try:

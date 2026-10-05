@@ -177,6 +177,8 @@ class JevJudge(JevEngine):
         failed_here = getattr(self, "elbereth_failed_at", None) == v.pos
         state = fight_state(c, loss, steps, failed_here, [x for x in v.s.get("messages", []) if x],
                             len(lane) if lane else None, "down" if up.get(goal) == ">" else "up")
+        if getattr(self, "standing_order", ""):
+            state["standing_order"] = self.standing_order
         answers = self.ask(state, QUESTIONS)
         self.prev_hp = (turn, c["hp"])
         if answers is None:

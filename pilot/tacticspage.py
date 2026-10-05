@@ -17,6 +17,8 @@ import os
 import sys
 
 from .dashboard import CSS
+from .engine import DEFAULT_ORDERS
+from .jev import USD_PER_INPUT_TOKEN, spent
 from .ledger import BATCH, rows, table
 from .tactics import PREDICTION
 
@@ -40,6 +42,12 @@ th { color:var(--dim); font-weight:500; } .bar { display:inline-block; height:8p
 .p i { display:block; height:8px; background:var(--accent); border-radius:2px; }
 button.by { font:inherit; font-size:12px; padding:2px 9px; border-radius:9px; border:1px solid var(--line); background:none; color:var(--ink); cursor:pointer; }
 button.by.on { border-color:var(--accent); color:var(--accent); }
+.flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:4px; font-size:12px; }
+.node { border:1px solid var(--line); border-radius:6px; padding:5px 8px; max-width:190px; } .node b { display:block; font-size:11px; color:var(--dim); font-weight:500; }
+.node.jev { border-color:#e08a2c; background:rgba(224,138,44,.12); } .arrow { align-self:center; color:var(--dim); }
+iframe#view { width:100%; height:680px; border:1px solid var(--line); border-radius:8px; background:var(--card); }
+textarea, input.say { width:100%; font:12px/1.4 ui-monospace, Menlo, monospace; background:var(--map); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:6px; }
+button.go { font:inherit; padding:4px 12px; border-radius:6px; border:1px solid var(--accent); background:none; color:var(--accent); cursor:pointer; }
 """
 
 JS = """
@@ -74,6 +82,18 @@ function detail() {
     o.menu.map(t => `<span>${t === o.tactic ? '<b>' + esc(t) + '</b>' : esc(t)}</span><span>${esc(D.prediction[t])}${t === o.tactic ? ' · chosen' : ''}</span>`).join('') +
     o.omitted.map(t => `<span style="text-decoration:line-through">${esc(t.id)}</span><span class="sub">omitted: ${esc(t.reason)}</span>`).join('') + '</div>'
     : '<span class="sub">This tactic continued an earlier decision; the menu is recorded where a tactic starts.</span>';
+  const node = (t, x, jev) => `<div class="node ${jev ? 'jev' : ''}"><b>${t}</b>${x}</div>`, arrow = '<span class="arrow">&rarr;</span>';
+  $('#flow').innerHTML = [
+    node('Observe', `${o.adjacent} adjacent, ${o.in_view} in view, HP ${o.hp}/${o.hpmax}`),
+    node('Build menu', `${o.menu.length} feasible, ${o.omitted.length} omitted`),
+    o.jev ? node('Jev: three yes/no answers', Object.entries(o.jev.p).map(([k, v]) => `${esc(k)} ${v.toFixed(2)}`).join(', '), true) : '',
+    node(o.jev ? 'Route (code, on the answers)' : 'Select (rules, fixed order)', esc(o.jev ? o.jev.route : o.tactic)),
+    node('Safety rules', 'passed'),
+    node('Motor', `${esc(o.tactic)} for ${o.turns} turn${o.turns === 1 ? '' : 's'}`),
+    node('Measure', `<span class="tag ${o.status}">${label[o.status]}</span>`),
+  ].filter(Boolean).join(arrow);
+  const src = `replay-${D.games[game].name}.html#t=${o.turn}`; if ($('#view').getAttribute('src') !== src) $('#view').setAttribute('src', src);
+  history.replaceState(null, '', `#g=${D.games[game].name}&o=${pick}`);
   $('#probs').innerHTML = o.jev ? Object.entries(o.jev.p).map(([k, v]) => `<div class="p"><span>${esc(k)}</span><span><i style="width:${Math.round(v * 100)}%"></i></span><span>${v.toFixed(2)}</span></div>`).join('')
     : '<span class="sub">Jev was not asked at this decision.</span>';
 }
@@ -90,11 +110,24 @@ document.addEventListener('click', e => {
   if (b) ledger(b.dataset.by);
 });
 pick = Math.max(0, D.games[0] ? D.games[0].outcomes.length - 1 : 0);
+const h = /g=([^&]+)&o=(\d+)/.exec(location.hash);  // keep the selection across live refreshes
+if (h) { const k = D.games.findIndex(g => g.name === h[1]); if (k >= 0) { game = k; pick = Math.min(+h[2], D.games[k].outcomes.length - 1); } }
 games(); decisions(); detail(); ledger('symbol');
+if (D.live) setTimeout(() => location.reload(), 20000);
+const served = location.protocol.startsWith('http');
+$('#orders').value = JSON.stringify(D.orders, null, 1);
+$('#ordernote').textContent = served ? 'Applies to games in flight within a turn; each game that takes them is marked "live orders applied" in its stats.'
+  : 'Opened as a file, this page cannot send orders. Start `python3 -m pilot.serve` and open http://127.0.0.1:3067/tactics.html to apply them to a running batch.';
+$('#apply').disabled = !served;
+$('#apply').addEventListener('click', async () => {
+  let body; try { body = JSON.stringify({orders: JSON.parse($('#orders').value || '{}'), say: $('#say').value}); } catch (e) { $('#ordernote').textContent = 'Not valid JSON: ' + e.message; return; }
+  const r = await fetch('orders', {method: 'POST', headers: {'Content-Type': 'application/json'}, body}), j = await r.json();
+  $('#ordernote').textContent = r.ok ? 'Applied: ' + JSON.stringify(j.applied) : 'Refused: ' + j.error;
+});
 """
 
 
-def write(run: str) -> str:
+def write(run: str, live: bool = False) -> str:
     with open(os.path.join(BATCH, f"{run}.json")) as f:
         d = json.load(f)
     gs = sorted(d["games"], key=lambda g: (-g["deepest"], g["name"]))
@@ -108,7 +141,9 @@ def write(run: str) -> str:
             o = os_[-1]
             k = (o["tactic"], ", ".join(t for t in o["menu"] if t != o["tactic"]) or "nothing else")
             last[k] = last.get(k, 0) + 1
+    tokens = sum(g.get("brain_tokens") or 0 for g in gs)
     payload = {
+        "live": live, "orders": {k: v for k, v in DEFAULT_ORDERS.items() if k in ("retreat_below", "rest_below", "fight_up_to", "descend", "eat_at")},
         "prediction": PREDICTION,
         "games": [{"name": g["name"], "deepest": g["deepest"], "xl": g.get("xlvl"), "turn": g.get("turn"),
                    "end": g.get("death") or g.get("stall") or "", "outcomes": g.get("outcomes") or []} for g in gs],
@@ -129,8 +164,11 @@ def write(run: str) -> str:
   <div class="stat"><b>{len(data):,}</b><span>tactic outcomes</span></div>
   <div class="stat"><b>{100 * sum(o["status"] == "met" for o in data) / max(len(data), 1):.0f}%</b><span>predictions met</span></div>
   <div class="stat"><b>{calls:,}</b><span>model calls</span></div>
-  <div class="stat"><b>{(secs / calls if calls else 0):.2f}s</b><span>per call (cost not recorded)</span></div>
+  <div class="stat"><b>{(secs / calls if calls else 0):.2f}s</b><span>per call</span></div>
+  <div class="stat"><b>{tokens:,}</b><span>input tokens</span></div>
+  <div class="stat"><b>${tokens * USD_PER_INPUT_TOKEN:.4f}</b><span>this run, estimated · ${spent():.4f} all runs</span></div>
 </div>
+{'<div class="sub" style="margin-top:8px">Run in progress: this page reloads every 20 seconds as games finish.</div>' if live else ''}
 <h2>What the pilot decided</h2>
 <div class="panels">
   <div class="panel"><h3>Games (deepest first) · tactics</h3><div class="list" id="games"></div></div>
@@ -141,6 +179,16 @@ def write(run: str) -> str:
     <div class="panel" style="margin-top:12px"><h3>Raw probabilities (Jev)</h3><div id="probs"></div></div>
   </div>
 </div>
+<h2>Composition of this decision</h2>
+<div class="sub" style="margin-bottom:8px">Orange nodes are Jev's judgments. Every other node is code: observation, the menu, routing, safety rules, the motor and the measurement.</div>
+<div class="panel"><div class="flow" id="flow"></div></div>
+<h2>The game at this decision</h2>
+<iframe id="view" title="Game replay at the selected decision"></iframe>
+<h2>Standing orders</h2>
+<div class="panel"><div class="sub" id="ordernote" style="margin-bottom:8px"></div>
+  <textarea id="orders" rows="7" aria-label="Standing orders as JSON"></textarea>
+  <input class="say" id="say" placeholder="Free-text order for Jev, for example: avoid melee with ants and bees" aria-label="Free-text order" style="margin:8px 0">
+  <button class="go" id="apply">Apply orders</button></div>
 <h2>Ledger: how often each prediction came true</h2>
 <div class="sub" style="margin-bottom:8px">Group by
   <button class="by" data-by="symbol">monster letter</button> <button class="by" data-by="target">monster</button>
