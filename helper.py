@@ -144,8 +144,12 @@ def term_size():
 
 
 def layout(rows, cols):
-    """Game pane width and height; the helper gets the rest of the columns."""
-    game_w = max(80, cols - HELPER_W - 1)
+    """Game pane width and height; the helper gets the rest of the columns.
+
+    Curses menus open against the pane's right edge and the map is 80 wide,
+    so the game takes up to 130 columns (menus beside the map) before the
+    helper drops below HELPER_W, down to 25."""
+    game_w = max(80, min(cols - 26, max(130, cols - HELPER_W - 1)))
     return game_w, rows - 1
 
 

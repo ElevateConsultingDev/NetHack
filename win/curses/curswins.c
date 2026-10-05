@@ -118,7 +118,9 @@ curses_create_window(int width, int height, orient orientation)
         starty = term_rows - height;
         break;
     case RIGHT:
-        if (invent || (moves > 1)) {
+        if (mapw + mapx + (mapb_offset * 2) + width <= term_cols) {
+            startx = mapw + mapx + (mapb_offset * 2); /* beside the map */
+        } else if (invent || (moves > 1)) {
             startx = (mapw + mapx + (mapb_offset * 2)) - width;
         } else {
             startx = term_cols - width;
