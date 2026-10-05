@@ -318,6 +318,7 @@ class Game:
             "dlvl": st.get("dlvl"), "xlvl": st.get("xlvl"), "turn": st.get("turn"),
             "hp": f"{st.get('hp')}/{st.get('hpmax')}", "gold": st.get("gold"),
             "stats": dict(self.engine.memory.stats), "deepest": self.deepest,
+            "outcomes": self.engine.tracker.finish(not self.stall, int(st.get("turn") or 0), st.get("hp") or 0),
             "race": st.get("race"), "prayers": self.engine.memory.prayer_log,
             "escalations": self.escalations, "feed": list(self.feed),
             "seed": self.seed, "keys": self.keys, "answers": self.answers, "brain": self.brain.name,

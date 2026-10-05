@@ -9,6 +9,7 @@ done, failed, or something changed that the brain should look at.
 from __future__ import annotations
 
 from .spoilers import spoiler
+from .tactics import Tracker, classify
 
 import re
 from collections import deque
@@ -1064,6 +1065,7 @@ class Engine:
         self.routine: str | None = None
         self.args: dict = {}
         self.last_checks: dict = {}
+        self.tracker = Tracker()  # tactics, predictions and outcomes (shadow record)
         self.acknowledged: set[str] = set()  # escalations the brain's routine is handling
         self.note = ""
         self._loot_args: dict = {"classes": self.orders["loot"]}
@@ -1144,7 +1146,33 @@ class Engine:
         if mech:
             self.note = mech[1]
             return mech[0], []
-        return self._decide(v)
+        out = self._decide(v)
+        if v.kind == "command" and v.pos and self.last_checks:
+            self._track(v, self.last_checks)
+        return out
+
+    def _track(self, v: View, c: dict) -> None:
+        """Shadow record of the fight-or-escape tactic just chosen, its prediction and what came of
+        it (pilot/tactics.py). Changes nothing about play."""
+        feasible = None
+        if classify(self.note) and not self.tracker.open:  # A new tactic: note what else was on offer.
+            m = self.memory
+            adj = [h["name"] for h in c["adjacent_hostiles"]]
+            foes = [n for n in adj if n not in DONT_MELEE]
+            up = [(x, y) for (d, x, y), n in m.features.items() if d == v.dlvl and n == "staircase up" and v.dlvl > 1]
+            near = bfs(v, lambda x, y: (x, y) in up) if up and v.pos not in up else None
+            lane = None if _chokepoint(v, *v.pos) else bfs(v, lambda x, y: _chokepoint(v, x, y))
+            feasible = {
+                "melee": True if foes and not unarmed(v) else "nothing adjacent that is safe to melee" if not foes else "unarmed",
+                "throw": True if throwable(v) and any(in_line(v.pos, (h["x"], h["y"])) and h["distance"] <= 8
+                                                       for h in c["visible_hostiles"]) else "nothing to throw, or no target in line",
+                "elbereth": True if adj and all(spoiler(n).get("elbereth", True) for n in adj) else "an adjacent monster ignores it" if adj else "nothing adjacent",
+                "stairs": True if v.pos in up or (near and len(near) <= 12) else "no stairs up within 12 steps",
+                "corridor": True if lane and len(lane) <= 8 and len(c["mobile_hostiles"]) >= 2 else "one enemy, or no corridor within 8 steps",
+                "pray": True if c["prayer_safe"] and c["major_trouble"] else "prayer gate closed, or no trouble a prayer fixes",
+            }
+        c["in_chokepoint"] = _chokepoint(v, *v.pos)
+        self.tracker.observe(c["turn"], v.dlvl, c, self.note, [x for x in v.s.get("messages", []) if x], feasible)
 
     def _remember_map(self, v: View) -> None:
         for (x, y), c in v.cells.items():
