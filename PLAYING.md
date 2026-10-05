@@ -22,6 +22,8 @@ NetHack (curses interface) on the left, a Claude helper on the right.
 - Cheat: the helper sees the whole level as it really is (every monster, every
   item truly identified, traps) and your inventory identified. `NETHACK_REVEAL= ./play`
   turns that off.
+- `F3` / `F4` (or `#godown` / `#goup`) walk to the down / up stairs once you know where
+  they are (with `F2` on, you always do). Anything interesting stops the walk; press again.
 - Your inventory stays visible to the right of the map (`perm_invent`); menus open over it.
 - Don't die for good: `./play -X` (or `#exploremode` mid-game) is NetHack's explore mode;
   when you would die it asks `Die?` and you can say no. Explore games skip the high scores.

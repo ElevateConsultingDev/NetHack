@@ -145,6 +145,9 @@ STATIC_PTR int NDECL(wiz_identify);
 STATIC_PTR int NDECL(wiz_intrinsic);
 STATIC_PTR int NDECL(wiz_map);
 STATIC_PTR int NDECL(doreveal);
+STATIC_PTR int NDECL(dogodown);
+STATIC_PTR int NDECL(dogoup);
+STATIC_DCL int FDECL(gostairs, (BOOLEAN_P));
 STATIC_PTR int NDECL(wiz_makemap);
 STATIC_PTR int NDECL(wiz_genesis);
 STATIC_PTR int NDECL(wiz_where);
@@ -916,6 +919,46 @@ doreveal(VOID_ARGS)
     flush_screen(1);
     pline(iflags.reveal_all ? "You see the whole level."
                             : "Your vision returns to normal.");
+    return 0;
+}
+
+/* #godown, #goup - travel to the known down (or up) staircase or ladder */
+STATIC_PTR int
+dogodown(VOID_ARGS)
+{
+    return gostairs(FALSE);
+}
+
+STATIC_PTR int
+dogoup(VOID_ARGS)
+{
+    return gostairs(TRUE);
+}
+
+STATIC_OVL int
+gostairs(up)
+boolean up;
+{
+    static char cmd[2];
+    xchar x = up ? xupstair : xdnstair, y = up ? yupstair : ydnstair;
+
+    if (!x)
+        x = up ? xupladder : xdnladder, y = up ? yupladder : ydnladder;
+    if (!x && sstairs.sx && (boolean) sstairs.up == up)
+        x = sstairs.sx, y = sstairs.sy;
+    if (!x || !levl[x][y].seenv) {
+        You("don't know where the %s are.", up ? "up stairs" : "down stairs");
+        return 0;
+    }
+    if (x == u.ux && y == u.uy) {
+        You("are already on them.");
+        return 0;
+    }
+    iflags.travelcc.x = u.tx = x;
+    iflags.travelcc.y = u.ty = y;
+    cmd[0] = Cmd.spkeys[NHKF_TRAVEL];
+    cmd[1] = 0;
+    readchar_queue = cmd;
     return 0;
 }
 
@@ -3401,6 +3444,8 @@ struct ext_func_tab extcmdlist[] = {
     { M('f'), "force", "force a lock", doforce, AUTOCOMPLETE },
     { ';', "glance", "show what type of thing a map symbol corresponds to",
             doquickwhatis, IFBURIED | GENERALCMD },
+    { '\0', "godown", "travel to the down stairs", dogodown, AUTOCOMPLETE },
+    { '\0', "goup", "travel to the up stairs", dogoup, AUTOCOMPLETE },
     { '?', "help", "give a help message", dohelp, IFBURIED | GENERALCMD },
     { '\0', "herecmdmenu", "show menu of commands you can do here",
             doherecmdmenu, IFBURIED },
