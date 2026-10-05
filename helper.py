@@ -29,13 +29,14 @@ import termios
 import pyte
 
 import guard
+import saves
 import palette
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.join(HERE, "playground")
 SAVES = os.path.join(GAME, "save")
 SNAPS = os.path.join(GAME, "snapshots")
-KEEP_SNAPS = 10
+KEEP_SNAPS = 20  # checkpoints kept per character (prune in the saves list)
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
 def ctrl_opt(letter):
@@ -51,24 +52,27 @@ FKEYS = {ctrl_opt("F"): b"#fog\r",     # lift / bring back the fog of war
          ctrl_opt("D"): b"#godown\r",  # travel to the down stairs
          ctrl_opt("U"): b"#goup\r"}    # travel to the up stairs
 WHAT_NOW = ctrl_opt("W")   # ask the helper what to do now
-SNAPSHOT = ctrl_opt("S")   # snapshot the game now
-REWIND = ctrl_opt("R")     # go back to the last snapshot
+SNAPSHOT = ctrl_opt("S")   # checkpoint the game now
+REWIND = ctrl_opt("R")     # go back to the last checkpoint
+SAVES_KEY = ctrl_opt("L")  # the saves list: load, delete, prune, new game
 SEARCH = ctrl_opt("K")     # search commands, items and map things
 COPY = ctrl_opt("C")       # copy the game screen to the clipboard as text
 SELECT = ctrl_opt("V")     # select mode: drag a rectangle to copy it
 ZOOM_IN, ZOOM_OUT = ctrl_opt("I"), ctrl_opt("O")  # (or the wheel over the map)
-LEADER_KEYS = {"t": "T", "f": "F", "d": "D", "u": "U", "w": "W", "s": "S", "r": "R",
+LEADER_KEYS = {"t": "T", "f": "F", "d": "D", "u": "U", "w": "W", "s": "S", "r": "R", "l": "L",
                "k": "K", "c": "C", "v": "V", "i": "I", "o": "O"}
-BAR = "⌃G: f fog  d/u stairs  w what now?  k search  s snapshot  r rewind  c copy  v select  i/o zoom  t helper"
-LEADER_BAR = (" ⌃G then: f fog of war  d down stairs  u up stairs  w what now?  k search  s snapshot  "
-              "r rewind  c copy screen  v select  i zoom in  o zoom out  t helper/game   (anything else cancels) ")
+BAR = "⌃G: f fog  d/u stairs  w what now?  k search  s checkpoint  r back  l saves  c copy  v select  i/o zoom  t helper"
+LEADER_BAR = (" ⌃G then: f fog of war  d down stairs  u up stairs  w what now?  k search  s checkpoint  l saves  "
+              "r back to last checkpoint  c copy screen  v select  i zoom in  o zoom out  t helper/game   (anything else cancels) ")
 MOUSE_ON = "\x1b[?1000h\x1b[?1002h\x1b[?1006h"   # clicks, drags (for resizing), SGR coordinates
 MOUSE_OFF = "\x1b[?1006l\x1b[?1002l\x1b[?1000l"
 UP, DOWN = (b"\x1b[A", b"\x1bOA"), (b"\x1b[B", b"\x1bOB")
 COMMANDS = palette.load_commands(os.path.join(HERE, "src", "cmd.c"))
 EXTRAS = [dict(label="what now", detail="ask the helper what to do right now  [⌃G w]", action=("fkey", WHAT_NOW)),
-          dict(label="snapshot", detail="save a snapshot to come back to  [⌃G s]", action=("fkey", SNAPSHOT)),
-          dict(label="rewind", detail="go back to the last snapshot  [⌃G r]", action=("fkey", REWIND)),
+          dict(label="checkpoint", detail="save a checkpoint to come back to  [⌃G s]", action=("fkey", SNAPSHOT)),
+          dict(label="back to checkpoint", detail="go back to the last checkpoint  [⌃G r]", action=("fkey", REWIND)),
+          dict(label="saves", detail="load, delete or prune saves and checkpoints; new game  [⌃G l]",
+               action=("fkey", SAVES_KEY)),
           dict(label="copy screen", detail="copy the game screen as text  [⌃G c]", action=("fkey", COPY)),
           dict(label="zoom in", detail="bigger map squares  [⌃G i, wheel up over the map]", action=("fkey", ZOOM_IN)),
           dict(label="zoom out", detail="smaller map squares  [⌃G o, wheel down over the map]", action=("fkey", ZOOM_OUT)),
@@ -120,7 +124,7 @@ Plain text only, no markdown: it is shown in a narrow terminal pane. \
 Write keys the Mac way: ⌃ is Control (⌃D kicks), ⌥ is Option, which is NetHack's Meta/Alt \
 (⌥L loots, ⌥P prays; never write M-l), ⇧ is Shift. Extended commands can always be typed \
 with # (#loot). This player's helper shortcuts: ⌃G f fog of war, ⌃G d / ⌃G u walk to the \
-down / up stairs, ⌃G k search, ⌃G s snapshot, ⌃G r rewind."""
+down / up stairs, ⌃G k search, ⌃G s checkpoint, ⌃G r back to the last checkpoint, ⌃G l saves."""
 
 ASCII = str.maketrans("─│┌┐└┘├┤┬┴┼", "-|+++++++++")  # box drawing as plain ASCII, any font
 COLORS = {"black": 0, "red": 1, "green": 2, "brown": 3, "blue": 4,
@@ -139,7 +143,7 @@ class Watcher:
         threading.Thread(target=self._run, daemon=True).start()
 
     def _run(self):
-        while True:  # a new connection each time the game restarts (snapshots)
+        while True:  # a new connection each time the game restarts (checkpoints, loads)
             try:
                 conn, _ = self.srv.accept()
             except OSError:
@@ -253,20 +257,6 @@ def legend(state):
     return out
 
 
-def snapshots(save_name=None):
-    """Snapshot files for one save file name (or all), oldest first."""
-    if not os.path.isdir(SNAPS):
-        return []
-    files = [os.path.join(SNAPS, f) for f in os.listdir(SNAPS)
-             if save_name is None or f.split("@")[0] == save_name]
-    return sorted(files, key=os.path.getmtime)
-
-
-def snap_label(path):
-    turn, dlvl = os.path.basename(path).rsplit("@", 1)[-1].split("-D")
-    return f"Dlvl {dlvl}, turn {int(turn)}"
-
-
 def term_size():
     rows, cols = struct.unpack("hh", fcntl.ioctl(1, termios.TIOCGWINSZ, b"\0" * 4))
     return rows, cols
@@ -321,16 +311,30 @@ class App:
         self.stream = pyte.ByteStream(self.screen)
         self.stream.use_utf8 = False  # the game sends ASCII + ACS line drawing, which pyte skips in UTF-8 mode
         self.argv = argv
-        self.saving = None    # "snapshot" or "rewind" while the wrapper has the game saving
-        self.over = False     # the game ended (died or quit) and a rewind is on offer
-        self.snap_dlvl = None # dungeon level of the last automatic snapshot
+        self.saving = None    # "checkpoint", "load" or "new" while the wrapper has the game saving
+        self.over = False     # the game ended (died or quit); the saves list is up
+        self.snap_dlvl = None # dungeon level of the last automatic checkpoint
+        self.load_target = None  # what to load once the game has saved: a saves.listing() item
+        self.new_name = None  # the character to start for a new game
+        self.saves_ui = None  # the ⌃G l list: items, sel, confirm, naming
         self.save_name = None # this character's save file name, once known
         self.spawn()
         self.resized = False
         signal.signal(signal.SIGWINCH, lambda *_: setattr(self, "resized", True))
 
-    def spawn(self):
-        """Start (or restart) the game; a saved game restores automatically."""
+    def spawn(self, name=None):
+        """Start (or restart) the game, as character `name` if given; a saved game
+        restores automatically."""
+        if name:
+            args, i = [], 0
+            while i < len(self.argv):  # drop any -u NAME / -uNAME
+                if self.argv[i] == "-u":
+                    i += 2
+                    continue
+                if not self.argv[i].startswith("-u"):
+                    args.append(self.argv[i])
+                i += 1
+            self.argv = args + ["-u", name]
         self.screen.reset()
         self.started = time.time()
         pid, self.fd = pty.fork()
@@ -368,44 +372,147 @@ class App:
         return True
 
     def game_exited(self):
-        """The game process ended: finish a snapshot or rewind, or offer a rewind
-        after a death. False means the wrapper should quit."""
+        """The game process ended: finish a checkpoint, load or new game, or (after
+        a death) put up the saves list. False means the wrapper should quit."""
         try:
             os.waitpid(self.pid, 0)
         except ChildProcessError:
             pass
         os.close(self.fd)
-        saves = sorted((os.path.join(SAVES, f) for f in os.listdir(SAVES)), key=os.path.getmtime)
-        fresh = [f for f in saves if os.path.getmtime(f) >= self.started]
+        files = sorted((os.path.join(SAVES, f) for f in os.listdir(SAVES)), key=os.path.getmtime)
+        fresh = [f for f in files if os.path.getmtime(f) >= self.started]
         why, self.saving = self.saving, None
         if why and fresh:
             save = fresh[-1]
             self.save_name = os.path.basename(save)
-            if why == "snapshot":
-                os.makedirs(SNAPS, exist_ok=True)
-                info = self.snap_info
-                shutil.copy2(save, os.path.join(
-                    SNAPS, f"{os.path.basename(save)}@{info.get('turn', 0):06d}-D{info.get('dlvl', 0)}"))
-                for old in snapshots(self.save_name)[:-KEEP_SNAPS]:
-                    os.unlink(old)
-                self.say("dim", f"Snapshot saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')}). ⌃G r goes back to it.")
+            self.checkpoint(save)  # whatever happens next, this point is kept
+            if why == "load":
+                self.load(self.load_target)
+            elif why == "new":
+                self.spawn(self.new_name)
             else:
-                self.restore_snapshot()
-            self.spawn()
+                self.spawn()
             return True
         if fresh:  # the player saved (S): done for now
             return False
-        snap = snapshots(self.save_name)[-1:] if snapshots(self.save_name) else []
-        if not snap:
-            return False
+        if not self.save_name or not saves.snapshots(SNAPS, self.save_name):
+            return False  # nothing of this character's to go back to (never offer someone else's)
         self.over = True
-        self.say("err", f"Game over. ⌃G r rewinds to your last snapshot ({snap_label(snap[0])}); q quits.")
+        self.open_saves()
+        self.say("err", "Game over. Pick a checkpoint and press Enter to play on from there; q quits.")
         return True
 
-    def restore_snapshot(self):
-        snap = snapshots(self.save_name)[-1]
-        shutil.copy2(snap, os.path.join(SAVES, os.path.basename(snap).split("@")[0]))
-        self.say("dim", f"Rewound to {snap_label(snap)}.")
+    def checkpoint(self, save):
+        """Keep a copy of a just-saved game."""
+        os.makedirs(SNAPS, exist_ok=True)
+        info = self.snap_info
+        shutil.copy2(save, os.path.join(SNAPS, f"{os.path.basename(save)}@{info.get('turn', 0):06d}-D{info.get('dlvl', 0)}"))
+        for old in saves.snapshots(SNAPS, self.save_name)[:-KEEP_SNAPS]:
+            os.unlink(old)
+        self.say("dim", f"Checkpoint saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')}). ⌃G r goes back to the last one.")
+
+    def load(self, item):
+        """Start the game from a saves.listing() item (a checkpoint or a saved game)."""
+        if item["kind"] == "snap":
+            shutil.copy2(item["path"], os.path.join(SAVES, item["base"]))
+        self.save_name = item["base"]
+        self.over = False
+        self.say("dim", f"Loaded {item['char']}: {item['what']}.")
+        self.spawn(item["char"])
+
+    def request_load(self, item):
+        """Load now if no game is running, else save the running game first."""
+        if self.over:
+            self.load(item)
+        elif self.save_game("load"):
+            self.load_target = item
+        else:
+            self.say("dim", "Loading works at the command prompt; finish this first.")
+
+    def open_saves(self):
+        items = saves.listing(SAVES, SNAPS)
+        sel = next((k for k, i in enumerate(items) if i["base"] == self.save_name), 0)  # start on this character
+        self.saves_ui = dict(items=items, sel=sel, confirm=None, naming=None)
+
+    def close_saves(self):
+        self.saves_ui = None
+        self.screen.dirty.update(range(self.gh))
+
+    def draw_saves(self):
+        u = self.saves_ui
+        y, x, w = 1, 2, min(self.gw - 4, 90)
+        title = (f" New game, name: {u['naming']}_" if u["naming"] is not None else
+                 " Delete this? d again to confirm, anything else cancels" if u["confirm"] == "d" else
+                 " Keep only the newest 3 checkpoints of this character? p again to confirm" if u["confirm"] == "p" else
+                 " Saves: Enter load  d delete  p prune to newest 3  n new game  Esc close")
+        edge = "+" + "-" * (w - 2) + "+"
+        self.gput(y, x, edge, curses.A_BOLD)
+        self.gput(y + 1, x, "|" + title.ljust(w - 2)[:w - 2] + "|", curses.A_BOLD)
+        n = 14
+        first = max(0, min(u["sel"] - n // 2, len(u["items"]) - n))
+        for i in range(n):
+            k = first + i
+            it = u["items"][k] if k < len(u["items"]) else None
+            line = f" {it['char'][:14]:<14} {it['what']:<24} {it['when']}" if it else ""
+            if not u["items"] and i == 0:
+                line = " (no saved games or checkpoints yet)"
+            self.gput(y + 2 + i, x, "|" + line.ljust(w - 2)[:w - 2] + "|",
+                      curses.A_REVERSE if it and k == u["sel"] else 0)
+        self.gput(y + 2 + n, x, edge, curses.A_BOLD)
+
+    def saves_key(self, data):
+        """Keys while the saves list is up; False means quit (q after a death)."""
+        u = self.saves_ui
+        items, sel = u["items"], u["sel"]
+        if u["naming"] is not None:  # typing a new character's name
+            if data in (b"\r", b"\n"):
+                name = u["naming"].strip()
+                self.close_saves()
+                if name:
+                    self.new_game(name)
+            elif data == b"\x1b":
+                u["naming"] = None
+            elif data in (b"\x7f", b"\x08"):
+                u["naming"] = u["naming"][:-1]
+            else:
+                u["naming"] += "".join(c for c in data.decode("latin-1") if c.isalnum())[:20]
+            return
+        if u["confirm"]:
+            what, u["confirm"] = u["confirm"], None
+            if data.decode("latin-1") == what and items:
+                it = items[sel]
+                if what == "d":
+                    os.unlink(it["path"])
+                    self.say("dim", f"Deleted {it['char']}: {it['what']}.")
+                else:
+                    gone = saves.prune(SNAPS, it["base"], keep=3)
+                    self.say("dim", f"Pruned {gone} older checkpoints of {it['char']}.")
+                u["items"] = saves.listing(SAVES, SNAPS)
+                u["sel"] = min(sel, max(0, len(u["items"]) - 1))
+            return
+        if data in UP or data in DOWN:
+            u["sel"] = max(0, min(len(items) - 1, sel + (1 if data in DOWN else -1)))
+        elif data in (b"\r", b"\n") and items:
+            self.close_saves()
+            self.request_load(items[sel])
+        elif data in (b"d", b"p") and items:
+            u["confirm"] = data.decode()
+        elif data == b"n":
+            u["naming"] = ""
+        elif data == b"q" and self.over:
+            return False
+        elif data == b"\x1b" and not self.over:
+            self.close_saves()
+
+    def new_game(self, name):
+        if any(saves.char_name(f) == name for f in os.listdir(SAVES)):
+            self.say("err", f"{name} already has a saved game; that one will load. Delete it first for a fresh start.")
+        self.new_name = name
+        if self.over:
+            self.over = False
+            self.spawn(name)
+        elif not self.save_game("new"):
+            self.say("dim", "A new game starts from the command prompt; finish this first.")
 
     def _winsize(self):
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("hhhh", self.gh, self.gw, 0, 0))
@@ -737,6 +844,8 @@ class App:
                 self.draw_popup()
             if self.search:
                 self.draw_search()
+            if self.saves_ui:
+                self.draw_saves()
             self.draw_helper()
             self.draw_bar()
             if bar:
@@ -1023,8 +1132,8 @@ class App:
             self.helper.lines.append(("warn", "! " + w))
         self.warned = now
         dlvl = (state.get("status") or {}).get("dlvl")
-        if dlvl and dlvl != self.snap_dlvl and self.save_game("snapshot"):
-            self.snap_dlvl = dlvl  # one automatic snapshot per level reached
+        if dlvl and dlvl != self.snap_dlvl and self.save_game("checkpoint"):
+            self.snap_dlvl = dlvl  # one automatic checkpoint per level reached
 
     def run(self):
         sys.stdout.write(MOUSE_ON)  # mouse clicks, SGR coordinates
@@ -1083,14 +1192,14 @@ class App:
             self.selecting, self.sel = not self.selecting, None
             self.paint(bar=self.SELECT_BAR if self.selecting else None)
             return
-        if self.over:  # dead: ⌃G r rewinds, q quits, other keys are ignored
+        if self.saves_ui and data:
+            return self.saves_key(data)
+        if self.over:  # dead, list closed somehow: q quits, anything else reopens it
             if data == b"q":
                 return False
-            if data != REWIND:
-                return
-            self.over = False
-            self.restore_snapshot()
-            self.spawn()
+            self.open_saves()
+        elif data == SAVES_KEY:
+            self.open_saves()
         elif self.search and data:
             self.search_key(data)
         elif data == SEARCH:
@@ -1108,13 +1217,14 @@ class App:
         elif data == WHAT_NOW:
             self.ask("What should I do right now?")
         elif data == SNAPSHOT:
-            if not self.save_game("snapshot"):
-                self.say("dim", "Snapshots happen at the command prompt; finish this first.")
+            if not self.save_game("checkpoint"):
+                self.say("dim", "Checkpoints happen at the command prompt; finish this first.")
         elif data == REWIND:
-            if not snapshots(self.save_name):
-                self.say("dim", "No snapshot yet (one is made on each new level, or press ⌃G s).")
-            elif not self.save_game("rewind"):
-                self.say("dim", "Rewind works at the command prompt; finish this first.")
+            last = saves.snapshots(SNAPS, self.save_name)
+            if not self.save_name or not last:
+                self.say("dim", "No checkpoint yet (one is made on each new level, or press ⌃G s).")
+            else:
+                self.request_load(next(i for i in saves.listing(SAVES, SNAPS) if i["path"] == last[-1]))
         elif self.focus == "game":
             self.game_key(data)
         else:

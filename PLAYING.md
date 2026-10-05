@@ -50,12 +50,16 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
 - Warnings appear in the helper pane (yellow) when they start to apply: low HP, Weak or
   Fainting, turning to stone or slime, strangling, deadly illness, and dangerous monsters
   within 7 squares.
-- Undo: a snapshot is taken on each new dungeon level (and with `⌃G s`); `⌃G r` rewinds to
-  the latest one. When you die, the helper offers `⌃G r` to rewind (`q` quits). A snapshot
-  saves and restarts the game, so you'll see "Restoring save file..." for a moment. The
-  last 10 per character are kept in `playground/snapshots/`.
-- Legend: the top of the helper pane lists every symbol on the map right now and what
-  it is (monsters by name, items by class, doors, stairs, traps...).
+- Checkpoints (saved copies of your game you can go back to): one is taken on each new
+  dungeon level and with `⌃G s`; `⌃G r` goes back to the latest. A checkpoint saves and
+  restarts the game, so you'll see "Restoring save file..." for a moment. The newest 20
+  per character are kept in `playground/snapshots/`.
+- Saves list (`⌃G l`): every saved game and checkpoint, all characters, newest first.
+  Enter loads the selected one (the game you're in is checkpointed first, so nothing is
+  lost); `d` deletes it, `p` prunes that character to its newest 3 checkpoints (both ask
+  for the same key again to confirm); `n` starts a new game (type a name). When you die
+  or quit, the list opens on your character's checkpoints: Enter plays on from there,
+  `q` quits.
 - Beside the map: status (HP colored by how hurt you are, Pw, AC, Xp, gold, turn, level),
   your location as x/y, stats, carried weight and capacity, speed, xp for the next level,
   your god, hunger and conditions; with the cheat on (the default) also, in magenta, Luck,
