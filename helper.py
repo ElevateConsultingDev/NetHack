@@ -1177,6 +1177,9 @@ class App:
         x -= GX  # game-pane coordinates from here on
         if x < 0 or y >= self.gh:
             return
+        if self.focus == "helper" and not (self.search or self.popup or self.saves_ui):
+            self.focus = "game"  # coming back from the helper: this click only switches focus
+            return
         if self.search:
             by, bx, w = self.search_box()
             i = y - by - 2
