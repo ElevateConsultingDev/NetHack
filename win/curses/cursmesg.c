@@ -101,11 +101,11 @@ curses_message_win_puts(const char *message, boolean recursed)
         mesg_add_line(message);
     }
 
-    /* -2: room for trailing ">>" (if More>> is needed) or leading "  "
-       (if combining this message with preceding one) */
-    linespace = (width - 1) - 2 - (mx - border_space);
+    /* -9: room for a trailing " --More--" */
+    linespace = (width - 1) - 9 - (mx - border_space);
 
-    if (linespace < message_length) {
+    /* every message starts its own line (a run of pickups reads as a list) */
+    if (linespace < message_length || mx > border_space) {
         if (my - border_space >= height - 1) {
             /* bottom of message win */
             if (++turn_lines > height
@@ -141,18 +141,18 @@ curses_message_win_puts(const char *message, boolean recursed)
         curses_toggle_color_attr(win, NONE, A_BOLD, ON);
 
     /* will this message fit as-is or do we need to split it? */
-    if (mx == border_space && message_length > width - 2) {
+    if (mx == border_space && message_length > width - 9) {
         /* split needed */
-        tmpstr = curses_break_str(message, (width - 2), 1);
+        tmpstr = curses_break_str(message, (width - 9), 1);
         mvwprintw(win, my, mx, "%s", tmpstr), mx += (int) strlen(tmpstr);
         /* one space to separate first part of message from rest [is this
            actually useful?] */
-        if (mx < width - 2)
+        if (mx < width - 9)
             ++mx;
         free(tmpstr);
         if (bold)
             curses_toggle_color_attr(win, NONE, A_BOLD, OFF);
-        tmpstr = curses_str_remainder(message, (width - 2), 1);
+        tmpstr = curses_str_remainder(message, (width - 9), 1);
         curses_message_win_puts(tmpstr, TRUE);
         free(tmpstr);
     } else {
@@ -188,12 +188,13 @@ curses_block(boolean noscroll) /* noscroll - blocking because of msgtype
     WINDOW *win = curses_get_nhwin(MESSAGE_WIN);
 
     curses_get_window_size(MESSAGE_WIN, &height, &width);
-    if (mx - brdroffset > width - 3) { /* -3: room for ">>_" */
+    if (mx - brdroffset > width - 10) { /* room for " --More--_" */
         if (my - brdroffset < height - 1)
             ++my, mx = brdroffset;
         else
-            mx = width - 3 + brdroffset;
+            mx = width - 10 + brdroffset;
     }
+    mx += (mx > brdroffset); /* a space before it */
     /* if ">>" (--More--) is being rendered at the same spot as before,
        toggle attributes so that the first '>' starts blinking if it wasn't
        or stops blinking if it was */
@@ -207,11 +208,11 @@ curses_block(boolean noscroll) /* noscroll - blocking because of msgtype
     curses_toggle_color_attr(win, MORECOLOR, moreattr, ON);
     if (blink) {
         wattron(win, A_BLINK);
-        mvwprintw(win, my, mx, ">"), mx += 1;
+        mvwprintw(win, my, mx, "-"), mx += 1;
         wattroff(win, A_BLINK);
-        waddstr(win, ">"), mx += 1;
+        waddstr(win, "-More--"), mx += 7;
     } else {
-        mvwprintw(win, my, mx, ">>"), mx += 2;
+        mvwprintw(win, my, mx, "--More--"), mx += 8;
     }
     curses_toggle_color_attr(win, MORECOLOR, moreattr, OFF);
     wrefresh(win);
@@ -234,7 +235,7 @@ curses_block(boolean noscroll) /* noscroll - blocking because of msgtype
     if (height == 1) {
         curses_clear_unhighlight_message_window();
     } else {
-        mx -= 2, mvwprintw(win, my, mx, "  "); /* back up and blank out ">>" */
+        mx -= 8, mvwprintw(win, my, mx, "        "); /* back up and blank out "--More--" */
         if (!noscroll) {
             scroll_window(MESSAGE_WIN);
         }
