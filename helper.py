@@ -709,7 +709,7 @@ class App:
         you = self.watcher.state.get("player") or {}
         if self.zoom_view:
             x0, y0, bw, bh, top, bottom = self.zoom_view
-            rows = {top + int((y - y0 + 0.5) * bh): y for y in range(y0, MAP_H)}  # row through each map row's middle
+            rows = {top + int((y - y0) * bh): y for y in range(y0, MAP_H)}  # screen row of each map row
             for r in range(self.gh):
                 y = rows.get(r) if top <= r < bottom else None
                 self.put(r, 0, f"{y:2d} " if y is not None else "   ",
@@ -719,13 +719,13 @@ class App:
             self.gput(self.gh + 1, 0, " " * MAP_W)
             free = 0  # first column not yet used by a label
             for x in range(x0, MAP_W):
-                col = max(0, int((x - x0 + 0.5) * bw) - len(str(x)) // 2)  # centered under its square
+                col = int((x - x0) * bw)
                 if col >= MAP_W:
                     break
                 if col >= free and (bw >= 2 or x % 5 == 0 or x == you.get("x")):
                     self.gput(self.gh + 1, col, str(x), curses.A_REVERSE if x == you.get("x") else curses.A_DIM)
                     free = col + len(str(x)) + 1
-            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}  zoom {bw:g}x".ljust(32), curses.A_BOLD)
+            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}  zoom {bw:g}x".ljust(24), curses.A_BOLD)
             return
         for r in range(self.gh):
             y = r - self.map_top
@@ -741,7 +741,7 @@ class App:
             col = you["x"] - 1
             self.gput(self.gh, col, tens[col], curses.A_REVERSE)
             self.gput(self.gh + 1, col, units[col], curses.A_REVERSE)
-            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(32), curses.A_BOLD)
+            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(24), curses.A_BOLD)
 
     def draw_panel(self):
         """Status, location and inventory beside the map, unless the game has a menu there."""
