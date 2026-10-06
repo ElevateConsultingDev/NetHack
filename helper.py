@@ -97,7 +97,7 @@ try:  # terminals that show images draw the zoomed map as a picture, with truly 
     GRAPHICS = not KITTY and os.environ.get("TERM_PROGRAM") in ("ghostty", "WezTerm")
 except ImportError:  # no Pillow
     GRAPHICS = False
-ROW_SQUEEZE = 0.75  # picture zoom: squares 3/4 as tall as the cell shape, so rows sit closer
+ROW_SQUEEZE = 0.62  # picture zoom: squares ~5/8 as tall as the cell shape, so rows sit close
 ZOOMS = ([(1, 1)] + [(z, z * ROW_SQUEEZE) for z in (1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4)] if GRAPHICS
          else [(1, 1), (2, 2), (3, 3), (4, 4)] if KITTY  # columns x rows per map square
          else [(1, 1), (2, 1), (4, 2), (6, 3)])

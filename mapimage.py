@@ -26,7 +26,7 @@ def render(grid, cell_w, cell_h, sw, sh=None):
     (fractions fine). Letters fill the square's width, as in normal text."""
     bw, bh = cell_w * sw, cell_h * (sh or sw)
     img = Image.new("RGBA", (max(1, round(len(grid[0]) * bw)), max(1, round(len(grid) * bh))), (0, 0, 0, 0))
-    size = max(8, int(min(bw / 0.6, bh) * 0.98))  # Menlo is 0.6 em wide
+    size = max(8, int(min(bw / 0.6, bh / 0.78) * 0.98))  # Menlo is 0.6 em wide; glyphs ~0.75 em tall
     font = _fonts.get(size) or _fonts.setdefault(size, ImageFont.truetype(FONT, size))
     draw = ImageDraw.Draw(img)
     for j, row in enumerate(grid):
