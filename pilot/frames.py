@@ -56,6 +56,12 @@ class Recorder:
             return
         st = s.get("status", {})
         p = s.get("player") or {}
+        # Mark the pilot where the map draws it. The player's coordinates can be a step ahead of
+        # the drawn map (a --More-- after a move, the frame after taking stairs), which put the
+        # highlight one square off the @.
+        you = next((c for c in s.get("cells", []) if c.get("kind") == "you"), None)
+        if you:
+            p = {"x": you["x"], "y": you["y"]}
         c = g.engine.last_checks or {}
         m = [self._rid(r.rstrip()) for r in s["map"]]
         while m and self.rows[m[-1]] == "":
