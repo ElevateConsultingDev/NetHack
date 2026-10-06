@@ -935,9 +935,9 @@ class App:
                     curses.curs_set(1 if show else 0)
                 except curses.error:
                     pass
-            if self.focus == "game" and self.zoom_view:
+            you = self.watcher.state.get("player")  # none for a moment while the game restarts
+            if self.focus == "game" and self.zoom_view and you:
                 x0, y0, bw, bh, top, _ = self.zoom_view
-                you = self.watcher.state["player"]
                 self.move_cursor(min(top + int((you["y"] - y0) * bh), self.gh - 1), GX + int((you["x"] - x0) * bw))
             elif self.focus == "game":
                 self.move_cursor(min(self.screen.cursor.y, self.gh - 1), GX + min(self.screen.cursor.x, self.gw - 1))
