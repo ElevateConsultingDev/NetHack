@@ -656,12 +656,22 @@ class App:
         return rows if any(re.search(r"\bHP:-?\d", self.row_text(r)) for r in rows) else []
 
     def panel_visible(self):
-        """The panel shows unless the game has something beside the map (a menu, a window)."""
-        if self.gw - MAP_W - 1 < 20 or not self.watcher.state.get("status"):
-            return False
+        """The panel shows when there's room beside the map and a game going."""
+        return self.gw - MAP_W - 1 >= 20 and bool(self.watcher.state.get("status"))
+
+    def beside_rows(self):
+        """Rows where the game has a box or menu beside the map (the panel gives them up)."""
         skip, buf = self.status_rows(), self.screen.buffer
-        return not any(buf[r][c].data not in (" ", "") for r in range(PANEL_TOP, self.gh) if r not in skip
-                       for c in range(MAP_W, self.gw))
+        return {r for r in range(PANEL_TOP, self.gh) if r not in skip
+                and any(buf[r][c].data not in (" ", "") for c in range(MAP_W, self.gw))}
+
+    def overlay(self):
+        """Is the game drawing over the map (a box or menu covering it)? The screen differs
+        from the map the game reports."""
+        rows, top, buf = self.watcher.state.get("map") or [], self.map_top, self.screen.buffer
+        return any((buf[top + y][x - 1].data or " ").translate(ASCII) != row[x - 1]
+                   for y, row in enumerate(rows) if top + y < self.gh
+                   for x in range(1, min(MAP_W, len(row) + 1)))
 
     def cell_attr(self, c):
         attr = self.color(c.fg, c.bg, c.bold)
@@ -676,8 +686,15 @@ class App:
     def zoom_active(self):
         """Zoomed drawing only while the map is what's on screen (not menus, cursor picks...)."""
         st = self.watcher.state
-        return (self.zoom > 0 and st.get("player") and not (self.popup or self.search or self.saves_ui)
-                and (st.get("context") or {}).get("kind") in ("command", "yn", "more"))
+        if not (self.zoom > 0 and st.get("player")) or self.popup or self.search or self.saves_ui:
+            return False
+        kind = (st.get("context") or {}).get("kind")
+        if kind in ("command", "yn", "more"):
+            return True
+        # boxes and menus beside the map, prompts on the message line: the map is still
+        # uncovered, so stay zoomed; a cursor pick (a bare key wait with nothing beside the
+        # map) or anything drawn over the map shows the normal map
+        return not self.overlay() and (kind != "key" or bool(self.beside_rows()))
 
     def set_zoom(self, step):
         self.zoom = max(0, min(len(ZOOMS) - 1, self.zoom + step))
@@ -876,11 +893,13 @@ class App:
         lines.append(("", 0, None))
         status = "  ".join(re.sub(r"  +", "  ", self.row_text(r)).strip() for r in self.status_rows())
         lines += [(l, 0, None) for l in textwrap.wrap(status, w)]  # the game's status lines, as one
-        for r in range(PANEL_TOP, self.gh):
+        taken = self.beside_rows()  # the game's box beside the map keeps these rows
+        free = [r for r in range(PANEL_TOP, self.gh) if r not in taken]
+        for r in free:
             self.gput(r, MAP_W, "|")  # map | panel
-        for n, r in enumerate(range(PANEL_TOP, self.gh)):
+        for n, r in enumerate(free):
             text, attr, letter = lines[n] if n < len(lines) else ("", 0, None)
-            if r == self.gh - 1 and len(lines) > n + 1:
+            if r == free[-1] and len(lines) > n + 1:
                 text, letter = "...", None
             self.gput(r, MAP_W + 1, text[:w].ljust(w), attr)
             if letter:
