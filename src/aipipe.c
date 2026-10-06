@@ -223,6 +223,7 @@ put_status()
                : u.ualign.type == A_NEUTRAL ? "neutral" : "lawful", TRUE);
     put_kv_str("role", urole.name.m, TRUE);
     put_kv_str("race", urace.noun, TRUE);
+    put_kv_str("name", plname, TRUE);
     put_kv_str("gender", flags.female ? "female" : "male", TRUE);
     put_kv_str("god", u_gname(), TRUE);
     put_kv_int("weight", (long) (inv_weight() + weight_cap()), TRUE);
@@ -375,6 +376,8 @@ put_inventory()
 
 /* ---------- reveal (a cheat for the helper) ---------- */
 
+static void NDECL(put_more);
+
 /* doname() with everything about the object known; the flags are put back */
 static char *
 true_name(obj)
@@ -522,7 +525,146 @@ put_reveal()
                 first = FALSE;
             }
     }
-    put("}}");
+    put("}");
+    put_more();
+    put("}");
+}
+
+/* the rest of what a player could want to know: timed effects (buffs and
+   ailments) with turns left, spells, skills, conducts, discoveries */
+static void
+put_more()
+{
+    static const struct { int prop; const char *name; } props[] = {
+        { FIRE_RES, "fire res" },
+        { COLD_RES, "cold res" },
+        { SLEEP_RES, "sleep res" },
+        { DISINT_RES, "disint res" },
+        { SHOCK_RES, "shock res" },
+        { POISON_RES, "poison res" },
+        { ACID_RES, "acid res" },
+        { STONE_RES, "stone res" },
+        { DRAIN_RES, "drain res" },
+        { SICK_RES, "sick res" },
+        { INVULNERABLE, "invulnerable" },
+        { ANTIMAGIC, "antimagic" },
+        { STUNNED, "stunned" },
+        { CONFUSION, "confusion" },
+        { BLINDED, "blinded" },
+        { DEAF, "deaf" },
+        { SICK, "sick" },
+        { STONED, "stoned" },
+        { STRANGLED, "strangled" },
+        { VOMITING, "vomiting" },
+        { GLIB, "glib" },
+        { SLIMED, "slimed" },
+        { HALLUC, "halluc" },
+        { HALLUC_RES, "halluc res" },
+        { FUMBLING, "fumbling" },
+        { WOUNDED_LEGS, "wounded legs" },
+        { SLEEPY, "sleepy" },
+        { HUNGER, "hunger" },
+        { SEE_INVIS, "see invis" },
+        { TELEPAT, "telepat" },
+        { WARNING, "warning" },
+        { WARN_OF_MON, "warn of mon" },
+        { WARN_UNDEAD, "warn undead" },
+        { SEARCHING, "searching" },
+        { CLAIRVOYANT, "clairvoyant" },
+        { INFRAVISION, "infravision" },
+        { DETECT_MONSTERS, "detect monsters" },
+        { ADORNED, "adorned" },
+        { INVIS, "invis" },
+        { DISPLACED, "displaced" },
+        { STEALTH, "stealth" },
+        { AGGRAVATE_MONSTER, "aggravate monster" },
+        { CONFLICT, "conflict" },
+        { JUMPING, "jumping" },
+        { TELEPORT, "teleport" },
+        { TELEPORT_CONTROL, "teleport control" },
+        { LEVITATION, "levitation" },
+        { FLYING, "flying" },
+        { WWALKING, "wwalking" },
+        { SWIMMING, "swimming" },
+        { MAGICAL_BREATHING, "magical breathing" },
+        { PASSES_WALLS, "passes walls" },
+        { SLOW_DIGESTION, "slow digestion" },
+        { HALF_SPDAM, "half spdam" },
+        { HALF_PHDAM, "half phdam" },
+        { REGENERATION, "regeneration" },
+        { ENERGY_REGENERATION, "energy regeneration" },
+        { PROTECTION, "protection" },
+        { PROT_FROM_SHAPE_CHANGERS, "prot from shape changers" },
+        { POLYMORPH, "polymorph" },
+        { POLYMORPH_CONTROL, "polymorph control" },
+        { UNCHANGING, "unchanging" },
+        { FAST, "fast" },
+        { REFLECTING, "reflecting" },
+        { FREE_ACTION, "free action" },
+        { FIXED_ABIL, "fixed abil" },
+        { LIFESAVED, "lifesaved" },
+    };
+    char tmp[BUFSZ];
+    boolean first;
+    int i;
+
+    put(",\"timed\":[");
+    first = TRUE;
+    for (i = 0; i < SIZE(props); i++)
+        if (u.uprops[props[i].prop].intrinsic & TIMEOUT) {
+            Sprintf(tmp, "%s{\"name\":\"%s\",\"turns\":%ld}", first ? "" : ",", props[i].name,
+                    (long) (u.uprops[props[i].prop].intrinsic & TIMEOUT));
+            put(tmp);
+            first = FALSE;
+        }
+    put("],\"spells\":[");
+    for (i = 0; i < MAXSPELL && spl_book[i].sp_id != NO_SPELL; i++) {
+        Sprintf(tmp, "%s{\"level\":%d,\"turns_left\":%d", i ? "," : "", spl_book[i].sp_lev,
+                spl_book[i].sp_know);
+        put(tmp);
+        put_kv_str("name", OBJ_NAME(objects[spl_book[i].sp_id]), TRUE);
+        put("}");
+    }
+    put("],\"skills\":[");
+    first = TRUE;
+    for (i = 1; i < P_NUM_SKILLS; i++) {
+        static const char *lv[] = { "restricted", "unskilled", "basic", "skilled", "expert",
+                                    "master", "grand master" };
+        if (P_RESTRICTED(i))
+            continue;
+        Sprintf(tmp, "%s{\"name\":\"%s\",\"level\":\"%s\",\"max\":\"%s\",\"can_advance\":%d}",
+                first ? "" : ",", skill_name(i), lv[min(P_SKILL(i), 6)],
+                lv[min(P_MAX_SKILL(i), 6)], can_advance(i, FALSE) ? 1 : 0);
+        put(tmp);
+        first = FALSE;
+    }
+    put("],\"conduct\":{");
+    put_kv_int("ate", u.uconduct.food, FALSE);
+    put_kv_int("ate_meat", u.uconduct.unvegetarian, TRUE);
+    put_kv_int("ate_animal_products", u.uconduct.unvegan, TRUE);
+    put_kv_int("prayed_or_altar", u.uconduct.gnostic, TRUE);
+    put_kv_int("weapon_hits", u.uconduct.weaphit, TRUE);
+    put_kv_int("kills", u.uconduct.killer, TRUE);
+    put_kv_int("read", u.uconduct.literate, TRUE);
+    put_kv_int("polymorphed_objects", u.uconduct.polypiles, TRUE);
+    put_kv_int("polymorphed_self", u.uconduct.polyselfs, TRUE);
+    put_kv_int("wishes", u.uconduct.wishes, TRUE);
+    put("},\"discoveries\":[");
+    first = TRUE;
+    for (i = 1; i < NUM_OBJECTS; i++)
+        if ((objects[i].oc_name_known && !objects[i].oc_pre_discovered && OBJ_DESCR(objects[i]))
+            || objects[i].oc_uname) {
+            if (!first)
+                put(",");
+            Sprintf(tmp, "%s%s%s%s", objects[i].oc_name_known ? OBJ_NAME(objects[i]) : "",
+                    OBJ_DESCR(objects[i]) ? " (" : "", OBJ_DESCR(objects[i]) ? OBJ_DESCR(objects[i]) : "",
+                    OBJ_DESCR(objects[i]) ? ")" : "");
+            if (objects[i].oc_uname)
+                Sprintf(eos(tmp), " called %s", objects[i].oc_uname);
+            put_str(tmp);
+            first = FALSE;
+        }
+    put("]");
 }
 
 static void

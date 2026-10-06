@@ -23,7 +23,7 @@ def snapshots(snaps_dir, save_name=None):
     if not os.path.isdir(snaps_dir):
         return []
     files = [os.path.join(snaps_dir, f) for f in os.listdir(snaps_dir)
-             if save_name is None or f.split("@")[0] == save_name]
+             if not f.endswith(".log") and (save_name is None or f.split("@")[0] == save_name)]
     return sorted(files, key=os.path.getmtime)
 
 
@@ -46,8 +46,15 @@ def prune(snaps_dir, save_name, keep=3):
     """Delete all but the newest `keep` checkpoints of one save file name; how many went."""
     old = snapshots(snaps_dir, save_name)[:-keep] if keep else snapshots(snaps_dir, save_name)
     for p in old:
-        os.unlink(p)
+        remove(p)
     return len(old)
+
+
+def remove(path):
+    """Delete a save or checkpoint, and the game log kept beside a checkpoint."""
+    os.unlink(path)
+    if os.path.exists(path + ".log"):
+        os.unlink(path + ".log")
 
 
 if __name__ == "__main__":
@@ -62,10 +69,13 @@ if __name__ == "__main__":
         open(p, "w").close()
         os.utime(p, (1000 + n, 1000 + n))
     open(os.path.join(sn, "501Bob.Z@000010-D1"), "w").close()
+    open(os.path.join(sn, "501Bob.Z@000010-D1.log"), "w").close()  # a checkpoint's log: not a save
     assert char_name("501Dave.Z@000735-D3") == "Dave"
     items = listing(sv, sn)
     assert [i["char"] for i in items] == ["Bob", "Dave", "Dave", "Dave", "Dave", "Dave"]
     assert items[2]["what"] == "Dlvl 4, turn 900"  # newest checkpoint first, after the save
     assert prune(sn, "501Dave.Z", keep=3) == 1 and len(snapshots(sn, "501Dave.Z")) == 3
     assert len(snapshots(sn, "501Bob.Z")) == 1
+    remove(os.path.join(sn, "501Bob.Z@000010-D1"))
+    assert not os.listdir(sn) or all(not f.startswith("501Bob") for f in os.listdir(sn))
     print("saves ok")

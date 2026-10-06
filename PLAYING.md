@@ -25,8 +25,15 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   you've actually explored (the lifted view is never written into your map memory).
   While the fog is lifted, every item you carry or that lies on the level is fully
   identified (and stays identified), and `⌃G d`/`⌃G u` know where the stairs are.
+- Game log: `logs/<name>.log` records every message the game shows (stamped with turn and
+  dungeon level), level changes, warnings, the guard's holds, checkpoints, loads and your
+  helper questions with its answers. Each checkpoint keeps the log as of that moment
+  (`checkpoints/<checkpoint>.log`), and loading a checkpoint brings it back with the game.
+  The helper gets the latest lines with every question and can read the whole log.
 - Cheat: the helper sees the whole level as it really is (every monster, every
-  item truly identified, traps) and your inventory identified. `NETHACK_REVEAL= ./play`
+  item truly identified, traps), your inventory identified, and your whole character:
+  stats, luck, prayer timeout, nutrition, intrinsics, buffs and ailments with turns left,
+  spells, skills (and which can be advanced), conducts, discoveries and kills. `NETHACK_REVEAL= ./play`
   turns that off.
 - `⌃G d` / `⌃G u` (or `#godown` / `#goup`) walk to the down / up stairs once you know where
   they are (with the fog lifted, you always do). Anything interesting stops the walk; press again.

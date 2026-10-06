@@ -64,3 +64,4 @@ playground/
 __pycache__/
 .reflect.lock
 checkpoints/
+logs/

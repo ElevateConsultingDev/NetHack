@@ -28,6 +28,7 @@ import termios
 
 import pyte
 
+import gamelog
 import guard
 import saves
 import palette
@@ -36,6 +37,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.join(HERE, "playground")
 SAVES = os.path.join(GAME, "save")
 SNAPS = os.path.join(HERE, "checkpoints")  # outside playground/, which a NetHack install wipes
+LOGS = os.path.join(HERE, "logs")          # one game log per character (gamelog.py)
 KEEP_SNAPS = 20  # checkpoints kept per character (prune in the saves list)
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
@@ -128,6 +130,10 @@ shopkeepers, floating eyes, cockatrices).
 
 The player has turned on a cheat: you also get the whole level as it really is, every monster, every item (truly identified, with blessed/cursed status), every trap, and the inventory fully identified. Use it freely, spoilers are wanted, but say so when you are telling them something they could not have seen. Coordinates are x=column (1 is the left edge of the map), y=row (0 is the top). \
 Plain text only, no markdown: it is shown in a narrow terminal pane. \
+Every message gives the game log's file name and its latest lines. The log is the whole \
+game so far (every message with turn T and dungeon level D, level changes, warnings, \
+checkpoints, earlier questions); when you need older history, read the file with the Read \
+tool (it is in your working directory). \
 Write keys the Mac way: ⌃ is Control (⌃D kicks), ⌥ is Option, which is NetHack's Meta/Alt \
 (⌥L loots, ⌥P prays; never write M-l), ⇧ is Shift. Extended commands can always be typed \
 with # (#loot). This player's helper shortcuts: ⌃G f fog of war, ⌃G d / ⌃G u walk to the \
@@ -178,14 +184,18 @@ class Helper:
         self.session = None
         self.scroll = 0  # lines up from the bottom
 
-    def ask(self, question, snapshot, redraw):
+    def ask(self, question, snapshot, redraw, log=None):
         self.lines.append(("you", "> " + question))
         self.busy = True
+        if log:
+            log.event(f"asked the helper: {question}")
 
         def run():
             try:
                 answer, self.session = ask_claude(question, snapshot, self.session)
                 self.lines.append(("text", answer))
+                if log:
+                    log.event("helper: " + answer.replace("\n", " / "))
             except RuntimeError as e:
                 self.lines.append(("err", f"error: {e}"))
             self.busy = False
@@ -194,9 +204,11 @@ class Helper:
 
 
 def ask_claude(question, snapshot, session):
-    """Runs claude -p (subscription login, no tools); returns (answer, session)."""
+    """Runs claude -p (subscription login; its only tool is Read, in the logs folder,
+    for the full game log); returns (answer, session)."""
+    os.makedirs(LOGS, exist_ok=True)
     cmd = ["claude", "-p", "--output-format", "json", "--model", MODEL,
-           "--tools", "", "--setting-sources", "", "--strict-mcp-config",
+           "--tools", "Read", "--allowedTools", "Read", "--setting-sources", "", "--strict-mcp-config",
            "--system-prompt", SYSTEM]
     if session:
         cmd += ["--resume", session]
@@ -204,7 +216,7 @@ def ask_claude(question, snapshot, session):
     prompt = f"Game state:\n{snapshot}\n\nQuestion: {question}"
     try:
         out = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
-                             timeout=120, cwd=tempfile.gettempdir(), env=env)
+                             timeout=180, cwd=LOGS, env=env)
     except subprocess.TimeoutExpired:
         raise RuntimeError("Claude took longer than 120s")
     except FileNotFoundError:
@@ -239,6 +251,21 @@ def snapshot(screen, state):
         parts.append("Items on the floor:\n" + "\n".join(f"x={o['x']} y={o['y']} {o['text']}" for o in rev["objects"]))
         parts.append("Traps:\n" + "\n".join(f"x={t['x']} y={t['y']} {t['name']}" for t in rev["traps"]))
         parts.append("Inventory, truly identified:\n" + "\n".join(f"{i['letter']} - {i['text']}" for i in rev["inventory"]))
+        st, pray = state.get("status") or {}, rev.get("prayer") or {}
+        parts.append("Character: " + ", ".join(f"{k} {v}" for k, v in st.items() if k != "conditions")
+                     + f", conditions {' '.join(st.get('conditions', [])) or 'none'}"
+                     + f"; luck {pray.get('luck')}, prayer timeout {pray.get('timeout')}, god anger {pray.get('anger')}"
+                     + f", nutrition {rev.get('nutrition')}, alignment record {rev.get('align_record')}")
+        parts.append("Intrinsics: " + (", ".join(rev.get("intrinsics", [])) or "none"))
+        parts.append("Timed effects (buffs and ailments, turns left): "
+                     + (", ".join(f"{t['name']} {t['turns']}" for t in rev.get("timed", [])) or "none"))
+        parts.append("Spells: " + (", ".join(f"{sp['name']} (level {sp['level']}, remembered {sp['turns_left']} more turns)"
+                                             for sp in rev.get("spells", [])) or "none"))
+        parts.append("Skills: " + ", ".join(f"{k['name']} {k['level']}/{k['max']}" + (" CAN ADVANCE (#enhance)" if k["can_advance"] else "")
+                                            for k in rev.get("skills", [])))
+        parts.append("Conduct counts: " + ", ".join(f"{k} {v}" for k, v in (rev.get("conduct") or {}).items()))
+        parts.append("Discoveries: " + (", ".join(rev.get("discoveries", [])) or "none"))
+        parts.append("Killed so far: " + (", ".join(f"{n} x{c}" for n, c in (rev.get("vanquished") or {}).items()) or "nothing"))
     return "\n\n".join(parts)
 
 
@@ -287,6 +314,7 @@ class App:
         self.scr = scr
         self.watcher = Watcher()
         self.helper = Helper()
+        self.log = gamelog.GameLog(LOGS)
         self.held = None      # a dangerous key held back by the guard, sent if pressed again
         self.warned = set()   # warnings already shown (each shows once while it applies)
         self.seq = 0
@@ -411,6 +439,7 @@ class App:
         if not self.save_name or not saves.snapshots(SNAPS, self.save_name):
             return False  # nothing of this character's to go back to (never offer someone else's)
         self.over = True
+        self.log.event("game over")
         self.open_saves()
         self.say("err", "Game over. Pick a checkpoint and press Enter to play on from there; q quits.")
         return True
@@ -419,7 +448,10 @@ class App:
         """Keep a copy of a just-saved game."""
         os.makedirs(SNAPS, exist_ok=True)
         info = self.snap_info
-        shutil.copy2(save, os.path.join(SNAPS, f"{os.path.basename(save)}@{info.get('turn', 0):06d}-D{info.get('dlvl', 0)}"))
+        snap = os.path.join(SNAPS, f"{os.path.basename(save)}@{info.get('turn', 0):06d}-D{info.get('dlvl', 0)}")
+        shutil.copy2(save, snap)
+        self.log.event(f"checkpoint saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')})")
+        self.log.copy_to(snap + ".log")  # the log as of this checkpoint
         for old in saves.snapshots(SNAPS, self.save_name)[:-KEEP_SNAPS]:
             os.unlink(old)
         self.say("dim", f"Checkpoint saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')}). ⌃G r goes back to the last one.")
@@ -428,6 +460,8 @@ class App:
         """Start the game from a saves.listing() item (a checkpoint or a saved game)."""
         if item["kind"] == "snap":
             shutil.copy2(item["path"], os.path.join(SAVES, item["base"]))
+            self.log.restore(item["path"] + ".log", item["char"])  # the log goes back to then too
+        self.log.event(f"loaded {item['char']}: {item['what']}")
         self.save_name = item["base"]
         self.over = False
         self.say("dim", f"Loaded {item['char']}: {item['what']}.")
@@ -495,7 +529,7 @@ class App:
             if data.decode("latin-1") == what and items:
                 it = items[sel]
                 if what == "d":
-                    os.unlink(it["path"])
+                    saves.remove(it["path"])
                     self.say("dim", f"Deleted {it['char']}: {it['what']}.")
                 else:
                     gone = saves.prune(SNAPS, it["base"], keep=3)
@@ -1179,7 +1213,12 @@ class App:
     def ask(self, question):
         if not self.helper.busy:
             self.helper.scroll = 0
-            self.helper.ask(question, snapshot(self.screen, self.watcher.state), self.redraw)
+            st = self.watcher.state
+            mine = [i for i in saves.listing(SAVES, SNAPS) if i["base"] == self.save_name]
+            extra = ("\n\nCheckpoints of this game: " + (", ".join(f"{i['what']} ({i['when']})" for i in mine) or "none")
+                     + f"\n\nGame log file: {os.path.basename(self.log.path or '(not started yet)')}"
+                     + "\nLatest log lines:\n" + self.log.tail(60))
+            self.helper.ask(question, snapshot(self.screen, st) + extra, self.redraw, self.log)
 
     def game_key(self, data):
         """Send a key to the game, unless the guard holds it (then a second press sends it)."""
@@ -1193,6 +1232,7 @@ class App:
                 self.held = data
                 self.helper.scroll = 0
                 self.helper.lines.append(("err", f"HELD: {why} Press the same key again to do it anyway."))
+                self.log.event("guard held a key: " + why)
                 return
             self.held = None
         self.send(data)
@@ -1202,6 +1242,7 @@ class App:
         if state.get("seq", 0) == self.seq:
             return
         self.seq = state.get("seq", 0)
+        self.log.on_state(state, quiet=self.holding or bool(self.saving))  # a checkpoint's save/restore chatter
         if self.holding and (state.get("context") or {}).get("kind") == "command" and state.get("player"):
             self.holding = False  # the restarted game is back at its prompt: show it
             self.screen.dirty.update(range(self.gh))
@@ -1212,6 +1253,7 @@ class App:
         for w in sorted(now - self.warned):
             self.helper.scroll = 0
             self.helper.lines.append(("warn", "! " + w))
+            self.log.event("warning: " + w)
         self.warned = now
         dlvl = (state.get("status") or {}).get("dlvl")
         if dlvl and dlvl != self.snap_dlvl and self.save_game("checkpoint"):
