@@ -250,7 +250,8 @@ LEGEND_ORDER = ("you", "pet", "monster", "invisible", "object", "trap", "feature
 
 
 def legend(state):
-    """'c name' for each distinct symbol on the map now (from aipipe's cells)."""
+    """(symbol, name, y, x) for each distinct symbol on the map now (from aipipe's
+    cells); y, x is one square showing it, for its color."""
     rows, seen, out = state.get("map") or [], set(), []
     cells = sorted(state.get("cells", []),
                    key=lambda c: LEGEND_ORDER.index(c["kind"]) if c["kind"] in LEGEND_ORDER else 99)
@@ -260,7 +261,7 @@ def legend(state):
         name = OBJECT_CLASSES.get(c.get("class"), c["name"]) if c["kind"] == "object" else c["name"]
         if (ch, name) not in seen:
             seen.add((ch, name))
-            out.append(f"{ch} {name}")
+            out.append((ch, name, c["y"], c["x"]))
     return out
 
 
@@ -812,19 +813,28 @@ class App:
             self.put(y, GX + self.gw, "|")  # game | helper, drag to resize
         top = 0
         entries = legend(self.watcher.state)
-        if entries:  # the map legend, packed into lines across the pane
-            lines, cur = [], ""
+        if entries:  # the map legend, packed into lines across the pane, symbols in their map colors
+            lines, cur, width = [], [], 0
             for e in entries:
-                if cur and len(cur) + 2 + len(e) > w - 1:
+                n = len(e[0]) + 1 + len(e[1])
+                if cur and width + 2 + n > w - 1:
                     lines.append(cur)
-                    cur = ""
-                cur = f"{cur}  {e}" if cur else e
+                    cur, width = [], 0
+                cur.append(e)
+                width += n + (2 if width else 0)
             lines.append(cur)
             lines = lines[:self.legend_max or max(3, rows // 3)]
             if self.legend_max:  # the height it was dragged to
-                lines += [""] * (self.legend_max - len(lines))
-            for y, l in enumerate(lines):
-                self.put(y, x0, l.ljust(w - 1)[:w - 1], curses.A_BOLD)
+                lines += [[]] * (self.legend_max - len(lines))
+            for y, line in enumerate(lines):
+                self.put(y, x0, " " * (w - 1))
+                col = x0
+                for ch, name, my, mx in line:
+                    r = self.map_top + my
+                    cell = self.screen.buffer[r][mx - 1] if 0 <= r < self.gh and 0 < mx <= self.gw else None
+                    self.put(y, col, ch, (self.cell_attr(cell) if cell else 0) | curses.A_BOLD)
+                    self.put(y, col + 1, f" {name}"[:max(0, x0 + w - 1 - col - 1)], curses.A_BOLD)
+                    col += len(ch) + 1 + len(name) + 2
             top = len(lines)
             self.put(top, x0 - 1, "+" + "-" * (w - 1))  # legend | chat, drag to resize
             self.legend_div = top
