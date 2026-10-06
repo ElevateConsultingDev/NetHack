@@ -894,6 +894,11 @@ class App:
             if wt is not None:  # weight, right-aligned (whole stack)
                 text = text[:w - 6].ljust(w - 5) + f"{wt:>5}"
             lines.append((text, attr, i["letter"]))
+        inv = self.watcher.state.get("inventory", [])
+        if inv and all("weight" in i for i in inv):  # total under the weights, and the capacity
+            total = sum(i["weight"] for i in inv)
+            label = f"Total ({st.get('capacity')} before you're Burdened)" if st.get("capacity") else "Total"
+            lines.append((label[:w - 6].ljust(w - 5) + f"{total:>5}", curses.A_BOLD, None))
         lines.append(("", 0, None))
         status = "  ".join(re.sub(r"  +", "  ", self.row_text(r)).strip() for r in self.status_rows())
         lines += [(l, 0, None) for l in textwrap.wrap(status, w)]  # the game's status lines, as one
