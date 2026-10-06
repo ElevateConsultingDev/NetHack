@@ -35,7 +35,7 @@ import palette
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAME = os.path.join(HERE, "playground")
 SAVES = os.path.join(GAME, "save")
-SNAPS = os.path.join(GAME, "snapshots")
+SNAPS = os.path.join(HERE, "checkpoints")  # outside playground/, which a NetHack install wipes
 KEEP_SNAPS = 20  # checkpoints kept per character (prune in the saves list)
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
@@ -1313,13 +1313,32 @@ class App:
             self.helper_key(data)
 
     def close(self):
-        sys.stdout.write(MOUSE_OFF)
-        sys.stdout.flush()
+        try:
+            sys.stdout.write(MOUSE_OFF)
+            sys.stdout.flush()
+        except OSError:  # the terminal is already gone (window closed)
+            pass
         self.watcher.close()
         try:
             os.kill(self.pid, signal.SIGHUP)  # NetHack saves on hangup
         except ProcessLookupError:
-            pass
+            return
+        # wait for that save and keep a checkpoint of it, so the latest progress
+        # also lives outside playground/
+        for _ in range(50):
+            try:
+                if os.waitpid(self.pid, os.WNOHANG)[0]:
+                    break
+            except ChildProcessError:
+                break
+            time.sleep(0.1)
+        files = [os.path.join(SAVES, f) for f in os.listdir(SAVES)]
+        fresh = [f for f in files if os.path.getmtime(f) >= self.started]
+        if fresh:
+            save = max(fresh, key=os.path.getmtime)
+            self.save_name = os.path.basename(save)
+            self.snap_info = self.watcher.state.get("status") or getattr(self, "snap_info", {})
+            self.checkpoint(save)
 
 
 def main(scr):

@@ -190,8 +190,11 @@ GAMEPERM = 0700
 VARFILEPERM = 0600
 VARDIRPERM = 0700
 POSTINSTALL+= sys/unix/hints/macosx.sh editsysconf sys/unix/sysconf $(HACKDIR)/sysconf;
-# We can use "make all" to build the whole thing - but it misses some things:
-MOREALL=$(MAKE) install
+# We can use "make all" to build the whole thing - but it misses some things.
+# "install" starts with rm -rf of the playground, saved games included, so it
+# only runs the first time; after that "update" refreshes the program files
+# and leaves save/ alone.
+MOREALL=if [ -x $(HACKDIR)/nethack ]; then $(MAKE) update; else $(MAKE) install; fi
 CFLAGS+=-DSYSCF -DSYSCF_FILE=\"$(HACKDIR)/sysconf\" -DSECURE
 else	# !WANT_SOURCE_INSTALL
 PREFIX:=$(wildcard ~)

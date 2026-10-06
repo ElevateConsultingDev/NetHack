@@ -506,7 +506,23 @@ put_reveal()
         INTR(Hunger, "fast hunger") INTR(Aggravate_monster, "aggravate")
 #undef INTR
     }
-    put("]}");
+    put("],\"vanquished\":{");  /* kills so far, by species */
+    {
+        int i;
+        boolean first = TRUE;
+        char tmp[16];
+
+        for (i = LOW_PM; i < NUMMONS; i++)
+            if (mvitals[i].died) {
+                if (!first)
+                    put(",");
+                put_str(mons[i].mname);
+                Sprintf(tmp, ":%d", (int) mvitals[i].died);
+                put(tmp);
+                first = FALSE;
+            }
+    }
+    put("}}");
 }
 
 static void

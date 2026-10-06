@@ -63,3 +63,4 @@ playground/
 # Python
 __pycache__/
 .reflect.lock
+checkpoints/

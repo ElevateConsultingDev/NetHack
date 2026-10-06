@@ -53,7 +53,8 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
 - Checkpoints (saved copies of your game you can go back to): one is taken on each new
   dungeon level and with `⌃G s`; `⌃G r` goes back to the latest. A checkpoint saves and
   restarts the game behind the scenes (the screen holds still meanwhile). The newest 20
-  per character are kept in `playground/snapshots/`.
+  per character are kept in `checkpoints/` (outside `playground/`, which a full NetHack
+  install wipes). Closing the terminal saves the game and also checkpoints it.
 - Saves list (`⌃G l`): every saved game and checkpoint, all characters, newest first.
   Enter loads the selected one (the game you're in is checkpointed first, so nothing is
   lost); `d` deletes it, `p` prunes that character to its newest 3 checkpoints (both ask
