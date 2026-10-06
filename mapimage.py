@@ -24,9 +24,10 @@ _fonts = {}
 CURSOR = (128, 128, 128)  # the block marking you, like the terminal's cursor
 
 
-def render(grid, cell_w, cell_h, scale, cursor=None):
+def render(grid, cell_w, cell_h, scale, cursor=None, holes=()):
     """PNG of grid (rows of (ch, fg, bold, reverse)); each map square is scale x scale cells.
-    cursor is the (row, column) of the square to mark with a cursor block."""
+    cursor is the (row, column) of the square to mark with a cursor block; holes are
+    (row, column) screen cells, from the picture's corner, left clear so text there shows."""
     bw, bh = cell_w * scale, cell_h * scale  # scale can be fractional (1.25x...)
     img = Image.new("RGBA", (max(1, round(len(grid[0]) * bw)), max(1, round(len(grid) * bh))), (0, 0, 0, 0))
     size = max(8, int(bh * 0.8))
@@ -43,14 +44,15 @@ def render(grid, cell_w, cell_h, scale, cursor=None):
                 color = (0, 0, 0)
             if ch.strip():
                 draw.text((x + bw / 2, y + bh / 2), ch, font=font, fill=color, anchor="mm")
+    for r, c in holes:
+        draw.rectangle([c * cell_w, r * cell_h, (c + 1) * cell_w - 1, (r + 1) * cell_h - 1], fill=(0, 0, 0, 0))
     out = io.BytesIO()
     img.save(out, "PNG")
     return out.getvalue()
 
 
 def place(png, row, col, cols, rows, z=0):
-    """Escape codes showing png stretched over cols x rows cells from (row, col), cursor unmoved.
-    z below -2**30 puts it under any cell with its own background color."""
+    """Escape codes showing png stretched over cols x rows cells from (row, col), cursor unmoved."""
     data = base64.standard_b64encode(png).decode()
     chunks = [data[k:k + 4096] for k in range(0, len(data), 4096)] or [""]
     out = [delete(), f"\x1b[{row + 1};{col + 1}H"]

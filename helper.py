@@ -654,10 +654,10 @@ class App:
                                else ((buf[top + y][x - 1].data or " ").translate(ASCII),
                                      buf[top + y][x - 1].fg, buf[top + y][x - 1].bold, buf[top + y][x - 1].reverse)
                                for x in range(x0, min(MAP_W, x0 + ncols))]
-            for y, x in cover:  # a game box: on top, at its usual place, with a solid background
+            for y, x in cover:  # a game box: drawn as text at its usual place; the picture leaves a hole
                 c = buf[top + y][x - 1]
-                self.gput(top + y, x - 1, (c.data or " ").translate(ASCII),
-                          self.color(c.fg, "black", c.bold) | (curses.A_BOLD if c.bold else 0))
+                self.gput(top + y, x - 1, (c.data or " ").translate(ASCII), self.cell_attr(c))
+            self.holes = frozenset((y, x - 1) for y, x in cover)
         for r in range(top, bottom) if not GRAPHICS else ():
             j, k = divmod(r - top, bh)
             y = y0 + j
@@ -681,7 +681,8 @@ class App:
         self.big = "".join(big)
         grid = [row for row in grid if row]
         cursor = (you["y"] - y0, you["x"] - x0) if self.focus == "game" else None  # drawn in the picture
-        self.img = (top, bw, tuple(map(tuple, grid)), cursor) if grid else None
+        self.img = (top, bw, tuple(map(tuple, grid)), cursor, getattr(self, "holes", frozenset())) if grid else None
+        self.holes = frozenset()
 
     def cell_pixels(self):
         """A character cell's size in pixels, from the terminal (or a guess)."""
@@ -699,11 +700,10 @@ class App:
         if want == self.img_sent:
             return
         if want:
-            top, scale, grid, cursor = want
+            top, scale, grid, cursor, holes = want
             cw, ch = self.cell_pixels()
-            png = mapimage.render(grid, cw, ch, scale, cursor)
-            out = mapimage.place(png, top, GX, round(len(grid[0]) * scale), round(len(grid) * scale),
-                                 z=-(2 ** 30) - 1)  # under text with a background: game boxes show on top
+            png = mapimage.render(grid, cw, ch, scale, cursor, holes)
+            out = mapimage.place(png, top, GX, round(len(grid[0]) * scale), round(len(grid) * scale))
         else:
             out = mapimage.delete()
         sys.stdout.write("\x1b7" + out + "\x1b8")  # keep curses' cursor and colors
