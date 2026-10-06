@@ -657,8 +657,7 @@ class App:
         self.screen.dirty.update(range(top, bottom))  # redraw normally when zoom ends
         self.big = "".join(big)
         grid = [row for row in grid if row]
-        cursor = (you["y"] - y0, you["x"] - x0) if self.focus == "game" else None  # drawn in the picture
-        self.img = (top, bw, tuple(map(tuple, grid)), cursor) if grid else None
+        self.img = (top, bw, tuple(map(tuple, grid))) if grid else None
 
     def cell_pixels(self):
         """A character cell's size in pixels, from the terminal (or a guess)."""
@@ -676,9 +675,9 @@ class App:
         if want == self.img_sent:
             return
         if want:
-            top, scale, grid, cursor = want
+            top, scale, grid = want
             cw, ch = self.cell_pixels()
-            png = mapimage.render(grid, cw, ch, scale, cursor)
+            png = mapimage.render(grid, cw, ch, scale)
             out = mapimage.place(png, top, GX, round(len(grid[0]) * scale), round(len(grid) * scale))
         else:
             out = mapimage.delete()
