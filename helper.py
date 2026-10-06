@@ -257,6 +257,12 @@ def snapshot(screen, state):
                      + f"; luck {pray.get('luck')}, prayer timeout {pray.get('timeout')}, god anger {pray.get('anger')}"
                      + f", nutrition {rev.get('nutrition')}, alignment record {rev.get('align_record')}")
         parts.append("Intrinsics: " + (", ".join(rev.get("intrinsics", [])) or "none"))
+        parts.append("Pets: " + ("; ".join(
+            f"{(p['name'] + ' the ') if p['name'] else ''}{p['species']} at x={p['x']} y={p['y']}: level {p['level']}, "
+            f"HP {p['hp']}/{p['hpmax']}, AC {p['ac']}, speed {p['speed']}, tameness {p['tameness']}/20, "
+            f"turns until hungry {p.get('turns_until_hungry')}" + (", leashed" if p["leashed"] else "")
+            + (", carrying " + ", ".join(p["carrying"]) if p["carrying"] else "")
+            for p in rev.get("pets", [])) or "none"))
         parts.append("Timed effects (buffs and ailments, turns left): "
                      + (", ".join(f"{t['name']} {t['turns']}" for t in rev.get("timed", [])) or "none"))
         parts.append("Spells: " + (", ".join(f"{sp['name']} (level {sp['level']}, remembered {sp['turns_left']} more turns)"
@@ -802,6 +808,16 @@ class App:
                          self.color("magenta", "default", False), None))
             more += [(l, self.color("magenta", "default", False), None)
                      for l in textwrap.wrap("Intrinsics: " + (", ".join(rev.get("intrinsics", [])) or "none"), w)]
+        for pet in rev.get("pets", []):  # tame monsters, with the hidden numbers in magenta
+            name = f"{pet['name']} the {pet['species']}" if pet["name"] else pet["species"]
+            more.append((f"Pet: {name}  L{pet['level']}  HP {pet['hp']}/{pet['hpmax']}  AC {pet['ac']}  "
+                         f"Spd {pet['speed']}", curses.A_BOLD, None))
+            hunger = pet.get("turns_until_hungry")
+            hunger = "?" if hunger is None else "hungry now" if hunger < 0 else f"hungry in {hunger}"
+            more += [(l, self.color("magenta", "default", False), None) for l in textwrap.wrap(
+                f"  tame {pet['tameness']}/20, {hunger}, at x={pet['x']} y={pet['y']}"
+                + (", leashed" if pet["leashed"] else "")
+                + (", carrying " + ", ".join(pet["carrying"]) if pet["carrying"] else ""), w)]
         lines = [(f"{st.get('gender', '').capitalize()} {st.get('race', '')} {st.get('role', '')}, "
                   f"{st.get('alignment', '')}", curses.A_BOLD, None),
                  (f"HP {hp}/{hpmax}", self.color(hp_col, "default", True) | curses.A_BOLD, None),

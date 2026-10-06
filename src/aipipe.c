@@ -617,6 +617,38 @@ put_more()
             put(tmp);
             first = FALSE;
         }
+    put("],\"pets\":[");  /* everything tame, with what the game keeps hidden */
+    first = TRUE;
+    {
+        struct monst *mtmp;
+        struct obj *otmp;
+
+        for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
+            if (DEADMONSTER(mtmp) || !mtmp->mtame)
+                continue;
+            Sprintf(tmp, "%s{\"x\":%d,\"y\":%d", first ? "" : ",", mtmp->mx, mtmp->my);
+            put(tmp);
+            put_kv_str("name", has_mname(mtmp) ? MNAME(mtmp) : "", TRUE);
+            put_kv_str("species", mtmp->data->mname, TRUE);
+            put_kv_int("level", (long) mtmp->m_lev, TRUE);
+            put_kv_int("hp", (long) mtmp->mhp, TRUE);
+            put_kv_int("hpmax", (long) mtmp->mhpmax, TRUE);
+            put_kv_int("ac", (long) find_mac(mtmp), TRUE);
+            put_kv_int("speed", (long) mtmp->data->mmove, TRUE);
+            put_kv_int("tameness", (long) mtmp->mtame, TRUE);  /* up to 20 */
+            if (has_edog(mtmp))  /* negative: hungry now */
+                put_kv_int("turns_until_hungry", EDOG(mtmp)->hungrytime - moves, TRUE);
+            put_kv_int("leashed", (long) mtmp->mleashed, TRUE);
+            put(",\"carrying\":[");
+            for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) {
+                if (otmp != mtmp->minvent)
+                    put(",");
+                put_str(true_name(otmp));
+            }
+            put("]}");
+            first = FALSE;
+        }
+    }
     put("],\"spells\":[");
     for (i = 0; i < MAXSPELL && spl_book[i].sp_id != NO_SPELL; i++) {
         Sprintf(tmp, "%s{\"level\":%d,\"turns_left\":%d", i ? "," : "", spl_book[i].sp_lev,
