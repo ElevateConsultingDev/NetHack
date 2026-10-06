@@ -75,9 +75,8 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   (80 columns), so they never run into the panel.
 - Zoom: the wheel over the map (or `⌃G i` / `⌃G o`) zooms the map in and out: each square
   becomes a block of its character (2x, 4x, 6x), colors kept, centered on you; the axes
-  number the part in view, and clicking a square travels there. With the picture zoom,
-  menus open beside it and game boxes show on top; only cursor picks (travel, farlook)
-  switch to the normal map. In Ghostty/cmux and WezTerm the zoomed map is drawn as a picture
+  number the part in view, and clicking a square travels there. Menus and cursor picks
+  show the normal map. In Ghostty/cmux and WezTerm the zoomed map is drawn as a picture
   (kitty's graphics protocol, rendered with Pillow), so the characters are truly bigger,
   in small steps (1.25x, 1.5x, 1.75x, 2x, 2.5x, 3x, 3.5x, 4x); in kitty it uses kitty's scaled text instead. Elsewhere, character
   blocks.

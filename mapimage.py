@@ -48,15 +48,14 @@ def render(grid, cell_w, cell_h, scale, cursor=None):
     return out.getvalue()
 
 
-def place(png, row, col, cols, rows, z=0):
-    """Escape codes showing png stretched over cols x rows cells from (row, col), cursor unmoved.
-    z below -2**30 puts it under any cell with its own background color."""
+def place(png, row, col, cols, rows):
+    """Escape codes showing png stretched over cols x rows cells from (row, col), cursor unmoved."""
     data = base64.standard_b64encode(png).decode()
     chunks = [data[k:k + 4096] for k in range(0, len(data), 4096)] or [""]
     out = [delete(), f"\x1b[{row + 1};{col + 1}H"]
     for n, chunk in enumerate(chunks):
         more = 1 if n < len(chunks) - 1 else 0
-        head = f"a=T,f=100,i={IMAGE_ID},c={cols},r={rows},z={z},C=1,q=2,m={more}" if n == 0 else f"m={more}"
+        head = f"a=T,f=100,i={IMAGE_ID},c={cols},r={rows},C=1,q=2,m={more}" if n == 0 else f"m={more}"
         out.append(f"\x1b_G{head};{chunk}\x1b\\")
     return "".join(out)
 
@@ -71,6 +70,6 @@ if __name__ == "__main__":
     assert png.startswith(b"\x89PNG")
     assert render([[("@", "default", False, False)]], 9, 18, 1.25, cursor=(0, 0)).startswith(b"\x89PNG")
     esc = place(png, 4, 3, 4, 4)
-    assert esc.startswith(delete() + "\x1b[5;4H\x1b_Ga=T,f=100,i=7,c=4,r=4,z=0,C=1,q=2,m=")
+    assert esc.startswith(delete() + "\x1b[5;4H\x1b_Ga=T,f=100,i=7,c=4,r=4,C=1,q=2,m=")
     assert esc.endswith("\x1b\\")
     print("mapimage ok")

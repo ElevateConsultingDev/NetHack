@@ -599,26 +599,11 @@ class App:
             attr |= curses.A_UNDERLINE
         return attr
 
-    def overlay(self):
-        """Map squares the game has covered with a box or menu: (y, x) where the screen
-        differs from the map the game reports."""
-        rows, top, buf = self.watcher.state.get("map") or [], self.map_top, self.screen.buffer
-        return {(y, x) for y, row in enumerate(rows) if top + y < self.gh
-                for x in range(1, min(MAP_W, len(row) + 1))
-                if (buf[top + y][x - 1].data or " ").translate(ASCII) != row[x - 1]}
-
     def zoom_active(self):
-        """Zoomed drawing while the map is what's on screen; in picture mode also with a
-        game box over it (drawn on top), but not for cursor picks or our own pop-ups."""
+        """Zoomed drawing only while the map is what's on screen (not menus, cursor picks...)."""
         st = self.watcher.state
-        if not (self.zoom > 0 and st.get("player")) or self.popup or self.search or self.saves_ui:
-            return False
-        kind = (st.get("context") or {}).get("kind")
-        if kind in ("command", "yn", "more"):
-            return True
-        # picture mode: menus open beside the map and boxes show on top; only a cursor pick
-        # (a bare key wait with nothing over the map: travel, farlook) needs the normal map
-        return GRAPHICS and (kind != "key" or bool(self.overlay()))
+        return (self.zoom > 0 and st.get("player") and not (self.popup or self.search or self.saves_ui)
+                and (st.get("context") or {}).get("kind") in ("command", "yn", "more"))
 
     def set_zoom(self, step):
         self.zoom = max(0, min(len(ZOOMS) - 1, self.zoom + step))
@@ -641,23 +626,15 @@ class App:
         y0 = max(0, min(MAP_H - nrows, you["y"] - nrows // 2)) if nrows < MAP_H else 0
         self.zoom_view = (x0, y0, bw, bh, top, bottom)
         buf, big, grid = self.screen.buffer, [], [[] for _ in range(nrows)]
-        if GRAPHICS:  # blank the map area; the picture goes under it
+        if GRAPHICS:  # blank the map area; the picture goes over it
             for r in range(top, bottom):
                 self.gput(r, 0, " " * MAP_W)
-            kind = (self.watcher.state.get("context") or {}).get("kind")
-            cover = self.overlay() if kind not in ("command", "yn", "more") else set()
-            rows = self.watcher.state.get("map") or []
             for j in range(nrows):
                 y = y0 + j
                 if y < MAP_H and top + y < self.gh:
-                    grid[j] = [(rows[y][x - 1], "default", False, False) if (y, x) in cover and y < len(rows)
-                               else ((buf[top + y][x - 1].data or " ").translate(ASCII),
-                                     buf[top + y][x - 1].fg, buf[top + y][x - 1].bold, buf[top + y][x - 1].reverse)
+                    grid[j] = [((buf[top + y][x - 1].data or " ").translate(ASCII),) +
+                               (buf[top + y][x - 1].fg, buf[top + y][x - 1].bold, buf[top + y][x - 1].reverse)
                                for x in range(x0, min(MAP_W, x0 + ncols))]
-            for y, x in cover:  # a game box: on top, at its usual place, with a solid background
-                c = buf[top + y][x - 1]
-                self.gput(top + y, x - 1, (c.data or " ").translate(ASCII),
-                          self.color(c.fg, "black", c.bold) | (curses.A_BOLD if c.bold else 0))
         for r in range(top, bottom) if not GRAPHICS else ():
             j, k = divmod(r - top, bh)
             y = y0 + j
@@ -702,8 +679,7 @@ class App:
             top, scale, grid, cursor = want
             cw, ch = self.cell_pixels()
             png = mapimage.render(grid, cw, ch, scale, cursor)
-            out = mapimage.place(png, top, GX, round(len(grid[0]) * scale), round(len(grid) * scale),
-                                 z=-(2 ** 30) - 1)  # under text with a background: game boxes show on top
+            out = mapimage.place(png, top, GX, round(len(grid[0]) * scale), round(len(grid) * scale))
         else:
             out = mapimage.delete()
         sys.stdout.write("\x1b7" + out + "\x1b8")  # keep curses' cursor and colors
@@ -750,7 +726,7 @@ class App:
                 if col >= free and (bw >= 2 or x % 5 == 0 or x == you.get("x")):
                     self.gput(self.gh + 1, col, str(x), curses.A_REVERSE if x == you.get("x") else curses.A_DIM)
                     free = col + len(str(x)) + 1
-            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}  zoom {bw:g}x".ljust(32), curses.A_BOLD)
+            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}  zoom {bw:g}x".ljust(24), curses.A_BOLD)
             return
         for r in range(self.gh):
             y = r - self.map_top
@@ -766,7 +742,7 @@ class App:
             col = you["x"] - 1
             self.gput(self.gh, col, tens[col], curses.A_REVERSE)
             self.gput(self.gh + 1, col, units[col], curses.A_REVERSE)
-            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(32), curses.A_BOLD)
+            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(24), curses.A_BOLD)
 
     def draw_panel(self):
         """Status, location and inventory beside the map, unless the game has a menu there."""
