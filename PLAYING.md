@@ -76,7 +76,7 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   your god, hunger and conditions; with the cheat on (the default) also, in magenta, Luck,
   prayer timeout, nutrition, alignment record and your intrinsics; your pets (level, HP,
   AC, speed, and in magenta tameness, turns until hungry, where, what they carry). Then
-  your inventory. Click an item
+  your inventory, with each item's weight (the whole stack) on the right. Click an item
   for what you can do with it (Wield, Wear, Put on, Quaff, Read, Zap, Eat, Apply, Throw,
   Drop, Ask the helper...); click an action or press its key, Esc closes. When the game
   asks for an item, clicking one answers. The game's own two status lines are moved here

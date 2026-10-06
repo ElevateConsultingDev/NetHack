@@ -369,6 +369,7 @@ put_inventory()
         /* distant_name() keeps doname() from marking the item as seen */
         put_kv_str("text", distant_name(otmp, doname), TRUE);
         put_kv_int("worn", otmp->owornmask != 0L, TRUE);
+        put_kv_int("weight", (long) otmp->owt, TRUE); /* whole stack */
         put("}");
     }
     put("]");

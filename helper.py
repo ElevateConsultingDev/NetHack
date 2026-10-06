@@ -257,7 +257,8 @@ def snapshot(screen, state):
     parts = ["Screen:\n" + "\n".join(rows).strip("\n")]
     inv = state.get("inventory")
     if inv:
-        parts.append("Inventory:\n" + "\n".join(f"{i['letter']} - {i['text']}" for i in inv))
+        parts.append("Inventory (weight of each stack in brackets):\n"
+                     + "\n".join(f"{i['letter']} - {i['text']} [{i.get('weight')}]" for i in inv))
     ctx = state.get("context") or {}
     if ctx.get("prompt"):
         parts.append(f"The game is asking: {ctx['prompt']}")
@@ -877,7 +878,7 @@ class App:
                  (f"St {strength} Dx {st.get('dex')} Co {st.get('con')} In {st.get('int')} "
                   f"Wi {st.get('wis')} Ch {st.get('cha')}", 0, None)] + more + [
                  (" ".join(flags), self.color("yellow", "default", True) | curses.A_BOLD, None),
-                 ("Inventory (click an item)", curses.A_DIM, None)]
+                 ("Inventory (click an item)".ljust(w - 6) + "weight"[:6], curses.A_DIM, None)]
         asked = guard.asked_letters(self.watcher.state)
         if asked:  # the game wants an item: say so, and pick out the ones that fit
             lines[-1] = (f"{asked[0]} Click one:", self.color("yellow", "default", True) | curses.A_BOLD, None)
@@ -889,7 +890,10 @@ class App:
                 fits = i["letter"] in asked[1]
                 attr = curses.A_BOLD if fits else curses.A_DIM
                 mark = "> " if fits else "  "
-            lines.append((f"{mark}{i['letter']}) {i['text']}", attr, i["letter"]))
+            text, wt = f"{mark}{i['letter']}) {i['text']}", i.get("weight")
+            if wt is not None:  # weight, right-aligned (whole stack)
+                text = text[:w - 6].ljust(w - 5) + f"{wt:>5}"
+            lines.append((text, attr, i["letter"]))
         lines.append(("", 0, None))
         status = "  ".join(re.sub(r"  +", "  ", self.row_text(r)).strip() for r in self.status_rows())
         lines += [(l, 0, None) for l in textwrap.wrap(status, w)]  # the game's status lines, as one
