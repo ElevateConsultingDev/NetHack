@@ -17,8 +17,8 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
 - Each question goes to `claude -p` (your Claude login, no tools) with the
   screen and your inventory, read from the game over the aipipe socket
   (`doc/aipipe.md`). The conversation continues for the session.
-- Mouse: click a menu line to pick it, click `--More--` to continue, click the map
-  to travel there, click the helper pane to type in it. The wheel pages a game
+- Mouse: click a menu line to pick it, click `--More--` to continue, click the helper
+  pane to type in it. Map clicks don't move you (click-to-travel is off). The wheel pages a game
   menu (same as `>` and `<`) or scrolls the helper's answers.
 - Cheat: `⌃G f` (or `#fog`) lifts the fog of war: every monster, item, trap and wall of the
   level is drawn, live as you play. `⌃G f` again brings the fog back and you see only what
@@ -30,6 +30,9 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   helper questions with its answers. Each checkpoint keeps the log as of that moment
   (`checkpoints/<checkpoint>.log`), and loading a checkpoint brings it back with the game.
   The helper gets the latest lines with every question and can read the whole log.
+- Helper history: the helper's conversation is kept per character (`logs/<name>.helper.json`)
+  and with each checkpoint; it comes back when you restart or load that checkpoint, and
+  Claude remembers the earlier conversation. Scroll it with the wheel or Page Up / Page Down.
 - Cheat: the helper sees the whole level as it really is (every monster, every
   item truly identified, traps), your inventory identified, and your whole character:
   stats, luck, prayer timeout, nutrition, intrinsics, buffs and ailments with turns left,
@@ -85,7 +88,7 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   (80 columns), so they never run into the panel.
 - Zoom: the wheel over the map (or `⌃G i` / `⌃G o`) zooms the map in and out: each square
   becomes a block of its character (2x, 4x, 6x), colors kept, centered on you; the axes
-  number the part in view, and clicking a square travels there. Menus and cursor picks
+  number the part in view. Menus and cursor picks
   show the normal map. In Ghostty/cmux and WezTerm the zoomed map is drawn as a picture
   (kitty's graphics protocol, rendered with Pillow), so the characters are truly bigger,
   in small steps (1.25x, 1.5x, 1.75x, 2x, 2.5x, 3x, 3.5x, 4x); in kitty it uses kitty's scaled text instead. Elsewhere, character

@@ -183,6 +183,25 @@ class Helper:
         self.busy = False
         self.session = None
         self.scroll = 0  # lines up from the bottom
+        self.on_answer = None  # called after each answer (the app saves the history)
+
+    def save(self, path):
+        """The transcript and Claude conversation, so they come back with the game."""
+        if path:
+            with open(path + ".tmp", "w") as f:
+                json.dump({"session": self.session, "lines": self.lines[-1000:]}, f)
+            os.replace(path + ".tmp", path)
+
+    def load(self, path):
+        """Bring back a saved transcript (replacing this one) and its Claude conversation."""
+        try:
+            with open(path) as f:
+                d = json.load(f)
+        except (OSError, ValueError):
+            return False
+        self.lines = [tuple(l) for l in d.get("lines", [])] + [("dim", "(history restored)")]
+        self.session, self.scroll = d.get("session"), 0
+        return True
 
     def ask(self, question, snapshot, redraw, log=None):
         self.lines.append(("you", "> " + question))
@@ -194,6 +213,8 @@ class Helper:
             try:
                 answer, self.session = ask_claude(question, snapshot, self.session)
                 self.lines.append(("text", answer))
+                if self.on_answer:
+                    self.on_answer()
                 if log:
                     log.event("helper: " + answer.replace("\n", " / "))
             except RuntimeError as e:
@@ -321,6 +342,8 @@ class App:
         self.watcher = Watcher()
         self.helper = Helper()
         self.log = gamelog.GameLog(LOGS)
+        self.hist_for = None  # the log file whose helper history is loaded
+        self.helper.on_answer = lambda: self.helper.save(self.hist_path())
         self.held = None      # a dangerous key held back by the guard, sent if pressed again
         self.warned = set()   # warnings already shown (each shows once while it applies)
         self.seq = 0
@@ -450,6 +473,9 @@ class App:
         self.say("err", "Game over. Pick a checkpoint and press Enter to play on from there; q quits.")
         return True
 
+    def hist_path(self):
+        return self.log.path[:-4] + ".helper.json" if self.log.path else None
+
     def checkpoint(self, save):
         """Keep a copy of a just-saved game."""
         os.makedirs(SNAPS, exist_ok=True)
@@ -458,6 +484,9 @@ class App:
         shutil.copy2(save, snap)
         self.log.event(f"checkpoint saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')})")
         self.log.copy_to(snap + ".log")  # the log as of this checkpoint
+        self.helper.save(self.hist_path())
+        if self.hist_path() and os.path.exists(self.hist_path()):
+            shutil.copy2(self.hist_path(), snap + ".helper.json")  # and the helper conversation
         for old in saves.snapshots(SNAPS, self.save_name)[:-KEEP_SNAPS]:
             os.unlink(old)
         self.say("dim", f"Checkpoint saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')}). ⌃G r goes back to the last one.")
@@ -467,6 +496,9 @@ class App:
         if item["kind"] == "snap":
             shutil.copy2(item["path"], os.path.join(SAVES, item["base"]))
             self.log.restore(item["path"] + ".log", item["char"])  # the log goes back to then too
+            if self.helper.load(item["path"] + ".helper.json"):  # and the helper conversation
+                self.helper.save(self.hist_path())
+            self.hist_for = self.log.path
         self.log.event(f"loaded {item['char']}: {item['what']}")
         self.save_name = item["base"]
         self.over = False
@@ -1004,6 +1036,9 @@ class App:
                 self.show_image()
 
     def helper_key(self, data):
+        if data in (b"\x1b[5~", b"\x1b[6~"):  # Page Up / Page Down scroll the conversation
+            self.helper.scroll += 10 if data == b"\x1b[5~" else -10
+            return
         for b in data:
             ch = chr(b)
             if b == 27:
@@ -1197,11 +1232,7 @@ class App:
             return
         self.focus = "game"
         if self.zoom_view and x < MAP_W and self.zoom_view[4] <= y < self.zoom_view[5]:
-            x0, y0, bw, bh, top, _ = self.zoom_view
-            tx, ty = x0 + int(x // bw), y0 + int((y - top) // bh)
-            if (self.watcher.state.get("context") or {}).get("kind") == "command" and tx < MAP_W and ty < MAP_H:
-                self.send(f"#goto\r{tx} {ty}\r".encode())  # travel to the square clicked
-            return
+            return  # map clicks don't move you
         letter = self.panel_items.get(y) if x >= MAP_W else None
         if letter:  # an item in the status/inventory panel
             if (self.watcher.state.get("context") or {}).get("kind") == "command":
@@ -1216,9 +1247,6 @@ class App:
         hits = [m for m in MENU_ITEM.finditer(row) if m.start() <= x]
         if hits:  # a menu
             self.send(hits[-1].group(1).encode())
-        elif (1000 << 5) in self.screen.mode:  # the game asked for xterm mouse reports
-            pos = bytes([32 + x + 1, 32 + y + 1])
-            self.send(b"\x1b[M " + pos + b"\x1b[M#" + pos)  # press, release
 
     def wheel(self, x, down):
         """Wheel: scrolls the helper transcript, or pages a multi-page game menu."""
@@ -1262,6 +1290,12 @@ class App:
             return
         self.seq = state.get("seq", 0)
         self.log.on_state(state, quiet=self.holding or bool(self.saving))  # a checkpoint's save/restore chatter
+        if self.log.path and self.log.path != self.hist_for:  # this character's helper history
+            self.hist_for = self.log.path
+            if os.path.exists(self.hist_path()):
+                current = self.helper.lines
+                self.helper.load(self.hist_path())
+                self.helper.lines += current[1:]  # keep what was said since this start
         if self.holding and (state.get("context") or {}).get("kind") == "command" and state.get("player"):
             self.holding = False  # the restarted game is back at its prompt: show it
             self.screen.dirty.update(range(self.gh))
@@ -1374,6 +1408,7 @@ class App:
             self.helper_key(data)
 
     def close(self):
+        self.helper.save(self.hist_path())
         try:
             sys.stdout.write(MOUSE_OFF)
             sys.stdout.flush()

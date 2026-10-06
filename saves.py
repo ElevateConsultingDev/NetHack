@@ -23,7 +23,7 @@ def snapshots(snaps_dir, save_name=None):
     if not os.path.isdir(snaps_dir):
         return []
     files = [os.path.join(snaps_dir, f) for f in os.listdir(snaps_dir)
-             if not f.endswith(".log") and (save_name is None or f.split("@")[0] == save_name)]
+             if not f.endswith((".log", ".json")) and (save_name is None or f.split("@")[0] == save_name)]
     return sorted(files, key=os.path.getmtime)
 
 
@@ -53,8 +53,9 @@ def prune(snaps_dir, save_name, keep=3):
 def remove(path):
     """Delete a save or checkpoint, and the game log kept beside a checkpoint."""
     os.unlink(path)
-    if os.path.exists(path + ".log"):
-        os.unlink(path + ".log")
+    for extra in (".log", ".helper.json"):  # the game log and helper conversation kept with it
+        if os.path.exists(path + extra):
+            os.unlink(path + extra)
 
 
 if __name__ == "__main__":
