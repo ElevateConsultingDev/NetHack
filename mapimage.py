@@ -21,11 +21,12 @@ PALETTE = {  # xterm's colors, close to most themes
 _fonts = {}
 
 
-def render(grid, cell_w, cell_h, scale):
-    """PNG of grid (rows of (ch, fg, bold, reverse)); each map square is scale x scale cells."""
-    bw, bh = cell_w * scale, cell_h * scale  # scale can be fractional (1.25x...)
+def render(grid, cell_w, cell_h, sw, sh=None):
+    """PNG of grid (rows of (ch, fg, bold, reverse)); each map square is sw x sh cells
+    (fractions fine). Letters fill the square's width, as in normal text."""
+    bw, bh = cell_w * sw, cell_h * (sh or sw)
     img = Image.new("RGBA", (max(1, round(len(grid[0]) * bw)), max(1, round(len(grid) * bh))), (0, 0, 0, 0))
-    size = max(8, int(bh * 0.8))
+    size = max(8, int(min(bw / 0.6, bh) * 0.98))  # Menlo is 0.6 em wide
     font = _fonts.get(size) or _fonts.setdefault(size, ImageFont.truetype(FONT, size))
     draw = ImageDraw.Draw(img)
     for j, row in enumerate(grid):
@@ -62,7 +63,7 @@ if __name__ == "__main__":
     png = render([[("@", "default", True, False), ("d", "red", False, False)],
                   [("#", "default", False, False), (" ", "default", False, True)]], 9, 18, 2)
     assert png.startswith(b"\x89PNG")
-    assert render([[("@", "default", False, False)]], 9, 18, 1.25).startswith(b"\x89PNG")  # fractional
+    assert render([[("@", "default", False, False)]], 9, 18, 1.25, 0.94).startswith(b"\x89PNG")  # fractional
     esc = place(png, 4, 3, 4, 4)
     assert esc.startswith(delete() + "\x1b[5;4H\x1b_Ga=T,f=100,i=7,c=4,r=4,C=1,q=2,m=")
     assert esc.endswith("\x1b\\")

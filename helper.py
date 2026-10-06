@@ -97,7 +97,8 @@ try:  # terminals that show images draw the zoomed map as a picture, with truly 
     GRAPHICS = not KITTY and os.environ.get("TERM_PROGRAM") in ("ghostty", "WezTerm")
 except ImportError:  # no Pillow
     GRAPHICS = False
-ZOOMS = ([(z, z) for z in (1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4)] if GRAPHICS  # a picture: any size
+ROW_SQUEEZE = 0.75  # picture zoom: squares 3/4 as tall as the cell shape, so rows sit closer
+ZOOMS = ([(1, 1)] + [(z, z * ROW_SQUEEZE) for z in (1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4)] if GRAPHICS
          else [(1, 1), (2, 2), (3, 3), (4, 4)] if KITTY  # columns x rows per map square
          else [(1, 1), (2, 1), (4, 2), (6, 3)])
 SGR_FG = {"black": 30, "red": 31, "green": 32, "brown": 33, "blue": 34, "magenta": 35,
@@ -657,7 +658,7 @@ class App:
         self.screen.dirty.update(range(top, bottom))  # redraw normally when zoom ends
         self.big = "".join(big)
         grid = [row for row in grid if row]
-        self.img = (top, bw, tuple(map(tuple, grid))) if grid else None
+        self.img = (top, bw, bh, tuple(map(tuple, grid))) if grid else None
 
     def cell_pixels(self):
         """A character cell's size in pixels, from the terminal (or a guess)."""
@@ -675,10 +676,10 @@ class App:
         if want == self.img_sent:
             return
         if want:
-            top, scale, grid = want
+            top, sw, sh, grid = want
             cw, ch = self.cell_pixels()
-            png = mapimage.render(grid, cw, ch, scale)
-            out = mapimage.place(png, top, GX, round(len(grid[0]) * scale), round(len(grid) * scale))
+            png = mapimage.render(grid, cw, ch, sw, sh)
+            out = mapimage.place(png, top, GX, round(len(grid[0]) * sw), round(len(grid) * sh))
         else:
             out = mapimage.delete()
         sys.stdout.write("\x1b7" + out + "\x1b8")  # keep curses' cursor and colors
