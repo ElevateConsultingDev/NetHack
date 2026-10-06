@@ -301,6 +301,13 @@ OBJECT_CLASSES = {")": "weapon", "[": "armor", "!": "potion", "?": "scroll", "/"
                   "=": "ring", '"': "amulet", "(": "tool", "%": "food", "*": "gem or rock",
                   "$": "gold", "`": "boulder or statue", "+": "spellbook", "0": "iron ball",
                   "_": "iron chain"}
+INV_GROUPS = [("$", "Coins"), (")", "Weapons"), ("[", "Armor"), ("%", "Food"), ("?", "Scrolls"),
+              ("+", "Spellbooks"), ("!", "Potions"), ("=", "Rings"), ('"', "Amulets"), ("/", "Wands"),
+              ("(", "Tools"), ("*", "Gems & rocks"), ("`", "Boulders & statues"), ("0", "Iron balls"),
+              ("_", "Chains")]
+IN_USE = re.compile(r"\((being worn|weapon in hand|wielded|on left|on right|in quiver|lit|in use|"
+                    r"embedded|tethered|attached|chained|alternate weapon; not wielded)")
+MENU_LINE = re.compile(r"^([< ])([a-zA-Z$#])([>)]) (.*?)\s*$")  # a curses menu line; <a> = selected
 LEGEND_ORDER = ("you", "pet", "monster", "invisible", "object", "trap", "feature")
 
 
@@ -355,6 +362,8 @@ class App:
         self.leader = False     # ⌃G pressed, waiting for its letter
         self.map_top = 1      # screen row of map row y=0 (found from the cursor on @)
         self.panel_items = {} # game-pane row -> inventory letter, for clicks
+        self.panel_spans = {} # game-pane row -> [(col0, col1, action)]: filters, Done, Cancel
+        self.inv_filter = None  # the inventory group shown (None: all)
         self.panel_on = False
         self.helper_w = None    # helper width once dragged
         self.legend_max = None  # legend lines once dragged
@@ -835,9 +844,82 @@ class App:
             self.gput(self.gh + 1, col, units[col], curses.A_REVERSE)
             self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(24), curses.A_BOLD)
 
+    def inventory_menu(self):
+        """When the game shows a menu of your own items beside the map (D, i, multi-pick):
+        {"title", "items": {letter: selected}}; None for other menus and paged ones."""
+        if (self.watcher.state.get("context") or {}).get("kind") != "menu":
+            return None
+        inv = {i["letter"]: i["text"] for i in self.watcher.state.get("inventory", [])}
+        title, items, matched = None, {}, 0
+        for r in sorted(self.beside_rows()):
+            raw = self.row_text(r).translate(ASCII)[MAP_W:].lstrip("|")  # keep the selection column (" a)" / "<a>")
+            text = raw.strip().strip("|+-").strip()
+            if "(Page" in text:
+                return None  # items on other pages aren't on screen
+            m = MENU_LINE.match(raw.rstrip().rstrip("|"))
+            if m:
+                items[m.group(2)] = m.group(1) == "<"
+                matched += inv.get(m.group(2), "").endswith(m.group(4).strip())
+            elif text and title is None:
+                title = text
+        if not items or matched * 2 < len(items):
+            return None
+        return {"title": title or "Choose", "items": items}
+
+    def inventory_lines(self, w):
+        """The one inventory list: grouped, filtered, in-use items green, and the place
+        where the game's item questions and item menus are answered."""
+        st = self.watcher.state.get("status") or {}
+        inv = self.watcher.state.get("inventory", [])
+        yellow = self.color("yellow", "default", True) | curses.A_BOLD
+        menu, asked = self.inventory_menu(), guard.asked_letters(self.watcher.state)
+        if menu:
+            head = [(f"{menu['title']}  Click items, then Done:", yellow, None)]
+        elif asked:
+            head = [(f"{asked[0]} Click one:", yellow, None)]
+        else:
+            head = [("Inventory (click an item)".ljust(w - 6) + "weight", curses.A_DIM, None)]
+        present = [(sym, name) for sym, name in INV_GROUPS if any(i.get("class") == sym for i in inv)]
+        if self.inv_filter not in [sym for sym, _ in present]:
+            self.inv_filter = None
+        lines, text, spans = head, "Show: ", []
+        for sym, name in [(None, "All")] + present:  # the filter rows: click a group to show only it
+            label = f"[{name}]" if sym == self.inv_filter else name
+            if spans and len(text) + len(label) > w:
+                lines.append((text, curses.A_DIM, spans))
+                text, spans = "      ", []
+            spans.append((len(text), len(text) + len(label), ("filter", sym)))
+            text += label + "  "
+        lines.append((text, curses.A_DIM, spans))
+        green = self.color("green", "default", True)
+        for sym, name in present:
+            if self.inv_filter not in (None, sym):
+                continue
+            lines.append((name, curses.A_UNDERLINE, None))
+            for i in (i for i in inv if i.get("class") == sym):
+                attr, mark = (green if IN_USE.search(i["text"]) else 0), " "
+                if menu:
+                    sel = menu["items"].get(i["letter"])
+                    mark = "✓" if sel else " " if sel is not None else "·"
+                    attr = (attr | curses.A_BOLD) if sel is not None else curses.A_DIM
+                elif asked:
+                    fits = i["letter"] in asked[1]
+                    mark, attr = (">", attr | curses.A_BOLD) if fits else (" ", curses.A_DIM)
+                row = f"{mark}{i['letter']}) {i['text']}"
+                if i.get("weight") is not None:  # weight, right-aligned (whole stack)
+                    row = row[:w - 6].ljust(w - 5) + f"{i['weight']:>5}"
+                lines.append((row, attr, i["letter"]))
+        if inv and all("weight" in i for i in inv):  # total under the weights, and the capacity
+            total = sum(i["weight"] for i in inv)
+            label = f"Total ({st.get('capacity')} before you're Burdened)" if st.get("capacity") else "Total"
+            lines.append((label[:w - 6].ljust(w - 5) + f"{total:>5}", curses.A_BOLD, None))
+        if menu:
+            lines.append(("[ Done ]   [ Cancel ]", yellow, [(0, 8, ("keys", b"\r")), (11, 21, ("keys", b"\x1b"))]))
+        return lines
+
     def draw_panel(self):
         """Status, location and inventory beside the map, unless the game has a menu there."""
-        self.panel_items = {}
+        self.panel_items, self.panel_spans = {}, {}
         if not self.panel_on:
             return
         w = self.gw - MAP_W - 1
@@ -878,31 +960,14 @@ class App:
                  (f"St {strength} Dx {st.get('dex')} Co {st.get('con')} In {st.get('int')} "
                   f"Wi {st.get('wis')} Ch {st.get('cha')}", 0, None)] + more + [
                  (" ".join(flags), self.color("yellow", "default", True) | curses.A_BOLD, None),
-                 ("Inventory (click an item)".ljust(w - 6) + "weight"[:6], curses.A_DIM, None)]
-        asked = guard.asked_letters(self.watcher.state)
-        if asked:  # the game wants an item: say so, and pick out the ones that fit
-            lines[-1] = (f"{asked[0]} Click one:", self.color("yellow", "default", True) | curses.A_BOLD, None)
-        for i in self.watcher.state.get("inventory", []):
-            worn = guard.WORN.search(i["text"]) or "weapon in hand" in i["text"]
-            attr = self.color("cyan", "default", False) if worn else 0
-            mark = ""
-            if asked:
-                fits = i["letter"] in asked[1]
-                attr = curses.A_BOLD if fits else curses.A_DIM
-                mark = "> " if fits else "  "
-            text, wt = f"{mark}{i['letter']}) {i['text']}", i.get("weight")
-            if wt is not None:  # weight, right-aligned (whole stack)
-                text = text[:w - 6].ljust(w - 5) + f"{wt:>5}"
-            lines.append((text, attr, i["letter"]))
-        inv = self.watcher.state.get("inventory", [])
-        if inv and all("weight" in i for i in inv):  # total under the weights, and the capacity
-            total = sum(i["weight"] for i in inv)
-            label = f"Total ({st.get('capacity')} before you're Burdened)" if st.get("capacity") else "Total"
-            lines.append((label[:w - 6].ljust(w - 5) + f"{total:>5}", curses.A_BOLD, None))
+                 ]
+        lines += self.inventory_lines(w)
         lines.append(("", 0, None))
         status = "  ".join(re.sub(r"  +", "  ", self.row_text(r)).strip() for r in self.status_rows())
         lines += [(l, 0, None) for l in textwrap.wrap(status, w)]  # the game's status lines, as one
-        taken = self.beside_rows()  # the game's box beside the map keeps these rows
+        # the game's box beside the map keeps its rows, unless it's a list of your items
+        # (then this panel is the list: inventory_lines() shows it)
+        taken = set() if self.inventory_menu() else self.beside_rows()
         free = [r for r in range(PANEL_TOP, self.gh) if r not in taken]
         for r in free:
             self.gput(r, MAP_W, "|")  # map | panel
@@ -911,8 +976,10 @@ class App:
             if r == free[-1] and len(lines) > n + 1:
                 text, letter = "...", None
             self.gput(r, MAP_W + 1, text[:w].ljust(w), attr)
-            if letter:
+            if isinstance(letter, str):
                 self.panel_items[r] = letter
+            elif letter:  # clickable spans on this row: filter names, Done, Cancel
+                self.panel_spans[r] = letter
 
     def draw_helper(self):
         rows, cols = self.scr.getmaxyx()
@@ -1261,7 +1328,17 @@ class App:
         self.focus = "game"
         if self.zoom_view and x < MAP_W and self.zoom_view[4] <= y < self.zoom_view[5]:
             return  # map clicks don't move you
+        for c0, c1, act in self.panel_spans.get(y, []) if x > MAP_W else []:
+            if c0 <= x - MAP_W - 1 < c1:
+                if act[0] == "filter":
+                    self.inv_filter = act[1]
+                else:
+                    self.send(act[1])
+                return
         letter = self.panel_items.get(y) if x >= MAP_W else None
+        if letter and self.inventory_menu():  # the game's item menu: toggle it there
+            self.send(letter.encode())
+            return
         if letter:  # an item in the status/inventory panel
             if (self.watcher.state.get("context") or {}).get("kind") == "command":
                 self.open_popup(x, y, letter)

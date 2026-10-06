@@ -76,8 +76,13 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   your god, hunger and conditions; with the cheat on (the default) also, in magenta, Luck,
   prayer timeout, nutrition, alignment record and your intrinsics; your pets (level, HP,
   AC, speed, and in magenta tameness, turns until hungry, where, what they carry). Then
-  your inventory, with each item's weight (the whole stack) on the right and the total at
-  the bottom, next to how much you can carry before you're Burdened. Click an item
+  your inventory: one list, grouped (Weapons, Armor, Potions...), items in use (worn,
+  wielded, quivered, lit) in green, each item's weight (whole stack) on the right and the
+  total at the bottom, next to how much you can carry before you're Burdened. "Show:"
+  filters it to one group (click a group, or All). The same list is where you answer the
+  game: for a one-item question ("What do you want to drop?") the items that fit are
+  marked, click one; for a menu of your items (`D`, `i`, picking several) the list takes
+  the menu's place: click items to mark them (✓), then Done or Cancel. Click an item
   for what you can do with it (Wield, Wear, Put on, Quaff, Read, Zap, Eat, Apply, Throw,
   Drop, Ask the helper...); click an action or press its key, Esc closes. When the game
   asks for an item, clicking one answers. The game's own two status lines are moved here
