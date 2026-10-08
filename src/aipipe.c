@@ -443,7 +443,13 @@ put_reveal()
         put_kv_int("hp", (long) mtmp->mhp, TRUE);
         put_kv_int("peaceful", (long) mtmp->mpeaceful, TRUE);
         put_kv_int("tame", (long) mtmp->mtame, TRUE);
-        put("}");
+        put(",\"items\":[");
+        for (otmp = mtmp->minvent; otmp; otmp = otmp->nobj) {
+            put_str(true_name(otmp));
+            if (otmp->nobj)
+                put(",");
+        }
+        put("]}");
         first = FALSE;
     }
     put("],\"objects\":[");

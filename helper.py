@@ -269,6 +269,7 @@ def snapshot(screen, state):
                      + "\n".join(r.rstrip() for r in rev["map"]).strip("\n"))
         parts.append("Monsters:\n" + "\n".join(
             f"x={m['x']} y={m['y']} {m['name']} hp={m['hp']}" + (" tame" if m["tame"] else " peaceful" if m["peaceful"] else "")
+            + (f", carrying: {'; '.join(m['items'])}" if m.get("items") else "")
             for m in rev["monsters"]))
         parts.append("Items on the floor:\n" + "\n".join(f"x={o['x']} y={o['y']} {o['text']}" for o in rev["objects"]))
         parts.append("Traps:\n" + "\n".join(f"x={t['x']} y={t['y']} {t['name']}" for t in rev["traps"]))
