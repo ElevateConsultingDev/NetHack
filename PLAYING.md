@@ -89,6 +89,8 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   asks for an item, clicking one answers. The game's own two status lines are moved here
   from under the map. Game menus open over this panel. When the game asks for an item
   ("What do you want to drink? [h or ?*]"), the panel says so and marks the items that fit.
+  At "What do you want to use or apply?", an arrow key applies the pick-axe (or mattock,
+  bullwhip) you're wielding in that direction: `a`, then an arrow, digs that way.
 - Regions are outlined (game | helper, map | panel, legend | chat | input). Drag the
   game | helper line left or right to resize them (the game redraws to fit), and the
   legend | chat line up or down. Messages and the game's status lines stay over the map
