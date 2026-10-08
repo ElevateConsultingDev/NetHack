@@ -221,6 +221,7 @@ curses_block(boolean noscroll) /* noscroll - blocking because of msgtype
     curses_got_input();
 
     oldcrsr = curs_set(1);
+    aipipe_more(TRUE);
     do {
         aipipe_snapshot(); /* external watcher */
         ret = wgetch(win);
@@ -229,6 +230,7 @@ curses_block(boolean noscroll) /* noscroll - blocking because of msgtype
         /* msgtype=stop should require space/enter rather than any key,
            as we want to prevent YASD from direction keys. */
     } while (!index(resp, (char) ret));
+    aipipe_more(FALSE);
     if (oldcrsr >= 0)
         (void) curs_set(oldcrsr);
 
