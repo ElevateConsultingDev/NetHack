@@ -113,6 +113,21 @@ def asked_letters(state):
     return m.group(1), letters
 
 
+ARROWS = {b"\x1b[" + c: c for c in (b"A", b"B", b"C", b"D")}
+ARROWS.update({b"\x1bO" + c: c for c in (b"A", b"B", b"C", b"D")})
+DIGGERS = re.compile(r"pick-axe|mattock|broad pick|bullwhip")  # apply asks a direction
+
+
+def apply_wielded(state, key):
+    """At "What do you want to use or apply?", an arrow means the wielded pick-axe
+    (or mattock, bullwhip) that way: its letter, to send before the arrow."""
+    q = asked_letters(state)
+    if key not in ARROWS or not q or q[0] != "What do you want to use or apply?":
+        return None
+    return next((k for k, t in _inventory(state).items()
+                 if "weapon in hand" in t and DIGGERS.search(t) and k in q[1]), None)
+
+
 def check(state, key):
     """Why `key` (bytes from the keyboard) is dangerous in this state, or None."""
     ctx = state.get("context") or {}
@@ -205,4 +220,9 @@ if __name__ == "__main__":
     assert asked("Really attack the gnome? [yn] (n)") is None
     assert check(dict(base, context={"kind": "command"}), b"O")
     assert check(dict(base, context={"kind": "yn", "prompt": "Really attack? [yn] (n)"}), b"O") is None
+    dig = dict(base, inventory=[{"letter": "L", "text": "a pick-axe (weapon in hand)"}],
+               context={"kind": "yn", "prompt": "What do you want to use or apply? [L or ?*]"})
+    assert apply_wielded(dig, b"\x1b[D") == "L"
+    assert apply_wielded(dig, b"L") is None  # a letter still picks the item
+    assert apply_wielded(dict(dig, inventory=[{"letter": "L", "text": "a pick-axe"}]), b"\x1b[D") is None
     print("guard ok")

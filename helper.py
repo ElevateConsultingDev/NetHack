@@ -1376,6 +1376,9 @@ class App:
         """Send a key to the game, unless the guard holds it (then a second press sends it)."""
         if len(data) == 2 and data[0] == 0x1b and 0x20 < data[1] < 0x7f and data[1:] not in (b"[", b"O"):
             data = bytes([data[1] | 0x80])  # Option+key (Esc, key at once): NetHack's Meta, as 8-bit
+        dig = guard.apply_wielded(self.watcher.state, data)
+        if dig:
+            data = dig.encode() + data  # the wielded pick-axe, then that direction
         if data == self.held:
             self.held = None
         elif data:
