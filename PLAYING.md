@@ -55,8 +55,8 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   reason in the helper pane; press it again to do it anyway. Covers eating cockatrice /
   chickatrice / Medusa / green slime corpses, eating while Satiated, praying when it
   isn't safe (uses the cheat's prayer timeout, luck and anger), putting on or wearing
-  cursed or unknown-BUC items, and moving into a floating eye or bare-handed into a
-  cockatrice.
+  cursed or unknown-BUC items, moving into a floating eye or bare-handed into a
+  cockatrice, and a stray `O` (the options menu) while mashing keys through `--More--`.
 - Warnings appear in the helper pane (yellow) when they start to apply: low HP, Weak or
   Fainting, turning to stone or slime, strangling, deadly illness, and dangerous monsters
   within 7 squares.
@@ -81,7 +81,8 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   total at the bottom, next to how much you can carry before you're Burdened. "Show:"
   filters it to one group (click a group, or All). The same list is where you answer the
   game: for a one-item question ("What do you want to drop?") the items that fit are
-  marked, click one; for a menu of your items (`D`, `i`, picking several) the list takes
+  marked, click one; for a menu of your items (`D` goes straight to the items, `i`, picking
+  several) the list takes
   the menu's place: click items to mark them (✓), then Done or Cancel. Click an item
   for what you can do with it (Wield, Wear, Put on, Quaff, Read, Zap, Eat, Apply, Throw,
   Drop, Ask the helper...); click an action or press its key, Esc closes. When the game

@@ -142,6 +142,8 @@ def check(state, key):
             return f"{text} is cursed: you won't be able to take it off."
         if not KNOWN_BUC.search(text):
             return f"{text} might be cursed (unknown); you might not get it off."
+    if ctx.get("kind") == "command" and key == b"O":  # a stray O while mashing through --More--
+        return "O opens the options menu."
     if ctx.get("kind") == "command" and key in DIRS:
         you = state.get("player") or {}
         dx, dy = DIRS[key]
@@ -201,4 +203,6 @@ if __name__ == "__main__":
     assert asked("What do you want to drink? [h or ?*]") == ("What do you want to drink?", {"h"})
     assert asked("What do you want to wield? [- a-cf or ?*]")[1] == {"-", "a", "b", "c", "f"}
     assert asked("Really attack the gnome? [yn] (n)") is None
+    assert check(dict(base, context={"kind": "command"}), b"O")
+    assert check(dict(base, context={"kind": "yn", "prompt": "Really attack? [yn] (n)"}), b"O") is None
     print("guard ok")
