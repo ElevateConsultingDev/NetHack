@@ -152,6 +152,9 @@ class Memory:
     corridors: set = field(default_factory=set)   # (dlvl, x, y) corridor squares seen
     kills: dict = field(default_factory=dict)     # (dlvl, x, y) -> (monster, turn) where we killed it
     eating_corpse: bool = False                   # an 'e' for a floor corpse is in progress
+    tinning: bool = False                         # the tinning kit was applied to a floor corpse: answer "tin it?"
+    tins_out: bool = False                        # "You seem to be out of tins.": the kit is spent
+    tinned_at: set = field(default_factory=set)   # (dlvl, x, y) squares where we already tinned
     declined_corpse: bool = False                 # we said no to a floor corpse just now
     stats: dict = field(default_factory=dict)     # counters for measuring the pilot
     prayer_log: list = field(default_factory=list)  # (turn prayed, "ok" | "failed")
@@ -511,6 +514,19 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
         if prompt.startswith("What do you want to") and memory.pending_item:
             letter, memory.pending_item = memory.pending_item, ""
             return letter, f"answer with item {letter}"
+        if "tin it?" in prompt and memory.tinning:
+            name = corpse_name(prompt)
+            ok, why = corpse_safe(name, memory, v)
+            memory.tinning = False
+            if ok:
+                memory.kills.pop((v.dlvl, *v.pos), None)
+                _count(memory, "corpses tinned")
+            else:
+                _count(memory, f"not tinned: {why}")
+            return ("y", f"tin the {name} corpse") if ok else ("n", f"not tinning it: {why}")
+        if prompt.startswith("What do you want to tin") and memory.tinning:
+            memory.tinning = False
+            return "\x1b", "no corpse here to tin after all"
         if ("eat it?" in prompt or "eat one?" in prompt) and memory.eating_corpse:
             memory.eating_corpse = False
             name = corpse_name(prompt)
@@ -1283,6 +1299,7 @@ class Engine:
                     return keys, []
             return None, [f"prompt: {v.kind} {v.ctx.get('prompt') or ''!r} choices {v.ctx.get('choices') or ''!r}"]
 
+        self.memory.tinning = False  # The kit's prompts, if any, came before this command prompt.
         c = checks(v, self.memory)
         self.last_checks = c
         if any(h["name"] not in self.orders["avoid"] or h["name"] in DANGEROUS_NEAR for h in c["mobile_hostiles"]):
@@ -1356,6 +1373,8 @@ class Engine:
                 if text in msg:  # Luck recovers one point per 600 turns.
                     m.luck_bad_until = max(m.luck_bad_until, turn + turns)
                     _count(m, f"luck penalty: {msg[:60]}")
+            if msg.startswith("You seem to be out of tins"):
+                m.tins_out = True
             if msg.startswith("It smells like "):
                 m.tin_smell = msg[len("It smells like "):].rstrip(".")
             elif msg.startswith("It contains spinach"):
@@ -1373,6 +1392,29 @@ class Engine:
                 m.feverish = True
             elif "You feel purified" in msg:
                 m.feverish = False
+
+    def _corpse_to_tin(self, v: View, c: dict):
+        """Not hungry, a tinning kit in the pack, and a fresh safe kill underfoot: tin it. A tin
+        never rots and weighs 10, so later hunger has an answer (apply.c use_tinning_kit; the
+        wiki calls the kit the practical answer to food that spoils). Up to six tins carried."""
+        m = self.memory
+        if c["hunger"] in HUNGRY or c["mobile_hostiles"] or m.tins_out or m.tinning:
+            return None
+        inv = v.s.get("inventory", [])
+        kit = next((i for i in inv if i["class"] == "(" and "tinning kit" in i["text"]), None)
+        if not kit or sum(1 for i in inv if i["class"] == "%" and re.search(r"\btins?\b", i["text"])) >= 6:
+            return None
+        turn = c["turn"]
+        here = (v.dlvl, *v.pos)
+        if here in m.tinned_at or here in m.shop_items:
+            return None
+        name, when = m.kills.get(here, (None, 0))
+        if not name or not species_ok(name, v.status.get("race", ""))[0] \
+                or not (name in NEVER_ROTS or turn - when <= FRESH_TURNS):
+            return None
+        m.tinned_at.add(here)
+        m.tinning, m.pending_item = True, kit["letter"]
+        return "a", "tin the fresh kill"
 
     def _corpse_to_eat(self, v: View, c: dict):
         """A fresh safe kill with a corpse still on it, within a short walk."""
@@ -1617,6 +1659,9 @@ class Engine:
                     _count(m, "desperate meal")
                     return "e", f"standing order: desperate meal ({risky[0]['text']})"
             # Hungry or Weak: keep going; the next safe kill is a meal.
+        tin = self._corpse_to_tin(v, c)
+        if tin:
+            return tin[0], "standing order: " + tin[1]
         corpse = self._corpse_to_eat(v, c)
         if corpse:
             return corpse[0], "standing order: " + corpse[1]
