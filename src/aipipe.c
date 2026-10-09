@@ -59,6 +59,9 @@ static boolean reveal = FALSE; /* NETHACK_REVEAL: also send the whole level, as 
 #define AI_MAXMSG 30
 static char msgs[AI_MAXMSG][BUFSZ];
 static int nmsgs = 0;
+/* attack rolls and damage since the last snapshot (reveal only) */
+static char fights[AI_MAXMSG][BUFSZ];
+static int nfights = 0;
 
 /* ---------- output buffer ---------- */
 
@@ -166,6 +169,21 @@ send_out()
 }
 
 /* ---------- context ---------- */
+
+/* an attack roll or damage, for the helper's fight log (reveal only) */
+void
+aipipe_combat(line)
+const char *line;
+{
+    if (!reveal)
+        return;
+    if (nfights == AI_MAXMSG) {
+        memmove(fights[0], fights[1], sizeof fights[0] * (AI_MAXMSG - 1));
+        nfights--;
+    }
+    (void) strncpy(fights[nfights], line, BUFSZ - 1);
+    fights[nfights++][BUFSZ - 1] = '\0';
+}
 
 void
 aipipe_more(on)
@@ -441,6 +459,7 @@ put_reveal()
         put(tmp);
         put_kv_str("name", mtmp->data->mname, TRUE);
         put_kv_int("hp", (long) mtmp->mhp, TRUE);
+        put_kv_int("hpmax", (long) mtmp->mhpmax, TRUE);
         put_kv_int("peaceful", (long) mtmp->mpeaceful, TRUE);
         put_kv_int("tame", (long) mtmp->mtame, TRUE);
         put(",\"items\":[");
@@ -767,6 +786,14 @@ emit_state()
     }
     put("]");
     nmsgs = 0;
+    put(",\"combat\":[");
+    for (i = 0; i < nfights; i++) {
+        if (i)
+            put(",");
+        put_str(fights[i]);
+    }
+    put("]");
+    nfights = 0;
     if (program_state.in_moveloop) {
         put(",\"player\":{");
         put_kv_int("x", u.ux, FALSE);

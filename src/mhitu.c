@@ -4,6 +4,7 @@
 /* NetHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
+#include "aipipe.h"
 #include "artifact.h"
 
 STATIC_VAR NEARDATA struct obj *mon_currwep = (struct obj *) 0;
@@ -662,7 +663,10 @@ register struct monst *mtmp;
     }
 
     for (i = 0; i < NATTK; i++) {
+        int need = 0, oldhp = Upolyd ? u.mh : u.uhp;
+
         sum[i] = 0;
+        j = 0;
         mon_currwep = (struct obj *)0;
         mattk = getmattk(mtmp, &youmonst, i, sum, &alt_attk);
         if ((u.uswallow && mattk->aatyp != AT_ENGL)
@@ -771,6 +775,7 @@ register struct monst *mtmp;
                         tmp += hittmp;
                         mswings(mtmp, mon_currwep);
                     }
+                    need = tmp; /* with the weapon's bonus */
                     if (tmp > (j = dieroll = rnd(20 + i)))
                         sum[i] = hitmu(mtmp, mattk);
                     else
@@ -794,6 +799,19 @@ register struct monst *mtmp;
 
         default: /* no attack */
             break;
+        }
+        if (j) { /* a to-hit roll was made: the helper's fight log */
+            char buf[BUFSZ];
+            int lost = oldhp - (Upolyd ? u.mh : u.uhp);
+
+            if (!need)
+                need = tmp;
+            Sprintf(buf, "The %s %s you: needed under %d on d%d, rolled %d",
+                    mdat->mname, need > j ? "hits" : "misses", need, 20 + i,
+                    j);
+            if (lost > 0)
+                Sprintf(eos(buf), ", you lost %d HP", lost);
+            aipipe_combat(buf);
         }
         if (context.botl)
             bot();

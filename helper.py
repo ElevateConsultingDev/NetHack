@@ -268,7 +268,7 @@ def snapshot(screen, state):
         parts.append(f"CHEAT, the whole level as it really is (you are @ at x={you.get('x')} y={you.get('y')}):\n"
                      + "\n".join(r.rstrip() for r in rev["map"]).strip("\n"))
         parts.append("Monsters:\n" + "\n".join(
-            f"x={m['x']} y={m['y']} {m['name']} hp={m['hp']}" + (" tame" if m["tame"] else " peaceful" if m["peaceful"] else "")
+            f"x={m['x']} y={m['y']} {m['name']} hp={m['hp']}/{m.get('hpmax')}" + (" tame" if m["tame"] else " peaceful" if m["peaceful"] else "")
             + (f", carrying: {'; '.join(m['items'])}" if m.get("items") else "")
             for m in rev["monsters"]))
         parts.append("Items on the floor:\n" + "\n".join(f"x={o['x']} y={o['y']} {o['text']}" for o in rev["objects"]))
@@ -355,6 +355,7 @@ class App:
         self.helper.on_answer = lambda: self.helper.save(self.hist_path())
         self.held = None      # a dangerous key held back by the guard, sent if pressed again
         self.warned = set()   # warnings already shown (each shows once while it applies)
+        self.fight = []       # (turn, line): recent attack rolls and damage, for the panel
         self.seq = 0
         self.popup = None     # actions for a clicked inventory item: x, y, w, letter, text, acts
         self.search = None    # the ⌃G k search: query, sel, items, results
@@ -918,6 +919,20 @@ class App:
             lines.append(("[ Done ]   [ Cancel ]", yellow, [(0, 8, ("keys", b"\r")), (11, 21, ("keys", b"\x1b"))]))
         return lines
 
+    def fight_lines(self, w, rev, you, turn):
+        """Hostile monsters next to you with their HP, and the latest attack rolls (cheat)."""
+        near = [m for m in rev.get("monsters", []) if not (m["tame"] or m["peaceful"])
+                and max(abs(m["x"] - you.get("x", 0)), abs(m["y"] - you.get("y", 0))) == 1]
+        recent = [l for t, l in self.fight if turn - t <= 10]
+        if not (near or recent):
+            return []
+        magenta = self.color("magenta", "default", False)
+        lines = [("Fight", curses.A_BOLD, None)]
+        lines += [(f" {m['name']}  HP {m['hp']}/{m.get('hpmax', '?')}", curses.A_BOLD, None) for m in near]
+        for l in recent:
+            lines += [(s, magenta, None) for s in textwrap.wrap(l, w, initial_indent=" ", subsequent_indent="   ")]
+        return lines
+
     def draw_panel(self):
         """Status, location and inventory beside the map, unless the game has a menu there."""
         self.panel_items, self.panel_spans = {}, {}
@@ -962,6 +977,7 @@ class App:
                   f"Wi {st.get('wis')} Ch {st.get('cha')}", 0, None)] + more + [
                  (" ".join(flags), self.color("yellow", "default", True) | curses.A_BOLD, None),
                  ]
+        lines += self.fight_lines(w, rev, you, st.get("turn", 0))
         lines += self.inventory_lines(w)
         lines.append(("", 0, None))
         status = "  ".join(re.sub(r"  +", "  ", self.row_text(r)).strip() for r in self.status_rows())
@@ -1417,6 +1433,8 @@ class App:
             self.helper.lines.append(("warn", "! " + w))
             self.log.event("warning: " + w)
         self.warned = now
+        turn = (state.get("status") or {}).get("turn", 0)
+        self.fight = (self.fight + [(turn, c) for c in state.get("combat", [])])[-6:]
         dlvl = (state.get("status") or {}).get("dlvl")
         if dlvl and dlvl != self.snap_dlvl and self.save_game("checkpoint"):
             self.snap_dlvl = dlvl  # one automatic checkpoint per level reached

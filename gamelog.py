@@ -57,6 +57,8 @@ class GameLog:
             self.turn, self.dlvl = turn, dlvl
         for m in [] if quiet else state.get("messages", []):
             self.write(f"{self.where()}  {m}")
+        for c in [] if quiet else state.get("combat", []):  # attack rolls and damage (cheat)
+            self.write(f"{self.where()}  [roll] {c}")
 
     def copy_to(self, path):
         """Keep the log as it is now beside a checkpoint."""

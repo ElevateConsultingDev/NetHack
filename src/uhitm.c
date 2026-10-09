@@ -4,6 +4,7 @@
 /* NetHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
+#include "aipipe.h"
 
 STATIC_DCL boolean FDECL(known_hitum, (struct monst *, struct obj *, int *,
                                        int, int, struct attack *, int));
@@ -478,6 +479,14 @@ int dieroll;
             Your("bloodthirsty blade attacks!");
     }
 
+    {
+        char buf[BUFSZ];
+
+        Sprintf(buf, "You %s the %s: needed under %d on d20, rolled %d",
+                *mhit ? "hit" : "miss", mon->data->mname, rollneeded,
+                dieroll);
+        aipipe_combat(buf);
+    }
     if (!*mhit) {
         missum(mon, uattk, (rollneeded + armorpenalty > dieroll));
     } else {
@@ -653,10 +662,19 @@ int thrown; /* HMON_xxx (0 => hand-to-hand, other => ranged) */
 int dieroll;
 {
     boolean result, anger_guards;
+    int oldhp = mon->mhp;
+    char buf[BUFSZ];
 
     anger_guards = (mon->mpeaceful
                     && (mon->ispriest || mon->isshk || is_watch(mon->data)));
     result = hmon_hitmon(mon, obj, thrown, dieroll);
+    if (DEADMONSTER(mon))
+        Sprintf(buf, "The %s is killed (it had %d HP)", mon->data->mname,
+                oldhp);
+    else
+        Sprintf(buf, "The %s took %d damage, HP now %d/%d", mon->data->mname,
+                oldhp - mon->mhp, mon->mhp, mon->mhpmax);
+    aipipe_combat(buf);
     if (mon->ispriest && !rn2(2))
         ghod_hitsu(mon);
     if (anger_guards)

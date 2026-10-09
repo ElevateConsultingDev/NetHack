@@ -91,6 +91,9 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   ("What do you want to drink? [h or ?*]"), the panel says so and marks the items that fit.
   At "What do you want to use or apply?", an arrow key applies the pick-axe (or mattock,
   bullwhip) you're wielding in that direction: `a`, then an arrow, digs that way.
+  During a fight a "Fight" section shows the HP of hostile monsters next to you and the
+  latest attack rolls (to-hit needed, d20 rolled, damage dealt and taken), in magenta like
+  the other hidden numbers. The rolls also go into the game log, so the helper sees them.
 - Regions are outlined (game | helper, map | panel, legend | chat | input). Drag the
   game | helper line left or right to resize them (the game redraws to fit), and the
   legend | chat line up or down. Messages and the game's status lines stay over the map
