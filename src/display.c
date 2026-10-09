@@ -1644,10 +1644,12 @@ fog_overlay()
     struct monst *mtmp;
     struct obj *otmp;
     struct trap *t;
+    boolean secret;
 
     for (x = 1; x < COLNO; x++)
         for (y = 0; y < ROWNO; y++) {
-            if (cansee(x, y) || (x == u.ux && y == u.uy))
+            secret = (levl[x][y].typ == SDOOR || levl[x][y].typ == SCORR);
+            if ((cansee(x, y) && !secret) || (x == u.ux && y == u.uy))
                 continue;
             if ((mtmp = m_at(x, y)) != 0 && !DEADMONSTER(mtmp))
                 glyph = mon_to_glyph(mtmp, rn2_on_display_rng);
@@ -1655,6 +1657,10 @@ fog_overlay()
                 glyph = obj_to_glyph(otmp, rn2_on_display_rng);
             else if ((t = t_at(x, y)) != 0)
                 glyph = trap_to_glyph(t, rn2_on_display_rng);
+            else if (secret) /* hidden doors and corridors, shown as found */
+                glyph = cmap_to_glyph(levl[x][y].typ == SCORR ? S_corr
+                                      : levl[x][y].horizontal ? S_hcdoor
+                                      : S_vcdoor);
             else {
                 sv = levl[x][y].seenv; /* walls draw by the angles seen */
                 levl[x][y].seenv = SVALL;

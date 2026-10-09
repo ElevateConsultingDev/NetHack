@@ -439,6 +439,10 @@ put_reveal()
                 ch = def_oc_syms[(int) level.objects[x][y]->oclass].sym;
             else if (t_at(x, y))
                 ch = '^';
+            else if (levl[x][y].typ == SDOOR) /* hidden: shown as found */
+                ch = '+';
+            else if (levl[x][y].typ == SCORR)
+                ch = '#';
             else {
                 glyph = back_to_glyph(x, y);
                 (void) mapglyph(glyph, &ch, &color, &special, x, y, 0);
