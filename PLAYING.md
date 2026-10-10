@@ -75,7 +75,9 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   your location as x/y, stats, carried weight and capacity, speed, xp for the next level,
   your god, hunger and conditions; with the cheat on (the default) also, in magenta, Luck,
   prayer timeout, nutrition, alignment record and your intrinsics; your pets (level, HP,
-  AC, speed, and in magenta tameness, turns until hungry, where, what they carry). Then
+  AC, speed, and in magenta tameness, turns until hungry, where, what they carry). This
+  character block sits under the map when the window is tall enough (and moves beside it
+  while zoomed, since the zoomed map uses those rows). Then
   your inventory: one list, grouped (Weapons, Armor, Potions...), items in use (worn,
   wielded, quivered, lit) in green, each item's weight (whole stack) on the right and the
   total at the bottom, next to how much you can carry before you're Burdened. "Show:"

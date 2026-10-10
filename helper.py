@@ -356,6 +356,7 @@ class App:
         self.held = None      # a dangerous key held back by the guard, sent if pressed again
         self.warned = set()   # warnings already shown (each shows once while it applies)
         self.fight = []       # (turn, line): recent attack rolls and damage, for the panel
+        self.under_drawn = set()  # rows under the map showing the character block
         self.seq = 0
         self.popup = None     # actions for a clicked inventory item: x, y, w, letter, text, acts
         self.search = None    # the ⌃G k search: query, sel, items, results
@@ -933,6 +934,20 @@ class App:
             lines += [(s, magenta, None) for s in textwrap.wrap(l, w, initial_indent=" ", subsequent_indent="   ")]
         return lines
 
+    def under_map_rows(self):
+        """Rows below the map that the game leaves blank (not while zoomed: the map uses them)."""
+        if self.zoom_view:
+            return []
+        buf, skip = self.screen.buffer, self.status_rows()
+        rows = []
+        for r in range(self.map_top + MAP_H, self.gh):
+            if r in skip:
+                continue
+            if any(buf[r][c].data not in (" ", "") for c in range(MAP_W)):
+                break  # something of the game's is there
+            rows.append(r)
+        return rows
+
     def draw_panel(self):
         """Status, location and inventory beside the map, unless the game has a menu there."""
         self.panel_items, self.panel_spans = {}, {}
@@ -948,35 +963,47 @@ class App:
         flags = [f for f in [st.get("hunger"), st.get("encumbrance")] + st.get("conditions", []) if f]
         rev = self.watcher.state.get("reveal") or {}
         pray = rev.get("prayer") or {}
-        more = [(f"Carrying {st.get('weight')}/{st.get('capacity')} wt   Speed {st.get('speed')}", 0, None),
-                (f"Next level at {st.get('next_exp')} xp   God: {st.get('god')}", 0, None)]
-        if pray:  # hidden numbers, from the cheat
-            more.append((f"Luck {pray.get('luck')}  Prayer timeout {pray.get('timeout')}  "
-                         f"Nutrition {rev.get('nutrition')}  Alignment {rev.get('align_record')}",
-                         self.color("magenta", "default", False), None))
-            more += [(l, self.color("magenta", "default", False), None)
-                     for l in textwrap.wrap("Intrinsics: " + (", ".join(rev.get("intrinsics", [])) or "none"), w)]
-        for pet in rev.get("pets", []):  # tame monsters, with the hidden numbers in magenta
-            name = f"{pet['name']} the {pet['species']}" if pet["name"] else pet["species"]
-            more.append((f"Pet: {name}  L{pet['level']}  HP {pet['hp']}/{pet['hpmax']}  AC {pet['ac']}  "
-                         f"Spd {pet['speed']}", curses.A_BOLD, None))
-            hunger = pet.get("turns_until_hungry")
-            hunger = "?" if hunger is None else "hungry now" if hunger < 0 else f"hungry in {hunger}"
-            more += [(l, self.color("magenta", "default", False), None) for l in textwrap.wrap(
-                f"  tame {pet['tameness']}/20, {hunger}, at x={pet['x']} y={pet['y']}"
-                + (", leashed" if pet["leashed"] else "")
-                + (", carrying " + ", ".join(pet["carrying"]) if pet["carrying"] else ""), w)]
-        lines = [(f"{st.get('gender', '').capitalize()} {st.get('race', '')} {st.get('role', '')}, "
-                  f"{st.get('alignment', '')}", curses.A_BOLD, None),
-                 (f"HP {hp}/{hpmax}", self.color(hp_col, "default", True) | curses.A_BOLD, None),
-                 (f"Pw {st.get('pw')}/{st.get('pwmax')}   AC {st.get('ac')}", 0, None),
-                 (f"Xp {st.get('xlvl')}/{st.get('exp')}   $ {st.get('gold')}   T {st.get('turn')}", 0, None),
-                 (f"Dlvl {st.get('dlvl')}  {st.get('dungeon', '')}", 0, None),
-                 (f"Location x={you.get('x')} y={you.get('y')}", curses.A_BOLD, None),
-                 (f"St {strength} Dx {st.get('dex')} Co {st.get('con')} In {st.get('int')} "
-                  f"Wi {st.get('wis')} Ch {st.get('cha')}", 0, None)] + more + [
-                 (" ".join(flags), self.color("yellow", "default", True) | curses.A_BOLD, None),
-                 ]
+        def stats(sw):  # who you are and how you're doing, wrapped to width sw
+            more = [(f"Carrying {st.get('weight')}/{st.get('capacity')} wt   Speed {st.get('speed')}", 0, None),
+                    (f"Next level at {st.get('next_exp')} xp   God: {st.get('god')}", 0, None)]
+            if pray:  # hidden numbers, from the cheat
+                more.append((f"Luck {pray.get('luck')}  Prayer timeout {pray.get('timeout')}  "
+                             f"Nutrition {rev.get('nutrition')}  Alignment {rev.get('align_record')}",
+                             self.color("magenta", "default", False), None))
+                more += [(l, self.color("magenta", "default", False), None)
+                         for l in textwrap.wrap("Intrinsics: " + (", ".join(rev.get("intrinsics", [])) or "none"), sw)]
+            for pet in rev.get("pets", []):  # tame monsters, with the hidden numbers in magenta
+                name = f"{pet['name']} the {pet['species']}" if pet["name"] else pet["species"]
+                more.append((f"Pet: {name}  L{pet['level']}  HP {pet['hp']}/{pet['hpmax']}  AC {pet['ac']}  "
+                             f"Spd {pet['speed']}", curses.A_BOLD, None))
+                hunger = pet.get("turns_until_hungry")
+                hunger = "?" if hunger is None else "hungry now" if hunger < 0 else f"hungry in {hunger}"
+                more += [(l, self.color("magenta", "default", False), None) for l in textwrap.wrap(
+                    f"  tame {pet['tameness']}/20, {hunger}, at x={pet['x']} y={pet['y']}"
+                    + (", leashed" if pet["leashed"] else "")
+                    + (", carrying " + ", ".join(pet["carrying"]) if pet["carrying"] else ""), sw)]
+            return [(f"{st.get('gender', '').capitalize()} {st.get('race', '')} {st.get('role', '')}, "
+                      f"{st.get('alignment', '')}", curses.A_BOLD, None),
+                     (f"HP {hp}/{hpmax}", self.color(hp_col, "default", True) | curses.A_BOLD, None),
+                     (f"Pw {st.get('pw')}/{st.get('pwmax')}   AC {st.get('ac')}", 0, None),
+                     (f"Xp {st.get('xlvl')}/{st.get('exp')}   $ {st.get('gold')}   T {st.get('turn')}", 0, None),
+                     (f"Dlvl {st.get('dlvl')}  {st.get('dungeon', '')}", 0, None),
+                     (f"Location x={you.get('x')} y={you.get('y')}", curses.A_BOLD, None),
+                     (f"St {strength} Dx {st.get('dex')} Co {st.get('con')} In {st.get('int')} "
+                      f"Wi {st.get('wis')} Ch {st.get('cha')}", 0, None)] + more + [
+                     (" ".join(flags), self.color("yellow", "default", True) | curses.A_BOLD, None),
+                     ]
+        under = self.under_map_rows()  # blank rows below the map, if any
+        top = stats(MAP_W - 1) if under else []
+        if len(top) > len(under):
+            top, under = [], []
+        for n, r in enumerate(under):  # the character block under the map, if it fits
+            text, attr, _ = top[n] if n < len(top) else ("", 0, None)
+            self.gput(r, 0, text[:MAP_W - 1].ljust(MAP_W), attr)
+        if set(under) != self.under_drawn:  # rows it left: the game's own content again
+            self.screen.dirty.update(self.under_drawn - set(under))
+            self.under_drawn = set(under)
+        lines = [] if top else stats(w)
         lines += self.fight_lines(w, rev, you, st.get("turn", 0))
         lines += self.inventory_lines(w)
         lines.append(("", 0, None))
