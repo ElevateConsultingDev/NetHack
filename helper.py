@@ -367,6 +367,7 @@ class App:
         self.panel_items = {} # game-pane row -> inventory letter, for clicks
         self.panel_spans = {} # game-pane row -> [(col0, col1, action)]: filters, Done, Cancel
         self.inv_filter = None  # the inventory group shown (None: all)
+        self.inv_open = set()   # inventory groups opened (closed ones show only items in use)
         self.panel_on = False
         self.helper_w = None    # helper width once dragged
         self.legend_max = None  # legend lines once dragged
@@ -898,8 +899,16 @@ class App:
         for sym, name in present:
             if self.inv_filter not in (None, sym):
                 continue
-            lines.append((name, curses.A_UNDERLINE, None))
-            for i in (i for i in inv if i.get("class") == sym):
+            items = [i for i in inv if i.get("class") == sym]
+            whole = menu or asked or sym in self.inv_open or self.inv_filter == sym
+            shown = items if whole else [i for i in items if IN_USE.search(i["text"])]
+            if menu or asked or self.inv_filter == sym:
+                lines.append((name, curses.A_UNDERLINE, None))
+            else:  # click the group name to open or close it
+                label = f"▾ {name}" if whole else f"▸ {name}" + (
+                    f" ({len(items) - len(shown)} more)" if len(items) > len(shown) else "")
+                lines.append((label, curses.A_UNDERLINE, [(0, len(label), ("toggle", sym))]))
+            for i in shown:
                 attr, mark = (green if IN_USE.search(i["text"]) else 0), " "
                 if menu:
                     sel = menu["items"].get(i["letter"])
@@ -1376,6 +1385,8 @@ class App:
             if c0 <= x - MAP_W - 1 < c1:
                 if act[0] == "filter":
                     self.inv_filter = act[1]
+                elif act[0] == "toggle":
+                    self.inv_open ^= {act[1]}
                 else:
                     self.send(act[1])
                 return

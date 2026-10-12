@@ -81,7 +81,10 @@ in `~/.config/ghostty/config` (iTerm2: Profiles > Keys > Left Option key: Esc+).
   your inventory: one list, grouped (Weapons, Armor, Potions...), items in use (worn,
   wielded, quivered, lit) in green, each item's weight (whole stack) on the right and the
   total at the bottom, next to how much you can carry before you're Burdened. "Show:"
-  filters it to one group (click a group, or All). The same list is where you answer the
+  filters it to one group (click a group, or All). Groups start closed, showing only what's in use
+  (worn, wielded, readied); "▸ Tools (2 more)" says what's tucked away. Click a group name
+  to open or close it. When the game asks for an item, or `D` and `i` open their lists,
+  every group is open. The same list is where you answer the
   game: for a one-item question ("What do you want to drop?") the items that fit are
   marked, click one; for a menu of your items (`D` goes straight to the items, `i`, picking
   several) the list takes
