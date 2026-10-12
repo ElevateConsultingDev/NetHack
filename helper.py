@@ -838,15 +838,29 @@ class App:
             self.put(r, 0, label, curses.A_REVERSE if y == you.get("y") else curses.A_DIM)
         tens = "".join(str(x // 10) if x % 10 == 0 else " " for x in range(1, MAP_W))
         units = "".join(str(x % 10) for x in range(1, MAP_W))
-        self.put(self.gh, 0, "   ", 0)
-        self.put(self.gh + 1, 0, " x ", curses.A_DIM)
-        self.gput(self.gh, 0, tens, curses.A_DIM)
-        self.gput(self.gh + 1, 0, units, curses.A_DIM)
+        r = self.ruler_row()
+        if r != self.gh:  # right under the map: the bottom rows are free
+            self.put(self.gh, 0, " " * (GX + MAP_W + 25))
+            self.put(self.gh + 1, 0, " " * (GX + MAP_W + 25))
+        self.put(r, 0, "   ", 0)
+        self.put(r + 1, 0, " x ", curses.A_DIM)
+        self.gput(r, 0, tens, curses.A_DIM)
+        self.gput(r + 1, 0, units, curses.A_DIM)
         if you.get("x"):
             col = you["x"] - 1
-            self.gput(self.gh, col, tens[col], curses.A_REVERSE)
-            self.gput(self.gh + 1, col, units[col], curses.A_REVERSE)
-            self.gput(self.gh + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(24), curses.A_BOLD)
+            self.gput(r, col, tens[col], curses.A_REVERSE)
+            self.gput(r + 1, col, units[col], curses.A_REVERSE)
+            if r == self.gh:  # beside it, unless the panel is there
+                self.gput(r + 1, MAP_W + 1, f"you: x={you['x']} y={you.get('y')}".ljust(24), curses.A_BOLD)
+
+    def ruler_row(self):
+        """Screen row for the column numbers: right under the map when the game leaves
+        those two rows blank, else the bottom of the screen."""
+        r, buf = self.map_top + MAP_H, self.screen.buffer
+        if r + 1 < self.gh and r + 1 not in self.status_rows() and not any(
+                buf[y][c].data not in (" ", "") for y in (r, r + 1) for c in range(MAP_W)):
+            return r
+        return self.gh
 
     def inventory_menu(self):
         """When the game shows a menu of your own items beside the map (D, i, multi-pick):
@@ -949,7 +963,8 @@ class App:
             return []
         buf, skip = self.screen.buffer, self.status_rows()
         rows = []
-        for r in range(self.map_top + MAP_H, self.gh):
+        start = self.map_top + MAP_H + (2 if self.ruler_row() != self.gh else 0)  # below the ruler
+        for r in range(start, self.gh):
             if r in skip:
                 continue
             if any(buf[r][c].data not in (" ", "") for c in range(MAP_W)):
