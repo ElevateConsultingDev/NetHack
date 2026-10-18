@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12), held out `20261018-154726` (seed 5000, deepest 7.31, XL 5.45); over the 128 games 7.32
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 73 commit (vault guards)
-- TRY passes in a row with no new best: 3 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 4 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -158,6 +158,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: prayer gamble at 500 turns since the last prayer (88% odds, was 700 at 90%). Dropped (iteration 76): -0.03 / -0.02, 3 games changed per set; the critical window is skipped by fast hitters.
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  Add a fresh copy of this task each time it is used.
+  2026-10-18: Elbereth at half HP against a fast monster above the pilot's level (the one melee group lost one time in four). Dropped (iteration 77): -0.19 / +0.02. Fifth flat melee tactic; the Review should turn to readiness, not tactics.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
