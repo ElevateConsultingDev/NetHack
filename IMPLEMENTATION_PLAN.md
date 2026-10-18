@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-151649` (seed 1000, deepest 7.31, XL 5.09), held out `20261018-151738` (seed 5000, deepest 7.23, XL 5.38); over the 128 games 7.27
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-151649 20261018-151738`): died in melee/other 70, died in the Mines 33, starving 8, wand or bolt 6, stall: no way on 5, praying 4, invisible monster 1, brain loop 1
 - Current best: the engine at the iteration 70 commit (blocked squares forgotten, crossing with nothing adjacent)
-- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -131,12 +131,13 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   Drill two. If a zapper is seen (a gnome lord with a wand, a `@` that
   zapped), step out of its line rather than approaching head-on.
   Done 2026-10-18, kept (iteration 67) as a different fix: 2 of 7 were kicked shop doors (the engraving was read at a --More-- the explore routine never saw); guard moved to every snapshot. +0.05 / +0.03, wand deaths 7 -> 6. Line-of-sight against zappers (4 of 7) is still open: add it as a TRY if wands stay in the top buckets.
-- [ ] TRY **Molds holding the only exits.** B15173825: a yellow mold and a
+- [x] TRY **Molds holding the only exits.** B15173825: a yellow mold and a
   green mold in a room's two exits, a boulder in the corridor beyond, 2,538
   turns of searching. Yellow and red molds hurt only on contact (1d4 stun,
   0d4 fire): at full HP, melee one that stands in a doorway or a corridor
   on the only path to unexplored ground; green and brown (4d6 acid, 6d4
   cold) stay on the throw-or-wait list. One game on the baselines.
+  Done 2026-10-18, dropped (iteration 71): the molds were not the blocker (a boulder sealing a dark corridor was); clearing molds measured flat, pushing boulders toward blank map as a pathing rule -0.83. A last-resort boulder push (searched-out level only, on the path to unexplored ground) is a possible TRY.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
