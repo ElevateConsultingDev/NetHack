@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261008-131911` (seed 1000, deepest 7.02, XL 5.12), held out `20261008-132002` (seed 5000, deepest 6.81, XL 5.30); over the 128 games 6.91
 - Buckets on the baselines (`python3 -m pilot.buckets 20261008-131911 20261008-132002`): died in melee/other 65 (50%), died in the Mines 26 (20%), stall: no way on 16 (12%), starving 8, wand or bolt 7, praying 4, invisible monster 2
 - Current best: the engine at commit `8903dae18` (iteration 59, tinning)
-- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 2 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -48,13 +48,14 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   smudged Elbereth died where fighting won; keep the yield to pilots that
   can take one more hit.
   Done 2026-10-18, dropped (iteration 60): cause found, the fight order outranks the ordered Elbereth so it never runs; yielding lost depth on both sets (-0.47 real, -0.30), under a quarter HP too (-0.16, -0.11), XL down. Needs a losing-fight signal, not an HP line. Reverted.
-- [ ] TRY **Ants and bees: fight in a corridor or on the stairs, not in the
+- [x] TRY **Ants and bees: fight in a corridor or on the stairs, not in the
   open.** Soldier ants, fire ants, giant ants and killer bees are 25 of 65
   melee deaths. Drill two. Likely cause: fighting a fast swarm in a room
   where several reach the pilot at once. Candidate: when a fast hostile
   (speed above the pilot's) is first seen at range and the pilot is in a
   room, step to a doorway or corridor square first, if one is within three
   steps, so one attacker at a time can reach it.
+  Done 2026-10-18, dropped (iteration 61): the drill disproved the premise (25 of 31 ant and bee fights were one-on-one at near full HP; the pilot is 2+ levels behind). Tried the cause instead: wait on a cleared level while dlvl is K above XL; K=3 flat (-0.08, 0.00), K=2 worse (-0.30, -0.20) and XL did not rise. Reverted.
 - [ ] TRY **Pack under 600 in the Mines.** 18 games still hit "carrying too
   much to get through" after iteration 57. Drill one. Candidate: on
   entering the Mines, or on the message, drop the heaviest loot that is
