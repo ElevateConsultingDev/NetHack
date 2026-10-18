@@ -141,6 +141,7 @@ class Memory:
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
+    vault_until: int = 0                          # turn until which a vault guard is being followed out
     cross_level: int = -1                         # a searched-out level: survivable traps count as walkable from now on
     unblocked: dict = field(default_factory=dict) # dlvl -> turn its blocked squares were last forgotten
     undiggable: set = field(default_factory=set)  # levels whose floor was too hard to dig in
@@ -482,6 +483,8 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
             return "-", "write with a fingertip"
         if v.kind == "yn" and "add to the current engraving" in prompt:
             return "n", "write fresh"
+        if v.kind == "getlin" and "who are you" in prompt:
+            return "pilot\r", "answer the vault guard"  # Any name but Croesus: he then leads us out.
         if v.kind == "getlin" and "write" in prompt:
             memory.engraving = False
             return "Elbereth\r", "write Elbereth"
@@ -1385,6 +1388,8 @@ class Engine:
         (--More-- ones too: that's where a prayer's result shows)."""
         m, turn = self.memory, v.status.get("turn", 0)
         for msg in v.s.get("messages", []):
+            if "follow me" in msg:  # A vault guard: drop the gold and walk out behind him (4 of 128 games died fighting him).
+                m.vault_until = turn + 150
             if closed_for_inventory(msg) and v.pos:
                 # Read on stepping up to a shut shop's door, usually at a --More--
                 # that the explore routine never sees: two pilots then kicked the
@@ -1597,6 +1602,19 @@ class Engine:
             # Inside a fog cloud, dust vortex, lurker...: any direction hits
             # it. Read as a 1x1 room it was 'no way on' (43 of 245 stalls).
             return "Fk", "standing order: fight out of whatever swallowed us"
+        if m.vault_until > c["turn"]:
+            if v.status.get("gold", 0) > 0:
+                m.pending_item = "$"
+                return "d", "standing order: drop the gold for the vault guard"
+            guard = next(((x, y) for (x, y), cell in v.cells.items() if cell["kind"] == "monster" and cell["name"] == "guard"), None)
+            if guard and max(abs(guard[0] - v.pos[0]), abs(guard[1] - v.pos[1])) > 1:
+                path = bfs(v, lambda x, y: max(abs(x - guard[0]), abs(y - guard[1])) == 1)
+                if path:
+                    keys, note = _step(v, m, path, "standing order: follow the vault guard")
+                    if keys:
+                        return keys, note
+            if guard:
+                return "s", "standing order: wait for the vault guard to lead on"
         mines = self._leave_mines(v, c)
         if mines:
             return mines
@@ -1723,7 +1741,7 @@ class Engine:
         if c["hp"] < c["hpmax"] * float(o["rest_below"]) and not c["mobile_hostiles"] and not c["under_attack"]:
             return "20s", f"standing order: rest (HP {c['hp']}/{c['hpmax']})"
         if o["pickup_gold"] and "$" not in str(o["loot"]) and c["gold_visible"] \
-                and not c["visible_hostiles"] and not self.routine:
+                and not c["visible_hostiles"] and not self.routine and m.vault_until <= c["turn"]:
             keys, note = r_pickup_gold(v, m, {})
             if keys:
                 return keys, "standing order: " + note
@@ -1754,7 +1772,8 @@ class Engine:
         # Loot waits a few turns after the last sighting: a room seen from one corridor square
         # and not the next flipped loot on and off and bounced the pilot for 3,000 turns (dungeon 7001).
         # Five turns: 25 cost 0.4 levels on the held-out set (iteration 46a).
-        if self.orders["loot"] and not burdened and not threats and v.status.get("turn", 0) - m.last_threat_turn >= 5:
+        if self.orders["loot"] and not burdened and not threats and v.status.get("turn", 0) - m.last_threat_turn >= 5 \
+                and m.vault_until <= v.status.get("turn", 0):  # Not the gold just dropped for the vault guard ("So be it, rogue!").
             keys, note = r_loot(v, m, self._loot_args)
             if keys:
                 self.note = "loot: " + note

@@ -7,10 +7,10 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 1 of 3; held-out seed this round 5000
-- Baselines (the only "before"): tuning `20261018-151649` (seed 1000, deepest 7.31, XL 5.09), held out `20261018-151738` (seed 5000, deepest 7.23, XL 5.38); over the 128 games 7.27
-- Buckets on the baselines (`python3 -m pilot.buckets 20261018-151649 20261018-151738`): died in melee/other 70, died in the Mines 33, starving 8, wand or bolt 6, stall: no way on 5, praying 4, invisible monster 1, brain loop 1
-- Current best: the engine at the iteration 70 commit (blocked squares forgotten, crossing with nothing adjacent)
-- TRY passes in a row with no new best: 2 (the stop is 8, or no TRY left)
+- Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12), held out `20261018-154726` (seed 5000, deepest 7.31, XL 5.45); over the 128 games 7.32
+- Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
+- Current best: the engine at the iteration 73 commit (vault guards)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -142,6 +142,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: rest to 80% HP before the stairs down (arrivals under 80% died within 150 turns at 2 to 4 times the rate). Dropped (iteration 72): -0.33 / -0.14, the resting turns cost more than the healthier arrivals save.
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  Add a fresh copy of this task each time it is used.
+  2026-10-18: vault guards killed 4 of 128 pilots that neither answered, dropped the gold nor followed. Kept (iteration 73): guard deaths 4 -> 0, +0.02 / +0.08, none worse.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
