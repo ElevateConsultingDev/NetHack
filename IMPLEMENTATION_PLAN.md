@@ -74,8 +74,9 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   a boulder on the path to unexplored ground may be pushed toward blank map
   (iteration 71's pathing rule cost 0.83; this is the trap-reopen shape).
   Done 2026-10-18, dropped (iteration 85): -0.08 / +0.02, 11 levels reopened, no stall freed.
-- [ ] TRY **Mines' End: go back up.** Requeued from round 1 when the buckets
+- [x] TRY **Mines' End: go back up.** Requeued from round 1 when the buckets
   show it; design is under the ticked task below.
+  Done 2026-10-18 without a candidate (not counted): no stall on either baseline is at Mines' End (deepest stall dlvl 7, no undiggable floor). Seen instead: on seed 6000, five of 64 games stall on dlvl 1 or 2 (B17033502, 520, 528, 540, 542), two after 9,000+ turns; the shallow-stall drill is the next idea.
 - [ ] TRY **Excalibur, carefully.** One fountain per game, at most five dips,
   only at HP full and XL 5 or more, and flee a water nymph on sight.
   Iteration 81's version dipped 479 times and lost 0.45.
