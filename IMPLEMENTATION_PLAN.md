@@ -7,10 +7,10 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 2 of 3; held-out seed this round 6000
-- Baselines (the only "before"): tuning `20261018-173214` (seed 1000, deepest 7.33, XL 5.12); held out `20261018-173311` (seed 6000, deepest 6.17, XL 4.94; a harder set of dungeons than seed 5000)
+- Baselines (the only "before"): tuning `20261018-174756` (seed 1000, deepest 7.25, XL 5.09); held out `20261018-174849` (seed 6000, deepest 6.09, XL 4.81; a harder set of dungeons than seed 5000)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
-- Current best: the engine at the iteration 87 commit (stairs hidden under objects)
-- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
+- Current best: the engine at the iteration 89 commit (eat kills further away)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -233,6 +233,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: two stall mechanisms (a mold killed from a distance keeps its square barred; a floating eye 3 squares down the only corridor). Dropped (iteration 88): both replays unstuck, stalls 7 -> 5, but held out -0.16 past its margin. The kill-after-throw memory fix is sound and small; carry it with a later candidate.
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  Add a fresh copy of this task each time it is used.
+  2026-10-18: starving pilots ate 8 to 25 of 29 to 86 safe kills; eat corpses up to 20 steps away unless a hostile is within 8. Kept marginally (iteration 89): starvation 11 -> 9, depth -0.08 / -0.08 within noise.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.

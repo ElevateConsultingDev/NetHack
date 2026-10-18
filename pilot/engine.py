@@ -1477,7 +1477,9 @@ class Engine:
         """A fresh safe kill with a corpse still on it, within a short walk."""
         o, m = self.orders, self.memory
         policy = o["eat_corpses"]
-        if policy == "never" or c["hunger"] == "Satiated" or c["mobile_hostiles"]:
+        # Starving pilots had made 29 to 86 safe kills and eaten 8 to 25 of them (11 of 128 games
+        # starved): a corpse more than 8 steps away, or any monster anywhere in view, cost the meal.
+        if policy == "never" or c["hunger"] == "Satiated" or any(h["distance"] <= 8 for h in c["mobile_hostiles"]):
             return None
         if policy == "hungry" and c["hunger"] not in HUNGRY:
             return None
@@ -1500,7 +1502,7 @@ class Engine:
             cell = v.cells.get((x, y))
             return (x, y) in spots and cell is not None and cell["name"] == "corpse"
         path = bfs(v, has_corpse)
-        if path and len(path) <= 8:
+        if path and len(path) <= 20:
             return _step(v, m, path, f"walk to the fresh kill at {path[-1]}")
         return None
 
