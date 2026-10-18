@@ -64,6 +64,11 @@ SESSILE = {"brown mold", "yellow mold", "green mold", "red mold", "shrieker", "v
            "blue jelly", "spotted jelly", "ochre jelly", "acid blob", "floating eye"}  # not lichens: they move, and melee is fine
 # Dangerous to stand next to, not just to hit: worth waking the brain for.
 DANGEROUS_NEAR = {"cockatrice", "chickatrice"}
+# Traps the pilot may cross when a known one is the only way to the stairs down
+# (B13200240: an arrow trap in a one-wide passage cut it off from a '>' in
+# view, 2,700 turns of wall searching). These are a fall, a few HP or a
+# short nap; a hole or trap door even goes the right way.
+TRAPS_NEVER = {"land mine", "level teleporter", "polymorph trap", "magic portal", "statue trap", "vibrating square"}
 # No eggs: an unknown egg can be a cockatrice egg. Tins are checked by
 # what they smell like when opened (tin_ok).
 SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "fortune cookie", "apple", "orange",
@@ -135,6 +140,7 @@ class Memory:
     locked: set = field(default_factory=set)      # (dlvl, x, y) doors the game told us are locked
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
+    cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
     unlocking: bool = False                       # we applied a key or pick to a door: answer "Unlock it?"
     features: dict = field(default_factory=dict)  # (dlvl, x, y) -> feature name last seen there
     blocked: set = field(default_factory=set)     # (dlvl, x, y) targets that didn't work out
@@ -232,7 +238,9 @@ class View:
                 # They move, so plan through them; the routine deals with one
                 # in the way. Except ones we must never bump into.
                 return not (self.memory and c["name"] in self.memory.avoid)
-            return False  # traps
+            if c["kind"] == "trap":
+                return bool(self.memory and self.memory.cross_traps and c["name"] not in TRAPS_NEVER)
+            return False
         if self.ch(x, y) in FLOOR_CHARS:
             return True
         # Dark floor we've stood on is drawn blank once we walk away (the
@@ -763,6 +771,13 @@ def r_go_down(v: View, memory: Memory, args: dict):
     path = bfs(v, ok)
     if path:
         return _step(v, memory, path, "head for the stairs down")
+    if args.get("may_cross"):
+        memory.cross_traps = True  # cleared at the next command prompt
+        path = bfs(v, ok)
+        if path:
+            _count(memory, "crossed a trap to the stairs")
+            return _step(v, memory, path, "head for the stairs down, over a known trap")
+        memory.cross_traps = False
     return None, "failed: no known way down"
 
 
@@ -1300,6 +1315,7 @@ class Engine:
             return None, [f"prompt: {v.kind} {v.ctx.get('prompt') or ''!r} choices {v.ctx.get('choices') or ''!r}"]
 
         self.memory.tinning = False  # The kit's prompts, if any, came before this command prompt.
+        self.memory.cross_traps = False
         c = checks(v, self.memory)
         self.last_checks = c
         if any(h["name"] not in self.orders["avoid"] or h["name"] in DANGEROUS_NEAR for h in c["mobile_hostiles"]):
@@ -1721,7 +1737,8 @@ class Engine:
                 self.note = "search dead ends: " + note
                 return self._stuck_guard(v, keys, note)
         if self.orders["descend"]:
-            keys, note = r_go_down(v, m, {"start_dlvl": v.dlvl})
+            safe = c.get("hp", 0) * 5 >= c.get("hpmax", 1) * 3 and not c.get("mobile_hostiles")
+            keys, note = r_go_down(v, m, {"start_dlvl": v.dlvl, "may_cross": safe})
             if keys:
                 self.note = "go down: " + note
                 return self._stuck_guard(v, keys, note)

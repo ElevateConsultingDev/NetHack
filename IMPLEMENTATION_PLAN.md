@@ -7,10 +7,10 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 1 of 3; held-out seed this round 5000
-- Baselines (the only "before"): tuning `20261008-131911` (seed 1000, deepest 7.02, XL 5.12), held out `20261008-132002` (seed 5000, deepest 6.81, XL 5.30); over the 128 games 6.91
-- Buckets on the baselines (`python3 -m pilot.buckets 20261008-131911 20261008-132002`): died in melee/other 65 (50%), died in the Mines 26 (20%), stall: no way on 16 (12%), starving 8, wand or bolt 7, praying 4, invisible monster 2
-- Current best: the engine at commit `8903dae18` (iteration 59, tinning)
-- TRY passes in a row with no new best: 2 (the stop is 8, or no TRY left)
+- Baselines (the only "before"): tuning `20261018-141157` (seed 1000, deepest 7.00, XL 5.11), held out `20261018-141311` (seed 5000, deepest 6.77, XL 5.28); over the 128 games 6.89
+- Buckets on the baselines (`python3 -m pilot.buckets 20261018-141157 20261018-141311`): died in melee/other 65, died in the Mines 27, stall: no way on 14, starving 9, wand or bolt 7, praying 4, invisible monster 2
+- Current best: the engine at the iteration 62 commit (trap crossing to known stairs)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -56,20 +56,22 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   room, step to a doorway or corridor square first, if one is within three
   steps, so one attacker at a time can reach it.
   Done 2026-10-18, dropped (iteration 61): the drill disproved the premise (25 of 31 ant and bee fights were one-on-one at near full HP; the pilot is 2+ levels behind). Tried the cause instead: wait on a cleared level while dlvl is K above XL; K=3 flat (-0.08, 0.00), K=2 worse (-0.30, -0.20) and XL did not rise. Reverted.
-- [ ] TRY **Pack under 600 in the Mines.** 18 games still hit "carrying too
+- [x] TRY **Pack under 600 in the Mines.** 18 games still hit "carrying too
   much to get through" after iteration 57. Drill one. Candidate: on
   entering the Mines, or on the message, drop the heaviest loot that is
   not worn, wielded, food or a known-useful tool until under 600 (weights
   from `objects.c`: iron ball, boulders, armor not worn, extra weapons).
+  Done 2026-10-18 without a candidate (not counted): the squeeze now costs 11 turns in 128 games and the one stall that hit it was a trap cutting off the stairs (iteration 62 below). 24 of 128 packs end over 600 (median 421): worn body armor and 15 pick-axes.
 - [ ] TRY **Keep the tinning kit through the Mines.** Iteration 59's tinning
   fired in only 4 of 128 games because the kit is dropped on entering the
   Mines (57b). Once the pack rule above holds, keep the kit (100) when the
   pack stays under 600 with it. Target: starvation deaths (8).
-- [ ] TRY **Trap crossing only to reach stairs in view.** Iteration 58 crossed
+- [x] TRY **Trap crossing only to reach stairs in view.** Iteration 58 crossed
   traps to explore and lost depth (stalls became Mines deaths). The trace
   (B22492805) stands: a sleeping gas trap split a one-wide passage with the
   stairs known. Cross a known survivable trap only when the stairs down
   are in view and no other path exists, HP 60%+, nothing hostile in view.
+  Done 2026-10-18, kept (iteration 62): traced from B13200240 (arrow trap in a one-wide passage, stairs drawn on its own map); stalls 16 -> 14, depth flat (-0.02, -0.05). Replay 20261008-132002/B13200240.
 - [ ] TRY **Remaining "stairs seen, no way on" stalls.** 16 stalls across the
   baselines, all "explored, searched the walls". Drill the three shallowest
   with the replay page's unseen overlay (it shows the hidden passage): sort
@@ -77,6 +79,12 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   and plain unexplored; fix the biggest group's cause. Hidden passages were
   9 of 15 last time: check whether the search spots cover the dead end
   nearest the unexplored side.
+- [ ] TRY **Dig down with a pick-axe.** 15 of 128 games end carrying a
+  pick-axe (dwarves drop them) and the pilot never applies it. `#apply`,
+  then `>` digs through the floor in a few turns: a way past every "no way
+  on" and a faster descent when the level is cleared. Mind shops (never
+  dig in one) and the Sokoban and Wizard's Tower floors (undiggable, the
+  game says so). Drill a game that carried one into a stall first.
 - [ ] TRY **Throw only at monsters no faster than the pilot.** Throws at
   faster monsters were 1% effective in the ledger; the turn is better spent
   closing or escaping. Drill one game where throws preceded a melee death.
