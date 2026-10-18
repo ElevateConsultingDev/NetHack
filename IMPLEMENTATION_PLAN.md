@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-141157` (seed 1000, deepest 7.00, XL 5.11), held out `20261018-141311` (seed 5000, deepest 6.77, XL 5.28); over the 128 games 6.89
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-141157 20261018-141311`): died in melee/other 65, died in the Mines 27, stall: no way on 14, starving 9, wand or bolt 7, praying 4, invisible monster 2
 - Current best: the engine at the iteration 62 commit (trap crossing to known stairs)
-- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 2 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -73,13 +73,32 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   stairs known. Cross a known survivable trap only when the stairs down
   are in view and no other path exists, HP 60%+, nothing hostile in view.
   Done 2026-10-18, kept (iteration 62): traced from B13200240 (arrow trap in a one-wide passage, stairs drawn on its own map); stalls 16 -> 14, depth flat (-0.02, -0.05). Replay 20261008-132002/B13200240.
-- [ ] TRY **Remaining "stairs seen, no way on" stalls.** 16 stalls across the
+- [x] TRY **Remaining "stairs seen, no way on" stalls.** 16 stalls across the
   baselines, all "explored, searched the walls". Drill the three shallowest
   with the replay page's unseen overlay (it shows the hidden passage): sort
   them into hidden passage never searched, stairs known but unreachable,
   and plain unexplored; fix the biggest group's cause. Hidden passages were
   9 of 15 last time: check whether the search spots cover the dead end
   nearest the unexplored side.
+  Done 2026-10-18, dropped (iteration 64): 8 hidden passages, 4 dark Mines levels declared explored, 2 Mines-exit cases. Fixed the exit (arrival stairs remembered): +0.02 / -0.23; with the exit rule off 0.00 / -0.12. Reverted; three TRY tasks below come from it.
+- [ ] TRY **Search the walls that face blank map.** B14131132 searched 13
+  spots on the far side of the level while the one secret door sat in the
+  west wall of the '<' room beside a wide blank. The spot score credits
+  dead ends (+250) and blank squares within 5; add a term for how much
+  blank lies beyond the wall in that direction (say, blank squares within
+  12 on the far side), so a room wall with an unexplored half of the map
+  behind it outranks a dead end facing a few blanks. 8 of 14 stalls.
+- [ ] TRY **Mines policy.** Non-dwarves leave the Mines by rule (XL < 8)
+  but stayed by a memory bug, and staying was no worse for depth
+  (iteration 64). Variants, each with the arrival stairs remembered:
+  leave only below XL 5; leave only after Minetown; never leave. Judge by
+  depth; Mines deaths will rise and that is allowed.
+- [ ] TRY **Dark caves declared explored.** B14131162 (Mines, dlvl 3): the
+  pilot searched walls with 472 passable squares never drawn and no
+  secrets on the level. Drill why explore and probe_dark gave up: the
+  frontier test needs a walkable square next to blank, and in a dark cave
+  the floor is blank until stood on, so a frontier square may itself be
+  undrawn. Fix the frontier for dark floor, then measure.
 - [ ] TRY **Dig down with a pick-axe.** 15 of 128 games end carrying a
   pick-axe (dwarves drop them) and the pilot never applies it. `#apply`,
   then `>` digs through the floor in a few turns: a way past every "no way
