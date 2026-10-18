@@ -142,6 +142,7 @@ class Memory:
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
     cross_level: int = -1                         # a searched-out level: survivable traps count as walkable from now on
+    unblocked: dict = field(default_factory=dict) # dlvl -> turn its blocked squares were last forgotten
     undiggable: set = field(default_factory=set)  # levels whose floor was too hard to dig in
     dig_level: int = -1                           # level we are digging through (no re-wield there)
     unlocking: bool = False                       # we applied a key or pick to a door: answer "Unlock it?"
@@ -1321,8 +1322,11 @@ class Engine:
         self.memory.tinning = False  # The kit's prompts, if any, came before this command prompt.
         c = checks(v, self.memory)
         self.last_checks = c
+        # Last resort on a level with no other way on (see _default_activity). Nothing adjacent, not
+        # nothing in view: B15052162 stalled with a jackal waiting on the far side of the one trap
+        # between it and the '>' (monsters avoid known traps too), the two of them watching each other.
         self.memory.cross_traps = v.dlvl == self.memory.cross_level and c["hp"] * 5 >= c["hpmax"] * 3 \
-            and not c["mobile_hostiles"]  # Last resort on a level with no other way on (see _default_activity).
+            and not c["adjacent_hostiles"]
         if any(h["name"] not in self.orders["avoid"] or h["name"] in DANGEROUS_NEAR for h in c["mobile_hostiles"]):
             self.memory.last_threat_turn = c["turn"]
         self._checkpoints(v, c)
@@ -1789,6 +1793,17 @@ class Engine:
                 return self._stuck_guard(v, keys, note)
             if note.startswith("failed: searched every spot"):
                 m.searched_out.add(v.dlvl)
+                # Squares given up on (a peaceful gnome in a one-wide cave passage, waited out and
+                # then marked blocked for good) shut a Mines pocket in B15052162: 49 squares
+                # reachable, "explored". The blocker has long moved: forget them and look again,
+                # at most once every 300 turns on a level.
+                stale = [k for k in m.blocked if k[0] == v.dlvl]
+                if stale and c.get("turn", 0) - m.unblocked.get(v.dlvl, -999) >= 300:
+                    m.blocked -= set(stale)
+                    m.unblocked[v.dlvl] = c.get("turn", 0)
+                    m.searched_out.discard(v.dlvl)
+                    _count(m, "blocked squares forgotten")
+                    return self._default_activity(v)
                 # Five of 13 stalls were the pilot cut off from most of its own map by a trap it
                 # had found (a sleeping gas trap in a doorway, B14554332: 14 squares reachable of
                 # 234 drawn). Before giving up, let survivable traps count as walkable on this
@@ -1796,7 +1811,7 @@ class Engine:
                 if m.cross_level != v.dlvl and any(c2["kind"] == "trap" and c2["name"] not in TRAPS_NEVER
                                                    for c2 in v.cells.values()):
                     m.cross_level = v.dlvl
-                    m.cross_traps = c.get("hp", 0) * 5 >= c.get("hpmax", 1) * 3 and not c.get("mobile_hostiles")
+                    m.cross_traps = c.get("hp", 0) * 5 >= c.get("hpmax", 1) * 3 and not c.get("adjacent_hostiles")
                     m.searched_out.discard(v.dlvl)
                     _count(m, "level reopened through its traps")
                     return self._default_activity(v)

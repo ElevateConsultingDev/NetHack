@@ -7,10 +7,10 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 1 of 3; held-out seed this round 5000
-- Baselines (the only "before"): tuning `20261018-150400` (seed 1000, deepest 7.30, XL 5.08), held out `20261018-150521` (seed 5000, deepest 7.16, XL 5.33); over the 128 games 7.23
-- Buckets on the baselines (`python3 -m pilot.buckets 20261018-150400 20261018-150521`): died in melee/other 70, died in the Mines 31, starving 8, stall: no way on 7, wand or bolt 6, praying 4, invisible monster 1, brain loop 1
-- Current best: the engine at the iteration 68 commit (searched-out levels reopen through their traps)
-- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
+- Baselines (the only "before"): tuning `20261018-151649` (seed 1000, deepest 7.31, XL 5.09), held out `20261018-151738` (seed 5000, deepest 7.23, XL 5.38); over the 128 games 7.27
+- Buckets on the baselines (`python3 -m pilot.buckets 20261018-151649 20261018-151738`): died in melee/other 70, died in the Mines 33, starving 8, wand or bolt 6, stall: no way on 5, praying 4, invisible monster 1, brain loop 1
+- Current best: the engine at the iteration 70 commit (blocked squares forgotten, crossing with nothing adjacent)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -95,12 +95,13 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   leave only below XL 5; leave only after Minetown; never leave. Judge by
   depth; Mines deaths will rise and that is allowed.
   Done 2026-10-18, dropped (iteration 69): leave below XL 5 is +0.03 / -0.08; with iteration 64's arms (below 8, never) three policies are flat. Closed.
-- [ ] TRY **Dark caves declared explored.** B14131162 (Mines, dlvl 3): the
+- [x] TRY **Dark caves declared explored.** B14131162 (Mines, dlvl 3): the
   pilot searched walls with 472 passable squares never drawn and no
   secrets on the level. Drill why explore and probe_dark gave up: the
   frontier test needs a walkable square next to blank, and in a dark cave
   the floor is blank until stood on, so a frontier square may itself be
   undrawn. Fix the frontier for dark floor, then measure.
+  Done 2026-10-18, kept (iteration 70): not the frontier; a trap with a coyote beyond it, then a square marked blocked by a peaceful gnome shut the pocket. Crossing now needs nothing adjacent; blocked squares are forgotten before a level is given up. +0.02 / +0.08, stalls 7 -> 5, none worse.
 - [x] TRY **Dig down with a pick-axe.** 15 of 128 games end carrying a
   pick-axe (dwarves drop them) and the pilot never applies it. `#apply`,
   then `>` digs through the floor in a few turns: a way past every "no way
