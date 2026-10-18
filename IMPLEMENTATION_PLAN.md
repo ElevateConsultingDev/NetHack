@@ -118,10 +118,11 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   (memory per level number is shared between branches: wipe as
   _leave_mines does). Drill B14131150's replay (R14131150) first.
   Done 2026-10-18 without a candidate (not counted): no stall on the baselines is at Mines' End; four of five are hidden-passage searches at dlvl 2 to 5. Requeue when the buckets show it.
-- [ ] TRY **Search the walls that face blank map (scoring).** Requeued: four of the
+- [x] TRY **Search the walls that face blank map (scoring).** Requeued: four of the
   five remaining stalls search for hidden passages for 348 to 4,709 turns on
   levels whose '>' exists. Drill B15173847 (4,709 turns): where were the
   secrets, where did it search. Then the scoring term from the earlier task.
+  Done 2026-10-18 without a candidate (not counted): three stalls, three different causes (Mines exit, molds in both exits, an unfindable secret under bad Luck); none is scoring. See the check log.
 - [x] TRY **Throw only at monsters no faster than the pilot.** Throws at
   faster monsters were 1% effective in the ledger; the turn is better spent
   closing or escaping. Drill one game where throws preceded a melee death.
@@ -130,6 +131,12 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   Drill two. If a zapper is seen (a gnome lord with a wand, a `@` that
   zapped), step out of its line rather than approaching head-on.
   Done 2026-10-18, kept (iteration 67) as a different fix: 2 of 7 were kicked shop doors (the engraving was read at a --More-- the explore routine never saw); guard moved to every snapshot. +0.05 / +0.03, wand deaths 7 -> 6. Line-of-sight against zappers (4 of 7) is still open: add it as a TRY if wands stay in the top buckets.
+- [ ] TRY **Molds holding the only exits.** B15173825: a yellow mold and a
+  green mold in a room's two exits, a boulder in the corridor beyond, 2,538
+  turns of searching. Yellow and red molds hurt only on contact (1d4 stun,
+  0d4 fire): at full HP, melee one that stands in a doorway or a corridor
+  on the only path to unexplored ground; green and brown (4d6 acid, 6d4
+  cold) stay on the throw-or-wait list. One game on the baselines.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
