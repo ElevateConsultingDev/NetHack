@@ -109,7 +109,7 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   dig in one) and the Sokoban and Wizard's Tower floors (undiggable, the
   game says so). Drill a game that carried one into a stall first.
   Done 2026-10-18, kept (iteration 65): +0.23 / +0.08, no-way-on stalls 14 -> 13, 42 digs in 11 games. Replay 20261018-141311/B14131150.
-- [ ] TRY **Mines' End: go back up.** A pilot at the bottom of the Mines
+- [x] TRY **Mines' End: go back up.** A pilot at the bottom of the Mines
   (dlvl 10 to 13, no '>', floor too hard to dig) ends "no way on". The way
   on is up: climb to the Mines branch level and take the main dungeon's
   '>'. Needs: recognise the bottom (the undiggable floor message, or the
@@ -117,6 +117,11 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   that climbs '<' level by level until the dungeon is the Dungeons of Doom
   (memory per level number is shared between branches: wipe as
   _leave_mines does). Drill B14131150's replay (R14131150) first.
+  Done 2026-10-18 without a candidate (not counted): no stall on the baselines is at Mines' End; four of five are hidden-passage searches at dlvl 2 to 5. Requeue when the buckets show it.
+- [ ] TRY **Search the walls that face blank map (scoring).** Requeued: four of the
+  five remaining stalls search for hidden passages for 348 to 4,709 turns on
+  levels whose '>' exists. Drill B15173847 (4,709 turns): where were the
+  secrets, where did it search. Then the scoring term from the earlier task.
 - [x] TRY **Throw only at monsters no faster than the pilot.** Throws at
   faster monsters were 1% effective in the ledger; the turn is better spent
   closing or escaping. Drill one game where throws preceded a melee death.
