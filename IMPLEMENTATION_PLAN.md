@@ -7,10 +7,10 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 2 of 3; held-out seed this round 6000
-- Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12); held out `20261018-170335` (seed 6000, deepest 5.95, XL 4.91; a harder set of dungeons than seed 5000, which the best scored 7.31)
+- Baselines (the only "before"): tuning `20261018-173214` (seed 1000, deepest 7.33, XL 5.12); held out `20261018-173311` (seed 6000, deepest 6.17, XL 4.94; a harder set of dungeons than seed 5000)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
-- Current best: the engine at the iteration 73 commit (vault guards)
-- TRY passes in a row with no new best: 5 (the stop is 8, or no TRY left)
+- Current best: the engine at the iteration 87 commit (stairs hidden under objects)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -81,7 +81,7 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   only at HP full and XL 5 or more, and flee a water nymph on sight.
   Iteration 81's version dipped 479 times and lost 0.45.
   Done 2026-10-18, dropped (iteration 86): -0.17 / +0.16, a wash; 157 dips in 49 games. Closed.
-- [ ] TRY **#enhance** (if Dave answers yes; otherwise skip): iteration 80's
+- [!] blocked TRY **#enhance** (waiting on Dave's answer in Questions for Dave; iteration 80 measured it): iteration 80's
   code, kept as the base for the readiness package.
 
 ### Round 1 tasks (done)
@@ -225,6 +225,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: dip the long sword for Excalibur at XL 5+ (66 of 128 games had a fountain in reach). Dropped (iteration 81): -0.45 / -0.47 real; 27 Excaliburs against 151 curses, 100 water nymphs, 23 water demons.
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  Add a fresh copy of this task each time it is used.
+  2026-10-18: seed 6000's dlvl 1 and 2 stalls were stairs hidden under a statue and a box. Kept (iteration 87): read "There is a staircase here", stand on every object square before giving up; held out +0.22, stalls 10 -> 7, none worse.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.

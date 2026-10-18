@@ -1433,6 +1433,11 @@ class Engine:
                 m.tin_smell = "decaying substance"
             if "too hard to dig in" in msg:
                 m.undiggable.add(v.dlvl)
+            if v.pos and msg.startswith("There is a staircase down here"):
+                # Under a box or a statue the '>' is never drawn (B17033528 stood on it for 9,000 turns).
+                m.features[(v.dlvl, *v.pos)] = "staircase down"
+            elif v.pos and msg.startswith("There is a staircase up here"):
+                m.features[(v.dlvl, *v.pos)] = "staircase up"
             if msg.startswith("You can't go down here") and v.pos:
                 # The stairs we remembered here are gone (a mimic, or a
                 # level number shared with another branch): forget them,
@@ -1825,6 +1830,16 @@ class Engine:
                 self.note = "search walls: " + note
                 return self._stuck_guard(v, keys, note)
             if note.startswith("failed: searched every spot"):
+                # Objects hide the stairs under them (a statue on the '>' cost B17033520 9,934
+                # turns on dlvl 1): before giving up, stand on every object square never stood on.
+                path = bfs(v, lambda x, y: (x, y) != v.pos and (v.dlvl, x, y) not in m.visited
+                           and (c3 := v.cells.get((x, y))) is not None and c3["kind"] == "object" and c3["name"] != "boulder")
+                if path:
+                    keys, note2 = _step(v, m, path, f"stand on the {v.cells[path[-1]]['name']} at {path[-1]} (anything under it?)")
+                    if keys:
+                        _count(m, "object squares checked")
+                        self.note = note2
+                        return self._stuck_guard(v, keys, note2)
                 m.searched_out.add(v.dlvl)
                 # Squares given up on (a peaceful gnome in a one-wide cave passage, waited out and
                 # then marked blocked for good) shut a Mines pocket in B15052162: 49 squares
