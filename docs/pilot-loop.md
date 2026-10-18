@@ -29,6 +29,32 @@ Baselines 20261008-131911 (seed 1000, deepest 7.02) and 20261008-132002 (seed 50
 
 Forced replay (`python3 -m pilot.forced`, 2026-10-18): each of the 91 melee and Mines deaths replayed from the turn its last fight turned bad (first tactic under half HP within 60 turns of death), as recorded and with each alternative forced for one decision, then the normal engine for 80 turns. All 91 as-recorded replays died on the recorded turn (deterministic). 55 of 91 (60%) had a surviving forced move: Elbereth alive in 41 of 91, stairs up 25 of 77 feasible, corridor 23 of 85, prayer 15 of 37 (gate open). On the ten shallowest deaths 8 of 10 had one, Elbereth 8 of 10. Reading: most fights are lost by choice at the moment HP crosses a half, and Elbereth at that point is the single best move; the stairs and a corridor help less than half the time. "Alive 80 turns later" is not "won the game", so a TRY must still measure depth. Full table: `playground/batch/forced-round1.txt`.
 
+### Round 1 report (2026-10-18)
+
+**Stop:** no gains, eight TRY passes in a row with no new best (iterations 74 to 81). The target (average deepest 10 on both sets) was not reached.
+
+**Baselines against the best.** Round start 20261008-131911 / 132002 (iteration 59): tuning 7.02, held-out 6.81, 6.91 over the 128 games. Best 20261018-154632 / 154726 (iteration 73): tuning 7.33 (+0.31 +/- 0.28, 8 better, 4 worse), held-out 7.31 (+0.50 +/- 0.20, 12 better, 3 worse, real), 7.32 over the 128 games. XL 5.21 -> 5.29. No-way-on stalls 16 -> 6; vault guard deaths 4 -> 0; wand deaths 7 -> 7 after two shopkeepers were removed; melee and Mines deaths 91 -> 101 (the pilots that no longer stall die deeper).
+
+**Kept (six behaviour changes, four correctness fixes):**
+- 62: cross a known survivable trap when it is the only way to known stairs down.
+- 65: dig down with a pick-axe when no way down is known (one dlvl 3 stall became an 18-level game).
+- 67: the "Closed for inventory" engraving is read on every snapshot (two pilots had kicked a shut shop's door).
+- 68: a searched-out level reopens through its survivable traps; a known hole or trap door counts as a way down (5 of 13 stalls were trap-split levels).
+- 70: trap crossing needs nothing adjacent, not nothing in view; blocked squares are forgotten before a level is given up.
+- 73: vault guards: answer, drop the gold, follow him out, no looting meanwhile.
+- Correctness: text windows close with Escape (an enlightenment window spun 600 s); a stuck routine passes a turn; a handless (polymorphed) pilot opens no doors and engraves nothing.
+
+**Dropped, by what they taught:**
+- In-fight tactics never moved depth: fight yields to Elbereth (60, -0.47), Elbereth against fast tough monsters (77, -0.19), flee upstairs after an HP prayer (74, -0.22, the monster follows), emergency wand or potion (75, flat), prayer gamble at 500 turns (76, flat; the critical window is skipped by fast hitters), no dagger at faster monsters (66, -0.31: the hit lands before an unavoidable melee).
+- Waiting gains nothing: XL gate by waiting on a cleared level (61, -0.30), rest to 80% before the stairs (72, -0.33).
+- The Mines policy is a wash three ways (64, 69): the main dungeon and the Mines kill at the same depth.
+- Readiness attempts that cost more than they earned: read-testing scrolls (78, -0.67 / -0.84), body armor upgrades (79, -0.36), Excalibur dipping (81, -0.45 / -0.47: 27 swords against 151 curses, 100 nymphs, 23 demons). Keeping the tinning kit (63) and clearing molds (71) were flat; pushing boulders toward blank map as a pathing rule was -0.83.
+- #enhance weapon skills (80): depth flat, XL +0.19 / +0.23 real on both sets; dropped by the depth-only rule and raised with Dave.
+
+**Where the pilot stands.** 101 of 128 games end in melee (68 main dungeon, 33 Mines), fights that begin at full HP against a fast monster above the pilot's level (26.7% of such fights are lost within 20 turns); 67% of deaths are two or more levels deeper than the pilot's XL. Stalls are 6 and heterogeneous (Mines exit memory, a boulder in a dark corridor, bad Luck on a secret). Starvation 8. The pilots carry unknown potions and scrolls and never learn them; 62 end with no body armor; none ever advanced a weapon skill or fought with anything better than a +1 long sword.
+
+**Replays worth watching:** 20261018-141311/B14131150 (digging, then Mines' End), 20261018-145543/B14554332 (trap-split level reopened), 20261018-150521/B15052162 (coyote across the trap, then the blocked gnome), 20261018-151649/B15164952 (vault guard), 20261018-154726/B15472609 (wand of cold at the quasit, iteration 75), any game of 20261018-164912 (#enhance), 20261018-165450 (Excalibur dips).
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
