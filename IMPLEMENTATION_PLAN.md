@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12); held out `20261018-170335` (seed 6000, deepest 5.95, XL 4.91; a harder set of dungeons than seed 5000, which the best scored 7.31)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 73 commit (vault guards)
-- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 2 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -55,10 +55,11 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   go up now (only adjacent monsters follow; iteration 74 fled too late).
   Come back down after 50 turns or when HP is full.
   Done 2026-10-18, dropped (iteration 82): fired 3 times in 128 games, depth flat. The sighting with stairs at hand almost never happens.
-- [ ] TRY **Elbereth before contact.** The same sighting with no stairs near
+- [x] TRY **Elbereth before contact.** The same sighting with no stairs near
   and the pilot standing on floor it can engrave: write Elbereth at full HP
   and hold it while the monster respects it (not the half-HP yield of 60 and
   77). Measure the two sighting tactics separately.
+  Done 2026-10-18, dropped (iteration 83): -0.23 +/- 0.14 tuning, -0.14 held out; 80 engravings, XL down on both. Pre-contact tactics closed.
 - [ ] TRY **Keep the kitten.** Do not take the stairs down while the pet is
   within 6 squares and not adjacent (wait up to 10 turns); the pilot dies
   young on levels where a kitten still wins fights. Count pets kept past
