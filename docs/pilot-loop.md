@@ -23,6 +23,10 @@ Guardrails: work on the `ai-player` branch only; after each kept fix, push `ai-p
 
 The outer loop now runs without Dave as a ralph loop: `PROMPT.md` (one pass, one task), `specs/PILOT-SPEC.md` (score, seed sets, keep rule, locked list, stop rules, rounds), `IMPLEMENTATION_PLAN.md` (loop state, tasks, questions for Dave). Start it from the repo root with `/ralph-loop "Read PROMPT.md and follow it exactly" --completion-promise "PILOT DONE"`. Every pass adds a row below and ticks its task; round summaries and reviews go under "Round N" headings here.
 
+## Round 1 (unattended loop, from 2026-10-18)
+
+Baselines 20261008-131911 (seed 1000, deepest 7.02) and 20261008-132002 (seed 5000, 6.81). Melee death table (`python3 -m pilot.buckets --deaths` on both): 91 deaths in melee or the Mines. Last recorded tactic before death: melee 82, stairs 6, Elbereth 1, corridor 1, pray 1. Of the 82 melee deaths, 71 (78%) had Elbereth, the stairs or prayer on the menu when that last melee decision was made, and 49 were made under a third HP; 10 had nothing else feasible. XL two or more behind the level in 61 of 91 (67%): most pilots die on levels they are not ready for, and most of them then fight on when an escape was there. Caveat: the last record is the final re-decision, usually at the death turn (0t before), so "under a third HP" describes the last choice, not how the fight started. Both TRY lines are live: yield to Elbereth low and slow (choice), and arriving unready (XL behind) is the larger share.
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)

@@ -19,13 +19,14 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
   across runs, killers in each, the shallowest games to drill with their
   replay command and page. Self-check `--check`.
   Done 2026-10-18: on the baselines, melee 50%, Mines 20%, no way on 12%; soldier ants, killer bees and fire ants lead the killers.
-- [ ] **Melee death drill table.** For each game that died in melee or in the
+- [x] **Melee death drill table.** For each game that died in melee or in the
   Mines, print from its recorded tactic outcomes (`outcomes` in the batch
   record, `pilot.ledger`) the last tactic before death, HP fraction at that
   moment, whether Elbereth and stairs were feasible, and the killer. One
   table for both baselines, in `docs/pilot-loop.md` under "Round 1". This
   tells the TRY tasks below which fights were lost by choice (an escape
   was feasible) and which by arriving unready (XL behind the level).
+  Done 2026-10-18: `python3 -m pilot.buckets --deaths`; 91 deaths, last tactic melee 82, 71 of them with an escape on the menu, 49 under a third HP; XL two or more behind in 61 (67%). Table in docs/pilot-loop.md "Round 1".
 - [ ] **Forced replay** (`docs/pilot-tactics-design.md`, phase 3): replay a
   melee death from a chosen turn with one tactic forced (Elbereth, stairs,
   corridor, pray), report whether the pilot survived 50 turns. Needs the

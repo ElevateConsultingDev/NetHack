@@ -1,6 +1,7 @@
 """Why the pilot fails: the failure split the loop's Review reads.
 
     python3 -m pilot.buckets <run> [<run> ...]          # buckets, killers, worst games to drill
+    python3 -m pilot.buckets --deaths <run> [<run> ...] # each melee or Mines death: the last tactic
     python3 -m pilot.buckets --check                    # self-check
 
 For each bucket (died in the Mines, stall: no way on, ...) it prints the
@@ -47,6 +48,42 @@ def report(runs: list[str]) -> str:
     return "\n".join(out)
 
 
+def deaths(games: list[tuple[str, dict]]) -> str:
+    """Each death in melee or the Mines with the last recorded tactic before
+    it: how long before death it started, the pilot's HP then, what else was
+    on the menu. Then the totals the TRY tasks lean on: lost by choice (an
+    escape was feasible) against lost unready (XL two or more behind the
+    level)."""
+    rows, by_tactic, escape, unready, low = [], collections.Counter(), 0, 0, 0
+    for run, g in games:
+        if not g["bucket"].startswith("died in melee") and g["bucket"] != "died in the Mines":
+            continue
+        end, outs = int(g.get("turn") or 0), g.get("outcomes") or []
+        o = outs[-1] if outs else None
+        xl, dlvl = int(g.get("xlvl") or 0), int(g.get("dlvl") or 0)
+        behind = dlvl - xl >= 2
+        unready += behind
+        if o is None:
+            rows.append(f"  {g['name']} dlvl {dlvl:>2} XL {xl:>2} {g.get('death', '')[:28]:28} no tactic recorded")
+            continue
+        frac = o["hp"] / max(o["hpmax"], 1)
+        others = [m for m in o["menu"] if m != o["tactic"]]
+        by_tactic[o["tactic"]] += 1
+        esc = any(m in others for m in ("elbereth", "stairs", "pray"))
+        escape += esc and o["tactic"] == "melee"
+        low += frac < 0.34 and o["tactic"] == "melee"
+        rows.append(f"  {g['name']} dlvl {dlvl:>2} XL {xl:>2} {g.get('death', '')[:28]:28} {o['tactic']:8} "
+                    f"{end - o['turn']:>4}t before, HP {int(100 * frac):>3}%, also: {', '.join(others) or 'nothing'}"
+                    + ("  XL behind" if behind else ""))
+    n = len(rows) or 1
+    head = [f"{len(rows)} deaths in melee or the Mines; last tactic: "
+            + ", ".join(f"{t} {c}" for t, c in by_tactic.most_common()),
+            f"  melee with an escape (Elbereth, stairs or prayer) on the menu: {escape} ({100 * escape // n}%)",
+            f"  melee started under a third HP: {low}",
+            f"  XL two or more behind the level: {unready} ({100 * unready // n}%)"]
+    return "\n".join(head + rows)
+
+
 def check() -> None:
     games = [("r", {"bucket": "a", "maxlvl": "3", "turn": "9"}),
              ("r", {"bucket": "b", "maxlvl": "1", "turn": "5"}),
@@ -54,12 +91,18 @@ def check() -> None:
     s = split(games)
     assert list(s) == ["a", "b"], s                   # biggest bucket first
     assert s["a"][0][1]["maxlvl"] == "1", s["a"]      # shallowest game first
+    g = {"name": "X", "bucket": "died in the Mines", "turn": "50", "xlvl": "2", "dlvl": "5", "death": "killed by an ant",
+         "outcomes": [{"tactic": "melee", "turn": 45, "hp": 5, "hpmax": 20, "menu": ["melee", "elbereth"]}]}
+    t = deaths([("r", g)])
+    assert "escape (Elbereth, stairs or prayer) on the menu: 1" in t and "XL behind" in t, t
     print("ok")
 
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--check"]:
         check()
+    elif sys.argv[1:2] == ["--deaths"]:
+        print(deaths([(r, g) for r in sys.argv[2:] for g in load(r)]))
     elif len(sys.argv) > 1:
         print(report(sys.argv[1:]))
     else:

@@ -63,3 +63,4 @@ playground/
 # Python
 __pycache__/
 .reflect.lock
+.claude/ralph-loop.local.md
