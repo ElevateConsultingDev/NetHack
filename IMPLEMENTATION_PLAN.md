@@ -65,10 +65,11 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   young on levels where a kitten still wins fights. Count pets kept past
   dlvl 3.
   Done 2026-10-18, dropped (iteration 84): -0.25 tuning, +0.25 held out, a wash; 307 waits.
-- [ ] TRY **Buy protection in Minetown.** A dwarf in the temple with gold of
+- [x] TRY **Buy protection in Minetown.** A dwarf in the temple with gold of
   at least 400 times (XL plus one): #chat with the aligned priest, pay. AC
   without weight. Needs the chat prompt flow; drill a dwarf game that
   reached Minetown with gold.
+  Done 2026-10-18 without a candidate (not counted): 13 of 128 games had a priest on a visited level and none held 400 times (XL plus one) gold at the time. Requeue if gold piles up (selling books would be the source).
 - [ ] TRY **Last-resort boulder push.** Only once a level is searched out:
   a boulder on the path to unexplored ground may be pushed toward blank map
   (iteration 71's pathing rule cost 0.83; this is the trap-reopen shape).
