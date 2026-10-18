@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12), held out `20261018-154726` (seed 5000, deepest 7.31, XL 5.45); over the 128 games 7.32
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 73 commit (vault guards)
-- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 2 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -150,6 +150,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: after an HP prayer with a foe adjacent, flee up known stairs (30 of 101 deaths refought the monster that forced the prayer). Dropped (iteration 74): -0.22 / -0.19, the adjacent monster follows up the stairs.
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  Add a fresh copy of this task each time it is used.
+  2026-10-18: emergency zap of a carried wand (27 of 47 dying pilots had one) or quaff of an unknown potion when losing with the prayer gate shut. Dropped (iteration 75): -0.03 / +0.02, deaths delayed a few turns. Kept from it: text windows are closed with Escape (two games spun 600 s on an enlightenment window).
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.

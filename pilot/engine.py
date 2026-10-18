@@ -470,8 +470,11 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
             return "y", "accept the character"
         if v.kind == "key":
             return "y", "let the game pick race and alignment"
-    if v.kind == "more" or (v.kind == "menu" and v.ctx.get("how") == "none") \
-            or (v.ctx.get("more") and v.kind not in ("menu",)):
+    if v.kind == "menu" and v.ctx.get("how") == "none":
+        # A text window (a potion of enlightenment's attributes list): Escape closes it whole,
+        # where Return only turned its pages while the harness spun for 600 s (B16075255).
+        return "\x1b", "close the text window"
+    if v.kind == "more" or (v.ctx.get("more") and v.kind not in ("menu",)):
         # A --More-- can be showing while a prompt (getlin, y/n) is already
         # pending behind it: dismiss it first, or typed answers are eaten.
         return "\r", "dismiss --More--"
