@@ -7,10 +7,10 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 1 of 3; held-out seed this round 5000
-- Baselines (the only "before"): tuning `20261018-141157` (seed 1000, deepest 7.00, XL 5.11), held out `20261018-141311` (seed 5000, deepest 6.77, XL 5.28); over the 128 games 6.89
-- Buckets on the baselines (`python3 -m pilot.buckets 20261018-141157 20261018-141311`): died in melee/other 65, died in the Mines 27, stall: no way on 14, starving 9, wand or bolt 7, praying 4, invisible monster 2
-- Current best: the engine at the iteration 62 commit (trap crossing to known stairs)
-- TRY passes in a row with no new best: 2 (the stop is 8, or no TRY left)
+- Baselines (the only "before"): tuning `20261018-144543` (seed 1000, deepest 7.23, XL 5.05), held out `20261018-144637` (seed 5000, deepest 6.84, XL 5.12); over the 128 games 7.03
+- Buckets on the baselines (`python3 -m pilot.buckets 20261018-144543 20261018-144637`): died in melee/other 68, died in the Mines 27, stall: no way on 13, starving 7, wand or bolt 7, praying 4, invisible monster 1, brain loop 1
+- Current best: the engine at the iteration 65 commit (dig down with a pick-axe)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -99,12 +99,21 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   frontier test needs a walkable square next to blank, and in a dark cave
   the floor is blank until stood on, so a frontier square may itself be
   undrawn. Fix the frontier for dark floor, then measure.
-- [ ] TRY **Dig down with a pick-axe.** 15 of 128 games end carrying a
+- [x] TRY **Dig down with a pick-axe.** 15 of 128 games end carrying a
   pick-axe (dwarves drop them) and the pilot never applies it. `#apply`,
   then `>` digs through the floor in a few turns: a way past every "no way
   on" and a faster descent when the level is cleared. Mind shops (never
   dig in one) and the Sokoban and Wizard's Tower floors (undiggable, the
   game says so). Drill a game that carried one into a stall first.
+  Done 2026-10-18, kept (iteration 65): +0.23 / +0.08, no-way-on stalls 14 -> 13, 42 digs in 11 games. Replay 20261018-141311/B14131150.
+- [ ] TRY **Mines' End: go back up.** A pilot at the bottom of the Mines
+  (dlvl 10 to 13, no '>', floor too hard to dig) ends "no way on". The way
+  on is up: climb to the Mines branch level and take the main dungeon's
+  '>'. Needs: recognise the bottom (the undiggable floor message, or the
+  level fully explored with no '>' in the Mines), then a standing order
+  that climbs '<' level by level until the dungeon is the Dungeons of Doom
+  (memory per level number is shared between branches: wipe as
+  _leave_mines does). Drill B14131150's replay (R14131150) first.
 - [ ] TRY **Throw only at monsters no faster than the pilot.** Throws at
   faster monsters were 1% effective in the ledger; the turn is better spent
   closing or escaping. Drill one game where throws preceded a melee death.

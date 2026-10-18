@@ -141,6 +141,8 @@ class Memory:
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
+    undiggable: set = field(default_factory=set)  # levels whose floor was too hard to dig in
+    dig_level: int = -1                           # level we are digging through (no re-wield there)
     unlocking: bool = False                       # we applied a key or pick to a door: answer "Unlock it?"
     features: dict = field(default_factory=dict)  # (dlvl, x, y) -> feature name last seen there
     blocked: set = field(default_factory=set)     # (dlvl, x, y) targets that didn't work out
@@ -1397,6 +1399,8 @@ class Engine:
                 m.tin_smell = "spinach"
             elif msg.startswith("It contains some decaying"):
                 m.tin_smell = "decaying substance"
+            if "too hard to dig in" in msg:
+                m.undiggable.add(v.dlvl)
             if msg.startswith("You can't go down here") and v.pos:
                 # The stairs we remembered here are gone (a mimic, or a
                 # level number shared with another branch): forget them,
@@ -1485,7 +1489,8 @@ class Engine:
         if c.get("visible_hostiles"):
             return None
         inv = v.s.get("inventory", [])
-        if unarmed(v) and c["turn"] - m.wield_tried >= 50:  # Not every turn: a were form can't wield.
+        tool_in_hand = v.dlvl != m.dig_level and any("(weapon in " in i["text"] and i["class"] == "(" for i in inv)  # a pick-axe after digging
+        if (unarmed(v) or tool_in_hand) and c["turn"] - m.wield_tried >= 50:  # Not every turn: a were form can't wield.
             blades = [i for i in inv if i["class"] == ")" and "cursed" not in i["text"].replace("uncursed", "")]
             if blades:
                 m.wield_tried = c["turn"]
@@ -1505,6 +1510,27 @@ class Engine:
             _count(m, f"wore {slot}")
             return "W", f"wear the {i['text']}"
         return None
+
+    def _dig_down(self, v: View, c: dict):
+        """No known way down and a pick-axe in the pack: dig through the floor
+        (13 of 128 games carried one; two of them searched walls for 2,500
+        and 4,100 turns with it). Never in a shop (the shopkeeper grabs the
+        pack as you fall), never from stairs or an altar, never with a foe
+        in view; applying the tool wields it, and _wear_armor takes the
+        sword back afterwards."""
+        m = self.memory
+        if v.dlvl in m.undiggable or c.get("visible_hostiles") or not v.pos:
+            return None
+        tool = next((i for i in v.s.get("inventory", []) if "pick-axe" in i["text"] or "mattock" in i["text"]), None)
+        if not tool:
+            return None
+        if v.feature(*v.pos) in ("staircase up", "staircase down", "altar", "fountain", "throne", "sink", "grave") \
+                or any(k[0] == v.dlvl and max(abs(k[1] - v.pos[0]), abs(k[2] - v.pos[1])) <= 8 for k in m.shop_items) \
+                or any(c2["kind"] == "monster" and c2["name"] == "shopkeeper" for c2 in v.cells.values()):
+            return None
+        m.pending_item, m.pending_dir, m.dig_level = tool["letter"], ">", v.dlvl
+        _count(m, "dug down")
+        return "a", f"dig down with the {tool['text']} (no known way down)"
 
     def _leave_mines(self, v: View, c: dict):
         """The Mines' gnomes and dwarves are peaceful only to dwarves and
@@ -1742,6 +1768,11 @@ class Engine:
             if keys:
                 self.note = "go down: " + note
                 return self._stuck_guard(v, keys, note)
+        if self.orders["descend"]:
+            dig = self._dig_down(v, c)
+            if dig:
+                self.note = dig[1]
+                return self._stuck_guard(v, dig[0], dig[1])
         if v.dlvl not in m.searched_out:
             keys, note = r_search_walls(v, m, {})
             if keys:
