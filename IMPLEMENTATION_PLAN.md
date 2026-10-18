@@ -27,12 +27,13 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
   tells the TRY tasks below which fights were lost by choice (an escape
   was feasible) and which by arriving unready (XL behind the level).
   Done 2026-10-18: `python3 -m pilot.buckets --deaths`; 91 deaths, last tactic melee 82, 71 of them with an escape on the menu, 49 under a third HP; XL two or more behind in 61 (67%). Table in docs/pilot-loop.md "Round 1".
-- [ ] **Forced replay** (`docs/pilot-tactics-design.md`, phase 3): replay a
+- [x] **Forced replay** (`docs/pilot-tactics-design.md`, phase 3): replay a
   melee death from a chosen turn with one tactic forced (Elbereth, stairs,
   corridor, pray), report whether the pilot survived 50 turns. Needs the
   seeded replay plus a forced first decision; no API calls. Run it on the
   ten shallowest melee deaths and record how many had a surviving move.
   A tool task, not a TRY.
+  Done 2026-10-18: `python3 -m pilot.forced <runs>`; all 91 deaths: 55 (60%) had a surviving move, Elbereth 41 of 91, stairs 25 of 77, corridor 23 of 85, prayer 15 of 37; ten shallowest 8 of 10. 455 replays in 6 min at parallel 12.
 
 ## 2. Tries (each is a TRY: drill first, one engine change, both seed sets)
 
