@@ -141,6 +141,7 @@ class Memory:
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
+    cross_level: int = -1                         # a searched-out level: survivable traps count as walkable from now on
     undiggable: set = field(default_factory=set)  # levels whose floor was too hard to dig in
     dig_level: int = -1                           # level we are digging through (no re-wield there)
     unlocking: bool = False                       # we applied a key or pick to a door: answer "Unlock it?"
@@ -763,6 +764,10 @@ def r_go_down(v: View, memory: Memory, args: dict):
     if args.setdefault("start_dlvl", v.dlvl) != v.dlvl:
         return None, "done: went down"
     def ok(x, y):
+        if memory.cross_traps:  # A known hole or trap door goes down too.
+            cell = v.cells.get((x, y))
+            if cell and cell["kind"] == "trap" and cell["name"] in ("hole", "trap door"):
+                return True
         return v.feature(x, y) == "staircase down" and (v.dlvl, x, y) not in memory.mines_stairs
     if ok(*v.pos):
         memory.last_down = (v.dlvl, *v.pos)
@@ -1314,9 +1319,10 @@ class Engine:
             return None, [f"prompt: {v.kind} {v.ctx.get('prompt') or ''!r} choices {v.ctx.get('choices') or ''!r}"]
 
         self.memory.tinning = False  # The kit's prompts, if any, came before this command prompt.
-        self.memory.cross_traps = False
         c = checks(v, self.memory)
         self.last_checks = c
+        self.memory.cross_traps = v.dlvl == self.memory.cross_level and c["hp"] * 5 >= c["hpmax"] * 3 \
+            and not c["mobile_hostiles"]  # Last resort on a level with no other way on (see _default_activity).
         if any(h["name"] not in self.orders["avoid"] or h["name"] in DANGEROUS_NEAR for h in c["mobile_hostiles"]):
             self.memory.last_threat_turn = c["turn"]
         self._checkpoints(v, c)
@@ -1783,6 +1789,17 @@ class Engine:
                 return self._stuck_guard(v, keys, note)
             if note.startswith("failed: searched every spot"):
                 m.searched_out.add(v.dlvl)
+                # Five of 13 stalls were the pilot cut off from most of its own map by a trap it
+                # had found (a sleeping gas trap in a doorway, B14554332: 14 squares reachable of
+                # 234 drawn). Before giving up, let survivable traps count as walkable on this
+                # level and look again; holes and trap doors are even a way down.
+                if m.cross_level != v.dlvl and any(c2["kind"] == "trap" and c2["name"] not in TRAPS_NEVER
+                                                   for c2 in v.cells.values()):
+                    m.cross_level = v.dlvl
+                    m.cross_traps = c.get("hp", 0) * 5 >= c.get("hpmax", 1) * 3 and not c.get("mobile_hostiles")
+                    m.searched_out.discard(v.dlvl)
+                    _count(m, "level reopened through its traps")
+                    return self._default_activity(v)
             else:  # A peaceful in the way (a shopkeeper on the shop door): route around it next turn.
                 self.note = "search walls: " + note
                 return "s", []

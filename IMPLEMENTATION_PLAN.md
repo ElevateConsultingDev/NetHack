@@ -7,9 +7,9 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 1 of 3; held-out seed this round 5000
-- Baselines (the only "before"): tuning `20261018-145442` (seed 1000, deepest 7.28, XL 5.11), held out `20261018-145543` (seed 5000, deepest 6.88, XL 5.16); over the 128 games 7.08
-- Buckets on the baselines (`python3 -m pilot.buckets 20261018-145442 20261018-145543`): died in melee/other 68, died in the Mines 28, stall: no way on 13, starving 7, wand or bolt 6, praying 4, invisible monster 1, brain loop 1
-- Current best: the engine at the iteration 67 commit (shop door guard on every snapshot)
+- Baselines (the only "before"): tuning `20261018-150400` (seed 1000, deepest 7.30, XL 5.08), held out `20261018-150521` (seed 5000, deepest 7.16, XL 5.33); over the 128 games 7.23
+- Buckets on the baselines (`python3 -m pilot.buckets 20261018-150400 20261018-150521`): died in melee/other 70, died in the Mines 31, starving 8, stall: no way on 7, wand or bolt 6, praying 4, invisible monster 1, brain loop 1
+- Current best: the engine at the iteration 68 commit (searched-out levels reopen through their traps)
 - TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
@@ -81,13 +81,14 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   9 of 15 last time: check whether the search spots cover the dead end
   nearest the unexplored side.
   Done 2026-10-18, dropped (iteration 64): 8 hidden passages, 4 dark Mines levels declared explored, 2 Mines-exit cases. Fixed the exit (arrival stairs remembered): +0.02 / -0.23; with the exit rule off 0.00 / -0.12. Reverted; three TRY tasks below come from it.
-- [ ] TRY **Search the walls that face blank map.** B14131132 searched 13
+- [x] TRY **Search the walls that face blank map.** B14131132 searched 13
   spots on the far side of the level while the one secret door sat in the
   west wall of the '<' room beside a wide blank. The spot score credits
   dead ends (+250) and blank squares within 5; add a term for how much
   blank lies beyond the wall in that direction (say, blank squares within
   12 on the far side), so a room wall with an unexplored half of the map
   behind it outranks a dead end facing a few blanks. 8 of 14 stalls.
+  Done 2026-10-18, kept as a different fix (iteration 68): the drill showed 5 of 13 stalls were trap-split levels, not scoring; a searched-out level now reopens through its survivable traps, holes count as a way down. +0.02 / +0.28, stalls 13 -> 7. The scoring idea itself is untested; the Review can requeue it if hidden passages still lead the stalls.
 - [ ] TRY **Mines policy.** Non-dwarves leave the Mines by rule (XL < 8)
   but stayed by a memory bug, and staying was no worse for depth
   (iteration 64). Variants, each with the arrival stairs remembered:
