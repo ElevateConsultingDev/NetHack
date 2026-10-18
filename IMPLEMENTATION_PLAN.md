@@ -6,11 +6,11 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 
 ## Loop state
 
-- Round: 1 of 3; held-out seed this round 5000
-- Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12), held out `20261018-154726` (seed 5000, deepest 7.31, XL 5.45); over the 128 games 7.32
+- Round: 2 of 3; held-out seed this round 6000
+- Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12); held out: TO BE SCORED on seed 6000 by the first task of round 2 (round 1's held-out best was `20261018-154726`, seed 5000, 7.31)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 73 commit (vault guards)
-- TRY passes in a row with no new best: 8 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -38,6 +38,44 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## 2. Tries (each is a TRY: drill first, one engine change, both seed sets)
 
 Order follows the buckets: melee first, Mines, then stalls, then hunger.
+
+### Round 2 (from 2026-10-18; held-out seed 6000)
+
+- [ ] **Held-out baseline for round 2.** Run the best engine on `--seed 6000
+  --games 64 --parallel 16` and write the run id and numbers into "Loop
+  state" as the held-out baseline. Not a TRY.
+- [ ] TRY **Keep every dagger and dart.** The loot classes omit weapons, so a
+  dagger lying alone is left (piles with a menu yield them). Add daggers,
+  darts, knives and shuriken to floor loot; the dagger thrown before
+  contact earned its turn (iteration 66). Cheap, no risk.
+- [ ] TRY **Retreat to the stairs before contact.** A fast monster above the
+  pilot's level seen at distance 3 or more, with stairs up within 4 steps:
+  go up now (only adjacent monsters follow; iteration 74 fled too late).
+  Come back down after 50 turns or when HP is full.
+- [ ] TRY **Elbereth before contact.** The same sighting with no stairs near
+  and the pilot standing on floor it can engrave: write Elbereth at full HP
+  and hold it while the monster respects it (not the half-HP yield of 60 and
+  77). Measure the two sighting tactics separately.
+- [ ] TRY **Keep the kitten.** Do not take the stairs down while the pet is
+  within 6 squares and not adjacent (wait up to 10 turns); the pilot dies
+  young on levels where a kitten still wins fights. Count pets kept past
+  dlvl 3.
+- [ ] TRY **Buy protection in Minetown.** A dwarf in the temple with gold of
+  at least 400 times (XL plus one): #chat with the aligned priest, pay. AC
+  without weight. Needs the chat prompt flow; drill a dwarf game that
+  reached Minetown with gold.
+- [ ] TRY **Last-resort boulder push.** Only once a level is searched out:
+  a boulder on the path to unexplored ground may be pushed toward blank map
+  (iteration 71's pathing rule cost 0.83; this is the trap-reopen shape).
+- [ ] TRY **Mines' End: go back up.** Requeued from round 1 when the buckets
+  show it; design is under the ticked task below.
+- [ ] TRY **Excalibur, carefully.** One fountain per game, at most five dips,
+  only at HP full and XL 5 or more, and flee a water nymph on sight.
+  Iteration 81's version dipped 479 times and lost 0.45.
+- [ ] TRY **#enhance** (if Dave answers yes; otherwise skip): iteration 80's
+  code, kept as the base for the readiness package.
+
+### Round 1 tasks (done)
 
 - [x] TRY **Elbereth under a third HP with a slow killer.** The ledger says
   melee under 1/3 HP ends in death within 20 turns 30% of the time and
@@ -188,18 +226,25 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
 
 ## 3. Finish
 
-- [x] **Report.** When a stop condition in the spec's "Done" is met: write
+- [ ] **Report.** When a stop condition in the spec's "Done" is met: write
   the end of the round in `docs/pilot-loop.md` under "Round 1" (which stop,
   baselines against best on both sets, what was kept and dropped, games to
   replay).
   Done 2026-10-18: round 1 stopped on no gains after eight TRYs; best 7.33 / 7.31 (7.32 over 128) from 7.02 / 6.81 (6.91); six behaviour changes and four correctness fixes kept, sixteen candidates dropped. See docs/pilot-loop.md "Round 1 report".
-- [ ] **Review.** When Report is ticked and another round is allowed: do the
+- [x] **Review.** When Report is ticked and another round is allowed: do the
   spec's "Rounds" steps 1 to 4. Then add the next round's tasks, set Round
   to the next one with its held-out seed (6000, then 7000), put a task
   first in section 2 to score the best on the new held-out seed (the new
   held-out baseline), set "TRY passes in a row with no new best" to 0,
   untick Report, and leave a fresh unticked copy of this Review task under
   it.
+  Done 2026-10-18: round 1 reviewed (docs/pilot-loop.md "Review, round 1"); round 2 planned on held-out seed 6000.
+- [ ] **Review.** When Report is ticked and another round is allowed: do the
+  spec's "Rounds" steps 1 to 4. Then add the next round's tasks, set Round
+  to the next one with its held-out seed (7000), put a task first in section
+  2 to score the best on the new held-out seed, set "TRY passes in a row
+  with no new best" to 0, untick Report, and leave a fresh unticked copy of
+  this Review task under it.
 
 ## Questions for Dave
 
