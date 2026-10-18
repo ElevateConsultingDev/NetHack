@@ -7,7 +7,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 2 of 3; held-out seed this round 6000
-- Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12); held out: TO BE SCORED on seed 6000 by the first task of round 2 (round 1's held-out best was `20261018-154726`, seed 5000, 7.31)
+- Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12); held out `20261018-170335` (seed 6000, deepest 5.95, XL 4.91; a harder set of dungeons than seed 5000, which the best scored 7.31)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 73 commit (vault guards)
 - TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
@@ -41,9 +41,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
 
 ### Round 2 (from 2026-10-18; held-out seed 6000)
 
-- [ ] **Held-out baseline for round 2.** Run the best engine on `--seed 6000
+- [x] **Held-out baseline for round 2.** Run the best engine on `--seed 6000
   --games 64 --parallel 16` and write the run id and numbers into "Loop
   state" as the held-out baseline. Not a TRY.
+  Done 2026-10-18: `20261018-170335`, deepest 5.95, XL 4.91; melee 37, no way on 9 (+1 blocker), Mines 8, starving 6, praying 1, wand 1, brain loop 1.
 - [ ] TRY **Keep every dagger and dart.** The loot classes omit weapons, so a
   dagger lying alone is left (piles with a menu yield them). Add daggers,
   darts, knives and shuriken to floor loot; the dagger thrown before
