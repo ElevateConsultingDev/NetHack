@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12), held out `20261018-154726` (seed 5000, deepest 7.31, XL 5.45); over the 128 games 7.32
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 73 commit (vault guards)
-- TRY passes in a row with no new best: 6 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 7 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -170,6 +170,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: body armor upgrades (chain mail lay on 47 level sets while 28 pilots fought in leather). Dropped (iteration 79): -0.36 real / -0.02; upgraded games lost 3 to 5 levels. Kept from it: a stuck routine passes a turn; the handless state (polymorph) stops doors and Elbereth.
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  Add a fresh copy of this task each time it is used.
+  2026-10-18: #enhance weapon skills when offered (75 of 128 games never claimed one). Dropped by the rule (iteration 80): depth 0.00 / -0.09, XL +0.19 / +0.23 real. Asked Dave.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
@@ -208,3 +212,9 @@ did meanwhile. Locked items wait for Dave.)
   The loop uses yours.
 - **Target depth.** The spec says average deepest 10 on both sets as the
   next waypoint. Your number if different.
+- **Keep a stronger pilot at the same depth?** Iteration 80 (#enhance when
+  offered) left depth flat (0.00 / -0.09) and raised XL by 0.19 and 0.23
+  (real) on both sets: more kills, no more levels. The keep rule scores
+  depth only, so it was reverted. Best guess: keep it, as a free permanent
+  combat gain that any later readiness work builds on; locked, so the loop
+  went on without it. Replay any game of 20261018-164912 to see it fire.
