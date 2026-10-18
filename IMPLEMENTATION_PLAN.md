@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12); held out `20261018-170335` (seed 6000, deepest 5.95, XL 4.91; a harder set of dungeons than seed 5000, which the best scored 7.31)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 73 commit (vault guards)
-- TRY passes in a row with no new best: 4 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 5 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -77,9 +77,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
 - [x] TRY **Mines' End: go back up.** Requeued from round 1 when the buckets
   show it; design is under the ticked task below.
   Done 2026-10-18 without a candidate (not counted): no stall on either baseline is at Mines' End (deepest stall dlvl 7, no undiggable floor). Seen instead: on seed 6000, five of 64 games stall on dlvl 1 or 2 (B17033502, 520, 528, 540, 542), two after 9,000+ turns; the shallow-stall drill is the next idea.
-- [ ] TRY **Excalibur, carefully.** One fountain per game, at most five dips,
+- [x] TRY **Excalibur, carefully.** One fountain per game, at most five dips,
   only at HP full and XL 5 or more, and flee a water nymph on sight.
   Iteration 81's version dipped 479 times and lost 0.45.
+  Done 2026-10-18, dropped (iteration 86): -0.17 / +0.16, a wash; 157 dips in 49 games. Closed.
 - [ ] TRY **#enhance** (if Dave answers yes; otherwise skip): iteration 80's
   code, kept as the base for the readiness package.
 
