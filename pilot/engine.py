@@ -655,9 +655,6 @@ def unlock_tool(v: View) -> dict | None:
 def r_explore(v: View, memory: Memory, args: dict):
     if any(m.startswith(DOOR_NOT_CLOSED) for m in v.s.get("messages", [])) and memory.last_door:
         memory.features[memory.last_door] = "broken door"  # Our picture was stale.
-    if any(closed_for_inventory(m) for m in v.s.get("messages", [])):
-        for dx, dy in DIRS.values():  # A shop door: kicking it angers the shopkeeper.
-            memory.dead_doors.add((v.dlvl, v.pos[0] + dx, v.pos[1] + dy))
     msgs = v.s.get("messages", [])
     warned = any("stop damaging that door" in m or "stop picking that lock" in m for m in msgs)
     in_town = v.dlvl in memory.watch or warned
@@ -1378,6 +1375,12 @@ class Engine:
         (--More-- ones too: that's where a prayer's result shows)."""
         m, turn = self.memory, v.status.get("turn", 0)
         for msg in v.s.get("messages", []):
+            if closed_for_inventory(msg) and v.pos:
+                # Read on stepping up to a shut shop's door, usually at a --More--
+                # that the explore routine never sees: two pilots then kicked the
+                # door open and died to the shopkeeper's wand (B14454323, B14463752).
+                for dx, dy in DIRS.values():
+                    m.dead_doors.add((v.dlvl, v.pos[0] + dx, v.pos[1] + dy))
             undecided = m.stats.get("prayers ok", 0) + m.stats.get("prayers failed", 0) < m.stats.get("prayers", 0)
             if undecided and m.last_pray_turn is not None and turn - m.last_pray_turn <= 10:
                 if PRAYER_OK.match(msg) or msg.startswith("You are surrounded by a shimmering light"):

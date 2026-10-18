@@ -7,10 +7,10 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 1 of 3; held-out seed this round 5000
-- Baselines (the only "before"): tuning `20261018-144543` (seed 1000, deepest 7.23, XL 5.05), held out `20261018-144637` (seed 5000, deepest 6.84, XL 5.12); over the 128 games 7.03
-- Buckets on the baselines (`python3 -m pilot.buckets 20261018-144543 20261018-144637`): died in melee/other 68, died in the Mines 27, stall: no way on 13, starving 7, wand or bolt 7, praying 4, invisible monster 1, brain loop 1
-- Current best: the engine at the iteration 65 commit (dig down with a pick-axe)
-- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
+- Baselines (the only "before"): tuning `20261018-145442` (seed 1000, deepest 7.28, XL 5.11), held out `20261018-145543` (seed 5000, deepest 6.88, XL 5.16); over the 128 games 7.08
+- Buckets on the baselines (`python3 -m pilot.buckets 20261018-145442 20261018-145543`): died in melee/other 68, died in the Mines 28, stall: no way on 13, starving 7, wand or bolt 6, praying 4, invisible monster 1, brain loop 1
+- Current best: the engine at the iteration 67 commit (shop door guard on every snapshot)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -118,9 +118,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   faster monsters were 1% effective in the ledger; the turn is better spent
   closing or escaping. Drill one game where throws preceded a melee death.
   Done 2026-10-18, dropped (iteration 66): -0.31 / +0.02; the thin premise (5 deaths within 20 turns of such a throw) did not hold, the damage lands before an unavoidable melee. Reverted.
-- [ ] TRY **Wand deaths: break line of sight.** 7 deaths to wands and bolts.
+- [x] TRY **Wand deaths: break line of sight.** 7 deaths to wands and bolts.
   Drill two. If a zapper is seen (a gnome lord with a wand, a `@` that
   zapped), step out of its line rather than approaching head-on.
+  Done 2026-10-18, kept (iteration 67) as a different fix: 2 of 7 were kicked shop doors (the engraving was read at a --More-- the explore routine never saw); guard moved to every snapshot. +0.05 / +0.03, wand deaths 7 -> 6. Line-of-sight against zappers (4 of 7) is still open: add it as a TRY if wands stay in the top buckets.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
