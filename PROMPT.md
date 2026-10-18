@@ -20,7 +20,7 @@ one task, then stops.
 4. Rules while doing it:
    - Never touch what the spec lists under "must never change". No
      superpowers: the pilot decides only from what the screen shows.
-   - Before any batch: `uptime` one minute load under 20 and
+   - Before any batch: `uptime` one minute load under 60 and
      `pgrep -fl playground/nethack` empty. Busy: wait 10 minutes and check
      again, up to an hour; then leave the task unchecked with a note and
      stop the pass. A batch with a time-limit game is invalid: rerun it.

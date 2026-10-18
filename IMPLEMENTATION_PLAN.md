@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261008-131911` (seed 1000, deepest 7.02, XL 5.12), held out `20261008-132002` (seed 5000, deepest 6.81, XL 5.30); over the 128 games 6.91
 - Buckets on the baselines (`python3 -m pilot.buckets 20261008-131911 20261008-132002`): died in melee/other 65 (50%), died in the Mines 26 (20%), stall: no way on 16 (12%), starving 8, wand or bolt 7, praying 4, invisible monster 2
 - Current best: the engine at commit `8903dae18` (iteration 59, tinning)
-- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -39,7 +39,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 
 Order follows the buckets: melee first, Mines, then stalls, then hunger.
 
-- [ ] TRY **Elbereth under a third HP with a slow killer.** The ledger says
+- [x] TRY **Elbereth under a third HP with a slow killer.** The ledger says
   melee under 1/3 HP ends in death within 20 turns 30% of the time and
   Elbereth 8.5%. Drill two melee deaths (buckets tool); if the pilot kept
   swinging below a third with Elbereth feasible and no ant or bee (they
@@ -47,6 +47,7 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   yield to Elbereth there. Mind iteration 36a: an XL 1 pilot resting on a
   smudged Elbereth died where fighting won; keep the yield to pilots that
   can take one more hit.
+  Done 2026-10-18, dropped (iteration 60): cause found, the fight order outranks the ordered Elbereth so it never runs; yielding lost depth on both sets (-0.47 real, -0.30), under a quarter HP too (-0.16, -0.11), XL down. Needs a losing-fight signal, not an HP line. Reverted.
 - [ ] TRY **Ants and bees: fight in a corridor or on the stairs, not in the
   open.** Soldier ants, fire ants, giant ants and killer bees are 25 of 65
   melee deaths. Drill two. Likely cause: fighting a fast swarm in a room

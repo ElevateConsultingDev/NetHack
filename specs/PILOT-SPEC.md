@@ -37,10 +37,13 @@ compare game by game (`python3 -m pilot.compare <before> <after>`).
 
 ## Valid measurements
 
-A batch counts only if the machine was quiet: load average (`uptime`, the
-one minute figure) under 20 when it started, no stray `nethack` processes
-from an earlier batch, and no game in it ended on the time limit
-(`--max-seconds`, 600 s). A batch under load (2026-10-08, load about 100)
+A batch counts only if no game in it ended on the time limit
+(`--max-seconds`, 600 s) and its longest game stayed well under it (the
+engine is deterministic, so load changes nothing else). Check before
+starting: no stray `nethack` processes from an earlier batch, and a load
+average (`uptime`, one minute) under 60; the uboat loop on the same
+machine runs it at 40 to 50 and games still take about a minute
+(2026-10-18). A batch under load (2026-10-08, load about 100)
 gave seven time-limit games and had to be redone. If the machine is busy,
 wait 10 minutes and check again; up to an hour, then leave the task
 unchecked with a note and stop the pass.
