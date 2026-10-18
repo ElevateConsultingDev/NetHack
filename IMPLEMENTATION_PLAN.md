@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-154632` (seed 1000, deepest 7.33, XL 5.12); held out `20261018-170335` (seed 6000, deepest 5.95, XL 4.91; a harder set of dungeons than seed 5000, which the best scored 7.31)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 73 commit (vault guards)
-- TRY passes in a row with no new best: 3 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 4 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -70,9 +70,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   without weight. Needs the chat prompt flow; drill a dwarf game that
   reached Minetown with gold.
   Done 2026-10-18 without a candidate (not counted): 13 of 128 games had a priest on a visited level and none held 400 times (XL plus one) gold at the time. Requeue if gold piles up (selling books would be the source).
-- [ ] TRY **Last-resort boulder push.** Only once a level is searched out:
+- [x] TRY **Last-resort boulder push.** Only once a level is searched out:
   a boulder on the path to unexplored ground may be pushed toward blank map
   (iteration 71's pathing rule cost 0.83; this is the trap-reopen shape).
+  Done 2026-10-18, dropped (iteration 85): -0.08 / +0.02, 11 levels reopened, no stall freed.
 - [ ] TRY **Mines' End: go back up.** Requeued from round 1 when the buckets
   show it; design is under the ticked task below.
 - [ ] TRY **Excalibur, carefully.** One fountain per game, at most five dips,
