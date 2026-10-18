@@ -19,6 +19,10 @@ Two loops improve the pilot. Both leave everything in git, so any step can be re
 
 Guardrails: work on the `ai-player` branch only; after each kept fix, push `ai-player` to the `elevate` remote (ElevateConsultingDev/NetHack; Dave, 2026-09-24), never anything else; never edit hooks or settings; hard safety rules stay in the engine, never in the journal alone. 16 games is noisy: a change that only moves one or two games is not evidence.
 
+## Unattended (from 2026-10-18)
+
+The outer loop now runs without Dave as a ralph loop: `PROMPT.md` (one pass, one task), `specs/PILOT-SPEC.md` (score, seed sets, keep rule, locked list, stop rules, rounds), `IMPLEMENTATION_PLAN.md` (loop state, tasks, questions for Dave). Start it from the repo root with `/ralph-loop "Read PROMPT.md and follow it exactly" --completion-promise "PILOT DONE"`. Every pass adds a row below and ticks its task; round summaries and reviews go under "Round N" headings here.
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)

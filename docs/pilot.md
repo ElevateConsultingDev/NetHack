@@ -4,6 +4,8 @@ Goal: play NetHack well enough to ascend. This fork (branch `ai-player`, based
 on `NetHack-3.6`) adds a structured control channel to the game and a Python
 pilot that plays through it.
 
+**Unattended loop:** `PROMPT.md`, `specs/PILOT-SPEC.md`, `IMPLEMENTATION_PLAN.md`; see `docs/pilot-loop.md` "Unattended".
+
 ## Pieces
 
 | Where | What |

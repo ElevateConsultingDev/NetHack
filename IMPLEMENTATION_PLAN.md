@@ -1,0 +1,119 @@
+# Pilot loop plan
+
+Read `specs/PILOT-SPEC.md` first. One task per pass, top unchecked first.
+Tick a task `[x]` when done and add one line under it saying what happened.
+Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
+
+## Loop state
+
+- Round: 1 of 3; held-out seed this round 5000
+- Baselines (the only "before"): tuning `20261008-131911` (seed 1000, deepest 7.02, XL 5.12), held out `20261008-132002` (seed 5000, deepest 6.81, XL 5.30); over the 128 games 6.91
+- Buckets on the baselines (`python3 -m pilot.buckets 20261008-131911 20261008-132002`): died in melee/other 65 (50%), died in the Mines 26 (20%), stall: no way on 16 (12%), starving 8, wand or bolt 7, praying 4, invisible monster 2
+- Current best: the engine at commit `8903dae18` (iteration 59, tinning)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
+  (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
+
+## 1. Tools (do these first: every later task leans on them)
+
+- [x] **Why the pilot fails.** `python3 -m pilot.buckets <run>...`: buckets
+  across runs, killers in each, the shallowest games to drill with their
+  replay command and page. Self-check `--check`.
+  Done 2026-10-18: on the baselines, melee 50%, Mines 20%, no way on 12%; soldier ants, killer bees and fire ants lead the killers.
+- [ ] **Melee death drill table.** For each game that died in melee or in the
+  Mines, print from its recorded tactic outcomes (`outcomes` in the batch
+  record, `pilot.ledger`) the last tactic before death, HP fraction at that
+  moment, whether Elbereth and stairs were feasible, and the killer. One
+  table for both baselines, in `docs/pilot-loop.md` under "Round 1". This
+  tells the TRY tasks below which fights were lost by choice (an escape
+  was feasible) and which by arriving unready (XL behind the level).
+- [ ] **Forced replay** (`docs/pilot-tactics-design.md`, phase 3): replay a
+  melee death from a chosen turn with one tactic forced (Elbereth, stairs,
+  corridor, pray), report whether the pilot survived 50 turns. Needs the
+  seeded replay plus a forced first decision; no API calls. Run it on the
+  ten shallowest melee deaths and record how many had a surviving move.
+  A tool task, not a TRY.
+
+## 2. Tries (each is a TRY: drill first, one engine change, both seed sets)
+
+Order follows the buckets: melee first, Mines, then stalls, then hunger.
+
+- [ ] TRY **Elbereth under a third HP with a slow killer.** The ledger says
+  melee under 1/3 HP ends in death within 20 turns 30% of the time and
+  Elbereth 8.5%. Drill two melee deaths (buckets tool); if the pilot kept
+  swinging below a third with Elbereth feasible and no ant or bee (they
+  respect it but the pilot's turn is spent), make the fight standing order
+  yield to Elbereth there. Mind iteration 36a: an XL 1 pilot resting on a
+  smudged Elbereth died where fighting won; keep the yield to pilots that
+  can take one more hit.
+- [ ] TRY **Ants and bees: fight in a corridor or on the stairs, not in the
+  open.** Soldier ants, fire ants, giant ants and killer bees are 25 of 65
+  melee deaths. Drill two. Likely cause: fighting a fast swarm in a room
+  where several reach the pilot at once. Candidate: when a fast hostile
+  (speed above the pilot's) is first seen at range and the pilot is in a
+  room, step to a doorway or corridor square first, if one is within three
+  steps, so one attacker at a time can reach it.
+- [ ] TRY **Pack under 600 in the Mines.** 18 games still hit "carrying too
+  much to get through" after iteration 57. Drill one. Candidate: on
+  entering the Mines, or on the message, drop the heaviest loot that is
+  not worn, wielded, food or a known-useful tool until under 600 (weights
+  from `objects.c`: iron ball, boulders, armor not worn, extra weapons).
+- [ ] TRY **Keep the tinning kit through the Mines.** Iteration 59's tinning
+  fired in only 4 of 128 games because the kit is dropped on entering the
+  Mines (57b). Once the pack rule above holds, keep the kit (100) when the
+  pack stays under 600 with it. Target: starvation deaths (8).
+- [ ] TRY **Trap crossing only to reach stairs in view.** Iteration 58 crossed
+  traps to explore and lost depth (stalls became Mines deaths). The trace
+  (B22492805) stands: a sleeping gas trap split a one-wide passage with the
+  stairs known. Cross a known survivable trap only when the stairs down
+  are in view and no other path exists, HP 60%+, nothing hostile in view.
+- [ ] TRY **Remaining "stairs seen, no way on" stalls.** 16 stalls across the
+  baselines, all "explored, searched the walls". Drill the three shallowest
+  with the replay page's unseen overlay (it shows the hidden passage): sort
+  them into hidden passage never searched, stairs known but unreachable,
+  and plain unexplored; fix the biggest group's cause. Hidden passages were
+  9 of 15 last time: check whether the search spots cover the dead end
+  nearest the unexplored side.
+- [ ] TRY **Throw only at monsters no faster than the pilot.** Throws at
+  faster monsters were 1% effective in the ledger; the turn is better spent
+  closing or escaping. Drill one game where throws preceded a melee death.
+- [ ] TRY **Wand deaths: break line of sight.** 7 deaths to wands and bolts.
+  Drill two. If a zapper is seen (a gnome lord with a wand, a `@` that
+  zapped), step out of its line rather than approaching head-on.
+- [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  Add a fresh copy of this task each time it is used.
+- [ ] TRY **Re-drill after a new best.** After every kept TRY, rerun the
+  buckets tool on the new baselines and, if the order of the buckets
+  changed, reorder the TRY list above and say so. Add a fresh unchecked
+  copy below it each time it is used.
+
+## 3. Finish
+
+- [ ] **Report.** When a stop condition in the spec's "Done" is met: write
+  the end of the round in `docs/pilot-loop.md` under "Round 1" (which stop,
+  baselines against best on both sets, what was kept and dropped, games to
+  replay).
+- [ ] **Review.** When Report is ticked and another round is allowed: do the
+  spec's "Rounds" steps 1 to 4. Then add the next round's tasks, set Round
+  to the next one with its held-out seed (6000, then 7000), put a task
+  first in section 2 to score the best on the new held-out seed (the new
+  held-out baseline), set "TRY passes in a row with no new best" to 0,
+  untick Report, and leave a fresh unticked copy of this Review task under
+  it.
+
+## Questions for Dave
+
+(The Review adds questions here, each with its best guess and what the loop
+did meanwhile. Locked items wait for Dave.)
+
+- **Push kept fixes?** The standing order (2026-09-24) is to push
+  `ai-player` to `elevate` after each kept fix; uboat's loop never pushes.
+  Best guess: keep pushing, the branch is yours alone. The loop pushes.
+- **Keep rule: fixed 0.25 or a paired test?** At 64 games the paired
+  margin on average deepest is about 0.15 to 0.35, so a 0.25 gain is
+  roughly one margin and luck gets through about one try in six. Uboat
+  moved to two standard errors on the paired difference. Best guess: keep
+  yours, it has worked; the held-out guard in the spec catches most luck.
+  The loop uses yours.
+- **Target depth.** The spec says average deepest 10 on both sets as the
+  next waypoint. Your number if different.
