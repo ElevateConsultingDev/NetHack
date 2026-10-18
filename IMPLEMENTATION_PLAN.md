@@ -45,10 +45,11 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   --games 64 --parallel 16` and write the run id and numbers into "Loop
   state" as the held-out baseline. Not a TRY.
   Done 2026-10-18: `20261018-170335`, deepest 5.95, XL 4.91; melee 37, no way on 9 (+1 blocker), Mines 8, starving 6, praying 1, wand 1, brain loop 1.
-- [ ] TRY **Keep every dagger and dart.** The loot classes omit weapons, so a
+- [x] TRY **Keep every dagger and dart.** The loot classes omit weapons, so a
   dagger lying alone is left (piles with a menu yield them). Add daggers,
   darts, knives and shuriken to floor loot; the dagger thrown before
   contact earned its turn (iteration 66). Cheap, no risk.
+  Done 2026-10-18 without a candidate (not counted): r_loot already picks up lone daggers, darts, knives and shuriken. 42 of 128 pilots end with no throwing weapon (thrown and not recovered; 1,965 throw turns across the pair), 29 with ten or more. The lever would be recovery after a fight, not pickup; a Review item.
 - [ ] TRY **Retreat to the stairs before contact.** A fast monster above the
   pilot's level seen at distance 3 or more, with stairs up within 4 steps:
   go up now (only adjacent monsters follow; iteration 74 fled too late).
