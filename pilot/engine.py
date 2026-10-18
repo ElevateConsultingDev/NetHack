@@ -141,6 +141,7 @@ class Memory:
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
+    handless: bool = False                        # polymorphed into a form that cannot open doors, engrave or wield
     vault_until: int = 0                          # turn until which a vault guard is being followed out
     cross_level: int = -1                         # a searched-out level: survivable traps count as walkable from now on
     unblocked: dict = field(default_factory=dict) # dlvl -> turn its blocked squares were last forgotten
@@ -394,6 +395,12 @@ def checks(v: View, memory: Memory) -> dict:
         memory.lycanthrope = True
     if "You feel purified" in msgs:
         memory.lycanthrope = False
+    if "no hands" in msgs or "can't even hold anything" in msgs or "You turn into a" in msgs:
+        # A handless form: opening a door or engraving costs no turn and never works, so a pilot
+        # polymorphed at HP 4 sent 'E' and 'o' at turn 1417 until the time limit (B16372610).
+        memory.handless = True
+    if "You return to" in msgs:
+        memory.handless = False
     if v.pos and ("You turn into a" in msgs or " stole " in msgs or "You return to" in msgs):
         # The kit came off (a were form drops it where we stand; a monkey or nymph took a piece):
         # it may be worn again, and this square is worth picking over again.
@@ -673,6 +680,8 @@ def r_explore(v: View, memory: Memory, args: dict):
     memory.pending_dir, memory.unlocking = "", False
     for dx, dy in ORTHO:
         d = (v.dlvl, v.pos[0] + dx, v.pos[1] + dy)
+        if memory.handless:
+            break  # No hands: doors stay shut until we are ourselves again.
         if v.feature(*d[1:]) == "closed door" and d not in memory.dead_doors:
             if any("This door is locked" in m for m in msgs):
                 memory.locked.add(d)
@@ -892,6 +901,8 @@ def r_elbereth(v: View, memory: Memory, args: dict):
     """Engrave Elbereth in the dust with a fingertip, then rest on it until
     HP recovers: most monsters won't melee you while you stand on it (3.6:
     attacking from it erodes it, so this never attacks)."""
+    if memory.handless:
+        return None, "failed: no hands to write with"
     st = v.status
     if not args.get("sent"):
         args["sent"], args["at"], args["turn"] = True, v.pos, st.get("turn", 0)
@@ -1879,7 +1890,11 @@ class Engine:
             # (an overloaded wererat that couldn't open its tin ended a game as "elbereth stuck").
             if not self.routine or keys == "e":
                 return "s", f"stuck on {keys!r}: marked blocked, trying elsewhere"
+            # A routine that changes nothing: end it AND pass a turn, or the brain re-orders it
+            # and the game never advances (a polymorphed pilot with no hands sent 'E' for
+            # Elbereth 180,000 times at turn 1417, B16372610).
             what = self.routine
             self._end_routine()
-            return None, [f"{what} stuck: {keys!r} changes nothing here"]
+            _count(m, f"{what} stuck")
+            return "s", f"{what} stuck: {keys!r} changes nothing here, passing a turn"
         return keys, []
