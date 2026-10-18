@@ -55,6 +55,20 @@ Forced replay (`python3 -m pilot.forced`, 2026-10-18): each of the 91 melee and 
 
 **Replays worth watching:** 20261018-141311/B14131150 (digging, then Mines' End), 20261018-145543/B14554332 (trap-split level reopened), 20261018-150521/B15052162 (coyote across the trap, then the blocked gnome), 20261018-151649/B15164952 (vault guard), 20261018-154726/B15472609 (wand of cold at the quasit, iteration 75), any game of 20261018-164912 (#enhance), 20261018-165450 (Excalibur dips).
 
+### Review, round 1 (2026-10-18)
+
+Buckets on the best (20261018-154632 / 154726): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, no way on 6, praying 3, invisible monster 2, brain loop 1. Death table: 101 melee and Mines deaths, last tactic melee in 90, an escape on the menu in 78 of those, XL two or more behind the level in 73 (72%). The three shallowest in each bucket were drilled during the round (kitten at dlvl 3 and giant bat at dlvl 4 unseen-attack deaths, iteration 60; imp and giant ant one-on-ones; Mines one-on-ones at XL 3 to 4), and the ledger split by speed and difficulty (iteration 77) holds across the set.
+
+**Where does the pilot still lose levels, and the likeliest cause?** Melee, 79% of endings: a fight that starts at full HP against a monster above the pilot's level, usually fast (26.7% of such fights are lost within 20 turns, against 2 to 6% for monsters at or below its level), two or more levels below where its XL belongs. The cause is arriving unready: a +1 long sword at Basic skill, AC 5 or 6 (62 of 128 end with no body armor), nothing identified, no escape item ever used. The Mines bucket is the same fight in a cave. Starvation (8) is food supply, not a decision. The six stalls have six causes.
+
+**Did a rule throw away a lead that looked real?** Yes, one: #enhance (iteration 80) raised XL by 0.19 and 0.23 (real) on both sets with depth flat; the depth-only rule dropped it. Also near: iteration 62's and 67's gains were within noise and kept on the second clause, which worked; iteration 68's held-out +0.28 carried the round. Nothing was kept that later proved false.
+
+**Is the noise hiding gains?** The paired margin on 64 games runs 0.10 to 0.30 levels; the round's real gains were 0.28 (68) and 0.50 (start to best, held out). Candidates measured at -0.02 to +0.08 were decided on the second clause (bucket shrank) or dropped as flat, which is right at this noise. The eight flat or negative TRYs were mostly clearly negative (-0.19 to -0.84), not noise. Noise is not hiding a 0.25 gain; the candidates were not producing one.
+
+**Untried ideas and near misses that would combine.** The in-fight tactics are exhausted for this engine. What is untried: (1) readiness that costs no turns and carries no risk: #enhance (Dave's call), picking up and keeping every dagger and dart lying alone on the floor (the loot classes omit weapons, so only piles with a menu yield them; the one dagger thrown before contact earned its turn in iteration 66); (2) avoiding the lost fight before contact: a fast monster above the pilot's level seen at range, with stairs up within a few steps, is the one case where the stairs work (only adjacent monsters follow), and Elbereth written before contact at full HP is a different thing from the half-HP yield that failed; (3) the pet: the kitten fights for the pilot on the levels where it dies young and is lost on dlvl 1 or 2; (4) protection from the Minetown priest for the dwarves that reach it with 400 times (XL plus one) gold; (5) the two stall classes with a known mechanism: Mines' End (climb back) and the boulder sealing a dark corridor (last-resort push); (6) a safer Excalibur (one fountain, five dips, flee the nymph) and readiness through consumables once the uses exist. Combination: #enhance plus daggers plus pre-contact stairs is the readiness package the round's evidence points at.
+
+Round 2 runs on held-out seed 6000. The no-gains stop stays at 8.
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
