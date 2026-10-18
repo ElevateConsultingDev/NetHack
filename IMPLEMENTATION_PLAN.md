@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-141157` (seed 1000, deepest 7.00, XL 5.11), held out `20261018-141311` (seed 5000, deepest 6.77, XL 5.28); over the 128 games 6.89
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-141157 20261018-141311`): died in melee/other 65, died in the Mines 27, stall: no way on 14, starving 9, wand or bolt 7, praying 4, invisible monster 2
 - Current best: the engine at the iteration 62 commit (trap crossing to known stairs)
-- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -62,10 +62,11 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   not worn, wielded, food or a known-useful tool until under 600 (weights
   from `objects.c`: iron ball, boulders, armor not worn, extra weapons).
   Done 2026-10-18 without a candidate (not counted): the squeeze now costs 11 turns in 128 games and the one stall that hit it was a trap cutting off the stairs (iteration 62 below). 24 of 128 packs end over 600 (median 421): worn body armor and 15 pick-axes.
-- [ ] TRY **Keep the tinning kit through the Mines.** Iteration 59's tinning
+- [x] TRY **Keep the tinning kit through the Mines.** Iteration 59's tinning
   fired in only 4 of 128 games because the kit is dropped on entering the
   Mines (57b). Once the pack rule above holds, keep the kit (100) when the
   pack stays under 600 with it. Target: starvation deaths (8).
+  Done 2026-10-18, dropped (iteration 63): tinning tripled (50 corpses, 32 tins eaten) but starvation stayed at 9 and depth was flat (0.00, -0.08). Reverted. Starvation needs its own drill.
 - [x] TRY **Trap crossing only to reach stairs in view.** Iteration 58 crossed
   traps to explore and lost depth (stalls became Mines deaths). The trace
   (B22492805) stands: a sleeping gas trap split a one-wide passage with the
