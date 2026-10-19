@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-181737` (seed 1000, deepest 7.25, XL 5.09); held out `20261018-181827` (seed 6000, deepest 6.09, XL 4.81; a harder set of dungeons than seed 5000)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 94 commit (iteration 89's numbers; handless pilots fight at critical HP)
-- TRY passes in a row with no new best: 5 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 6 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -265,9 +265,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: no candidate (not counted). The "poisoned by a rotted glob" deaths (desperate meals) are not on the current baselines; excluding globs from desperate meals is a one-line tweak to bundle with a later candidate. Ideas with evidence are running out; the next pass takes one more or declares none worth a pass, so the Report and the round 3 Review can run.
-- [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
+  2026-10-18: walk to where a thrown dagger should lie (42 of 128 end with no throwing weapon). Dropped (iteration 96): -0.30 / +0.31, a wash with 7,383 extra steps. No further idea worth a pass this round; the TRY list ends here so the Report and Review can run.
 - [ ] TRY **Re-drill after a new best.** After every kept TRY, rerun the
   buckets tool on the new baselines and, if the order of the buckets
   changed, reorder the TRY list above and say so. Add a fresh unchecked
