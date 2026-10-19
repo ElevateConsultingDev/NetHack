@@ -150,6 +150,31 @@ Dave asked for a bigger second loop and delegated the open questions. Campaign 2
 
 **Untried ideas and combinations.** (1) Diving with a depth cap (dive on dlvl up to 3, 5 or 7, then play as now): a SWEEP. (2) Dive plus patrol: the depth of the one, the XL of the other. (3) Sokoban, the stretch build, untouched. Round 2 runs these on held-out seed 9000. Diving changes the game's tempo, so the XL guard will judge each.
 
+### Campaign 2, round 2 report (2026-10-19)
+
+**Stop:** no gains, six TRYs in a row without a new best (iterations 118 to 123). Target (10 on both sets) not reached.
+
+**Baselines against the best.** Round start: seed 1000 x128 20261018-202858 at 6.98 (XL 5.27), seed 9000 x128 20261018-224138 at 6.85 (XL 5.38). Best: seed 1000 20261019-003024 at 7.88 (XL 5.67), seed 9000 20261019-003753 at 7.90 (XL 5.93). Paired over the round: +0.90 +/- 0.30 and +1.05 +/- 0.30, pooled +0.97 +/- 0.21 levels, XL +0.48 +/- 0.10. The first round in either campaign to move depth by more than noise, and XL rose with it.
+
+**What was kept (all pushed to elevate):**
+- 109: banded, splint and plate mail are safe armor (the list stopped at chain mail's weight). Pooled +0.22 +/- 0.09.
+- 110: pray when Weak 500 turns after the last prayer, not 1000 (`hunger_gamble`). Starvation 13 -> 7 and 20 -> 10, pooled +0.09.
+- 111: dip the long sword into fountains for Excalibur (lawful, XL 5+, outside the Mines, at most 12 dips). Pooled +0.41 +/- 0.12, the largest single gain of the campaign; Excalibur games went 2.5 levels deeper.
+- 116: a refused diagonal step is remembered as that step instead of blocking the target square for good, with iteration 113's covered-door line. No way on 14 -> 13 and 17 -> 10, pooled +0.12.
+- 117: dwarves leave the Mines below XL 8 too (`dwarf_mines_xl`). Mines deaths 19 -> 4 and 36 -> 4, pooled +0.12, XL +0.16 real.
+
+**What was dropped, by lesson:**
+- Diving is still bought with XL, at any cap (107), mixed with patrol (108), or with Excalibur in hand (122).
+- Excalibur is limited by where fountains are, not by when the pilot looks (114, 115), and making dips safer costs more Excaliburs than it saves lives (118).
+- "No way on" has several causes; peaceful blocks expiring is flat twice (112, 120), shedding armor for tight squeezes costs AC everywhere (119). The drills found real defects in every case; only the stuck guard's walls (116) were worth depth.
+- Cloaks (121) and the critical-HP gamble at 500 (123) are too small to measure.
+
+**Where the pilot stands.** Melee is 191 of 256 (75%); no way on 25; starvation 12; wands 13; Mines 8. The buckets other than melee have been cut hard this round; melee is now nearly everything.
+
+**What the round learned about the method.** Every kept change came from a drill of a specific game (armor on the floor, a prayer gate, an unused fountain, a doorway, dwarves in the Mines), not from a tactic. Two probes (who blocked a square; whether a secret square had a searchable neighbour) found causes the replay page could not show; the replay page draws the map one column left of the game's x.
+
+**Replays worth watching:** B23321394 (Excalibur, dlvl 9 -> 22), B00375374 (dwarf out of the Mines, 8 -> 19), B00250227 (freed doorway stall, 5 -> 9).
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
