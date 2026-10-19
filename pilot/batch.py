@@ -437,6 +437,9 @@ def _play_one(spec: dict) -> dict:
         brain.model = spec["model"]
     g = Game(spec["name"], spec["role"], brain, spec["max_turns"], spec["max_seconds"], spec["save"],
              seed=spec["seed"], engine=engine)
+    if spec.get("orders"):  # --orders: standing-order overrides for a sweep variant.
+        bad = g.engine.set_orders(spec["orders"])
+        assert not bad, f"unknown standing orders: {bad}"
     page, live = os.path.join(batch_dir, f"game-{g.name}.html"), os.path.join(batch_dir, f"live-{g.name}.json")
     stop = threading.Event()
 
@@ -511,7 +514,11 @@ def main() -> None:
     p.add_argument("--branches", nargs="?", const=True, metavar="DIR",
                    help="branch recall: the engine puts only the memory leaves matching each moment in the brief (DIR: a pinned tree)")
     p.add_argument("--replay", metavar="RUN/NAME", help="rerun one recorded seeded game with its brain answers")
+    p.add_argument("--orders", help='standing-order overrides for every game, JSON (a sweep variant), e.g. \'{"rest_below": 0.65}\'')
+    p.add_argument("--env", help='environment flags for every game, JSON, e.g. \'{"PILOT_PATROL": "1"}\'')
     args = p.parse_args()
+    if args.env:  # Set before the worker pool starts, so every game process inherits it.
+        os.environ.update({k: str(v) for k, v in json.loads(args.env).items()})
     if (args.seed is not None or args.replay) and os.environ.get("PYTHONHASHSEED") != "0":
         # Set iteration order must not vary between runs either.
         os.execvpe(sys.executable, [sys.executable, "-m", "pilot.batch", *sys.argv[1:]],
@@ -558,7 +565,8 @@ def main() -> None:
     specs = [{"name": f"B{run[-6:]}{i:02d}", "role": args.role, "brain": args.brain, "journal": not args.no_journal,
               "branches": bool(args.branches), "model": args.model,
               "max_turns": args.max_turns, "max_seconds": args.max_seconds, "save": not args.no_save,
-              "seed": None if args.seed is None else args.seed + i, "run": run} for i in range(args.games)]
+              "seed": None if args.seed is None else args.seed + i, "run": run,
+              "orders": json.loads(args.orders) if args.orders else None} for i in range(args.games)]
     results: list[dict] = []
 
     def save_json() -> None:
@@ -566,6 +574,8 @@ def main() -> None:
             json.dump({"run": run, "brain": args.brain, "model": args.model, "journal": not args.no_journal,
                        "branches": args.branches or None, "conclusions": args.conclusions, "seed": args.seed,
                        "checkpoints": not args.no_checkpoints,
+                       "orders": json.loads(args.orders) if args.orders else None,
+                       "env": json.loads(args.env) if args.env else None,
                        "games": sorted(results, key=lambda r: r["name"])}, f)
 
     def board_games() -> list:

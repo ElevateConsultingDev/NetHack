@@ -43,13 +43,14 @@ So: a better instrument first, then readiness through multi-pass builds.
   differences, prints each set's mean and SE, the pooled mean and SE, and the
   verdict under the campaign 2 keep rule. A self-check with made-up runs.
   Done 2026-10-18: `python3 -m pilot.compare --pool A1 B1 A2 B2` prints each set and the pooled mean and SE with a keep / flat / drop verdict; `--check` tests it. Found and fixed on the way: games were matched by the last two characters of their names, which collide in a 128-game run (games 0 to 27 against 100 to 127); they are now matched by index. Old 64-game comparisons are unchanged (iteration 62 still reads -0.02 +/- 0.04).
-- [ ] **1.3 Sweep tool.** `python3 -m pilot.sweep '<json list>' --seed 1000
+- [x] **1.3 Sweep tool.** `python3 -m pilot.sweep '<json list>' --seed 1000
   --games 128 --name NAME`: each list item is a dict of standing-order
   overrides and/or `PILOT_*` environment flags; runs one batch per variant
   (each batch already runs its games 16 at a time), compares each with the
   baseline (paired), and prints a table sorted by depth gain with XL and the
   bucket counts. Needs `pilot.batch --orders '<json>'` (apply with
   `engine.set_orders` at game start) and `--env '<json>'`. A self-check.
+  Done 2026-10-18: `pilot.batch --orders '<json>' --env '<json>'` (orders applied with set_orders at game start, unknown names rejected; env set before the worker pool so every game inherits it; both recorded in the run file); `python3 -m pilot.sweep '<json list>' --base RUN` runs one batch per variant, pairs each with the baseline by game index, prints a table by depth gain with XL, buckets and any time-limit games, and writes sweep-NAME.json. `--check` passes; a 2-game smoke run recorded its orders and env.
 - [ ] **1.4 Danger table.** `python3 -m pilot.danger <runs...>` reads the
   tactic outcomes (`pilot.ledger.rows`) and writes `pilot/danger.json`:
   for each monster name and each gap band (difficulty minus XL: <=0, 1-2,
