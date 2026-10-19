@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 1 of 3; held-out seed this round 8000 (128 games per set)
 - Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out `20261018-203302` (seed 8000, 128 games, deepest 7.37, XL 5.57)
 - Current best: the engine at the iteration 94 commit plus #enhance
-- TRY passes in a row with no new best: 5 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 6 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -115,9 +115,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   temple priest for protection when gold reaches 400 times (XL plus one)
   (#chat, answer the donation prompt). Each part behind its own flag.
   Done 2026-10-18, dropped (iteration 105): protection unaffordable (median gold 76); selling books and buying food work but fire about once per 128 games; pooled +0.01 +/- 0.03, flat. Reverted.
-- [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy each time it is used.
+  2026-10-18: dive (take known stairs down before exploring; the score is the deepest level and the death is coming anyway). Not kept (iteration 106): pooled depth +0.49 +/- 0.23 real, XL -0.83 +/- 0.14 real, fails the XL guard. Asked Dave.
 - [ ] BUILD **Sokoban, level 1 (stretch).** Up from the Oracle's level's
   stairs. A boulder-puzzle solver (BFS over boulder positions, the known
   fixed maps of the two level-1 variants), never squeezing past boulders,
@@ -146,3 +147,10 @@ did meanwhile. Locked items wait for Dave.)
 - Answered 2026-10-18 ("I trust you", campaign 2): #enhance adopted; keep
   rule is now the pooled paired test in the spec; 128 games per set; target
   stays 10; pushing continues.
+- **Dive for depth?** Iteration 106: taking known stairs down before exploring
+  gains +0.49 +/- 0.23 levels pooled over 256 games (real) and costs 0.83 XL
+  (real); games are a quarter shorter. The XL guard refuses it, since depth
+  bought by arriving weaker is not progress toward ascension. Best guess:
+  keep refusing it as the default; it is worth knowing that the score can
+  be bought this way. If you want the depth number, say so and the loop
+  adopts it. Locked; the loop went on without it.
