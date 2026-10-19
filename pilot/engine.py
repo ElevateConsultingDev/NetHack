@@ -175,6 +175,8 @@ class Memory:
     retrieve: set = field(default_factory=set)    # names of things we threw, to pick back up
     probed: set = field(default_factory=set)      # (dlvl, x, y) blank squares we've tried to step into
     tried_wear: set = field(default_factory=set)  # inventory texts we've tried to put on
+    dips: int = 0                                 # long sword dips into fountains (for Excalibur)
+    dipping: bool = False                         # a #dip is waiting for its "into the fountain?" prompt
     ate_at: set = field(default_factory=set)      # (dlvl, x, y) squares where we already tried the corpse
     lycanthrope: bool = False                     # bitten ("You feel feverish") and not yet purified
     wield_tried: int = -999                       # turn we last tried to wield a weapon
@@ -503,6 +505,8 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
         if v.kind == "getlin" and "write" in prompt:
             memory.engraving = False
             return "Elbereth\r", "write Elbereth"
+    if v.kind == "getlin" and v.ctx.get("prompt", "").startswith("For what do you wish"):
+        return "blessed +2 gray dragon scale mail\r", "wish (a grateful water demon)"
     if memory.pending_dir and v.ctx.get("prompt", "").startswith("In what direction"):
         key, memory.pending_dir = memory.pending_dir, ""
         return key, "toward the door"
@@ -525,6 +529,9 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
             if memory.pending_fight:
                 memory.peaceful[(v.dlvl, *memory.pending_fight)] = v.status.get("turn", 0)
             return "n", "never attack a peaceful"
+        if memory.dipping and prompt.startswith("Dip ") and "into the fountain" in prompt:
+            memory.dipping = False
+            return "y", "dip it into the fountain"
         if prompt.startswith("Are you sure you want to pray") and memory.pending_pray:
             memory.pending_pray = False
             return "y", "confirm the prayer"
@@ -1157,6 +1164,7 @@ def _key(why: str) -> str:
 DEFAULT_ORDERS = {
     "fight_up_to": None,        # melee adjacent hostiles up to this difficulty (None: your level + fight_margin)
     "fight_margin": 2,          # with fight_up_to None: fight up to difficulty XL + this
+    "excalibur": True,          # lawful, XL 5+: dip the long sword into known fountains
     "hunger_gamble": 500,       # Weak with no safe food: pray this many turns after the last prayer (None: never)
     "avoid": sorted(DONT_MELEE),  # never melee these
     "eat_at": "Hungry",         # eat known-safe food at this hunger ("never" to stop)
@@ -1417,6 +1425,10 @@ class Engine:
         for msg in v.s.get("messages", []):
             if "more confident in your" in msg:
                 m.enhance = True  # A skill can be advanced: free, no turn (iteration 80: XL +0.2 on both sets).
+            if "fountain disappears" in msg or "fountain dries up" in msg:
+                m.features.pop((v.dlvl, *v.pos), None)
+            if "hand reaches up to bless the sword" in msg:
+                _count(m, "Excalibur")
             if "follow me" in msg:  # A vault guard: drop the gold and walk out behind him (4 of 128 games died fighting him).
                 m.vault_until = turn + 150
             if closed_for_inventory(msg) and v.pos:
@@ -1564,6 +1576,31 @@ class Engine:
             _count(m, f"wore {slot}")
             return "W", f"wear the {i['text']}"
         return None
+
+    def _excalibur(self, v: View, c: dict):
+        """A lawful Valkyrie at XL 5+ dipping her long sword into a fountain
+        gets Excalibur one time in six (fountain.c). Not in the Mines
+        (Minetown's watch turns on whoever dries its fountain), not hurt,
+        nothing hostile in view, at most 12 dips a game (a water demon or
+        moccasins come once in 30)."""
+        m = self.memory
+        if not self.orders["excalibur"] or v.status.get("alignment") != "lawful" or (c["xlvl"] or 0) < 5 \
+                or m.dips >= 12 or c.get("visible_hostiles") or c["wounded"] != "fine" or not v.pos \
+                or v.status.get("dungeon") == "The Gnomish Mines":
+            return None
+        sword = next((i for i in v.s.get("inventory", []) if "long sword" in i["text"] and "(weapon in " in i["text"]
+                      and "Excalibur" not in i["text"]), None)
+        fountains = [(x, y) for (d, x, y), n in m.features.items() if d == v.dlvl and n == "fountain"]
+        if not sword or not fountains:
+            return None
+        if v.pos in fountains:
+            m.dips += 1
+            m.pending_item, m.dipping = sword["letter"], True
+            _count(m, "fountain dips")
+            return "#dip\n", "dip the long sword into the fountain (Excalibur)"
+        path = bfs(v, lambda x, y: (x, y) in fountains)
+        keys = _step(v, m, path, "")[0] if path else None
+        return (keys, "walk to the fountain to dip for Excalibur") if keys else None
 
     def _dig_down(self, v: View, c: dict):
         """No known way down and a pick-axe in the pack: dig through the floor
@@ -1809,6 +1846,9 @@ class Engine:
         wear = self._wear_armor(v, c)
         if wear:
             return self._stuck_guard(v, wear[0], wear[1])
+        dip = self._excalibur(v, c)
+        if dip:
+            return self._stuck_guard(v, dip[0], dip[1])
         burdened = v.status.get("encumbrance", "") != ""
         # Hostiles we never melee (a floating eye in the way) don't stop
         # looting, even next to us (they only hurt if hit; paths never walk

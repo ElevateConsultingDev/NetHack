@@ -10,8 +10,8 @@ its three round reports are in `docs/pilot-loop.md`.
 ## Loop state
 
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
-- Baselines (the only "before"): tuning `20261018-231807` (seed 1000, 128 games, deepest 7.30, XL 5.47); held out `20261018-232544` (seed 9000, 128 games, deepest 7.15, XL 5.50)
-- Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110)
+- Baselines (the only "before"): tuning `20261018-233213` (seed 1000, 128 games, deepest 7.70, XL 5.53); held out `20261018-233453` (seed 9000, 128 games, deepest 7.59, XL 5.69)
+- Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111)
 - TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
@@ -84,6 +84,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-18 cause: starvation (13 and 20 games): every one was Weak again 400 to 900 turns after the prayer that fed it, with the 1000-turn gate shut and nothing safe to eat. (Armor upgrades were drilled first: only 8 of 128 games stepped on better body armor, too few.)
   KEPT (iteration 110, bucket clause): pray when Weak 500+ turns after the last prayer; starving 13 -> 7 and 20 -> 10, pooled +0.09 +/- 0.05. Replay B23254489.
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-18 cause: melee (79 and 63) is lost on damage, and the Valkyrie's standard answer was never used: dipping the long sword into a fountain at XL 5+ (102 of 128 games reach it) for Excalibur. (Mines deaths drilled first: spread over a dozen killers, no single cause.)
+  KEPT (iteration 111): pooled +0.41 +/- 0.12, XL +0.12; 56 Excaliburs in 256 games, those games +2.5 levels; 9 games lost to water demons or moccasins. Follow up: retreat from a water demon or moccasins instead of fighting them. Replay B23321394 (9 -> 22).
 - [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
