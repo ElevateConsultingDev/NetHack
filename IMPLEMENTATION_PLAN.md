@@ -7,9 +7,9 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 2 of 3; held-out seed this round 6000
-- Baselines (the only "before"): tuning `20261018-174756` (seed 1000, deepest 7.25, XL 5.09); held out `20261018-174849` (seed 6000, deepest 6.09, XL 4.81; a harder set of dungeons than seed 5000)
+- Baselines (the only "before"): tuning `20261018-181737` (seed 1000, deepest 7.25, XL 5.09); held out `20261018-181827` (seed 6000, deepest 6.09, XL 4.81; a harder set of dungeons than seed 5000)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
-- Current best: the engine at the iteration 89 commit (eat kills further away)
+- Current best: the engine at the iteration 94 commit (iteration 89's numbers; handless pilots fight at critical HP)
 - TRY passes in a row with no new best: 4 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
@@ -253,6 +253,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: wear safe cloaks (smock, elven, the four magic ones). Dropped (iteration 93): -0.20 / +0.20, a wash; body armor unaffected.
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  Add a fresh copy of this task each time it is used.
+  2026-10-18: the small buckets drilled; praying deaths are the gamble's designed cost; the two brain loops were handless pilots. Kept as correctness (iteration 94): critical HP fights when handless; two stall labels became deaths, nothing else changed.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.

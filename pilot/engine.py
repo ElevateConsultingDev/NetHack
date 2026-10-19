@@ -1616,7 +1616,9 @@ class Engine:
                 # a throne room at 2 HP, 840 turns after the last prayer).
                 _count(m, "prayer gamble")
                 return r_pray(v, m, {})[0], "standing order: pray (critical, the gate is probably open)"
-            esc = self._escalate("critical HP and prayer isn't safe")
+            # With no hands the brain's Elbereth cannot be written, and asking again every turn ended
+            # two games as "brain loop" stalls at 3 and 5 HP (B17475640, B17484962): fight instead.
+            esc = None if m.handless else self._escalate("critical HP and prayer isn't safe")
             if esc:
                 return esc
         if v.engulfed:
