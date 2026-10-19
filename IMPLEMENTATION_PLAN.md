@@ -79,6 +79,7 @@ So: a better instrument first, then readiness through multi-pass builds.
   squares in turn, then back up a level and patrol there) for up to N turns
   per level, fighting what comes. Pass 1: the patrol routine behind
   `PILOT_PATROL=0`. Pass 2: sweep N (300, 800) and K (2, 3).
+  Pass 1 done 2026-10-18: `Engine._patrol` behind `PILOT_PATROL_TURNS` (0 = off) and `PILOT_PATROL_BEHIND` (default 2): walks to the visited square farthest from here, then the farthest from there, while dlvl - XL >= K, HP >= 60% and not hungry, counting patrol turns per level. Off: B20285803 replays identically (3,344 keys). On at 300 turns: 8 games, 2,976 patrol turns, no errors. Next: pass 2 sweeps N 300 / 800 and K 2 / 3 on tuning, the best two to the pair.
 - [ ] BUILD **Altar knowledge.** Remember altars. When an altar is reachable
   and nothing hostile is in view, drop every unknown item on it (one `D`
   with all classes), read the flashes ("black flash" cursed, "amber" blessed),

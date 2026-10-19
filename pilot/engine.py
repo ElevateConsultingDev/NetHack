@@ -11,6 +11,7 @@ from __future__ import annotations
 from .spoilers import spoiler
 from .tactics import Tracker, classify
 
+import os
 import re
 from collections import deque
 from dataclasses import dataclass, field
@@ -141,6 +142,8 @@ class Memory:
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
+    patrol_to: tuple | None = None                # (dlvl, x, y) the patrol is walking to
+    patrol_from: int = -1                         # turn of the last patrol step, for counting patrol turns
     enhance: bool = False                         # "You feel more confident in your weapon skills": #enhance pending
     handless: bool = False                        # polymorphed into a form that cannot open doors, engrave or wield
     vault_until: int = 0                          # turn until which a vault guard is being followed out
@@ -1145,6 +1148,11 @@ ROUTINES = {
 }
 
 
+# Active leveling (campaign 2 build): while dlvl is PATROL_BEHIND or more above XL, walk the explored
+# level for up to PATROL_TURNS turns before going down, fighting what comes. 0 turns: off.
+PATROL_TURNS = int(os.environ.get("PILOT_PATROL_TURNS", 0))
+PATROL_BEHIND = int(os.environ.get("PILOT_PATROL_BEHIND", 2))
+
 HUNGER_RANK = ["", "Hungry", "Weak", "Fainting", "Fainted"]
 
 
@@ -1562,6 +1570,39 @@ class Engine:
             return "W", f"wear the {i['text']}"
         return None
 
+    def _patrol(self, v: View, c: dict):
+        """Walk the explored level to meet its monsters before descending under-levelled: to the
+        visited square farthest from here, then the farthest from there, until the level's patrol
+        budget is spent. Monsters met are fought by the standing orders, which run first."""
+        m = self.memory
+        if not PATROL_TURNS or not v.pos or not self.orders["descend"]:
+            return None
+        if v.dlvl - (c.get("xlvl") or 1) < PATROL_BEHIND or c.get("hunger") in HUNGRY \
+                or c.get("hp", 0) * 5 < c.get("hpmax", 1) * 3:
+            return None
+        key = f"patrol turns on dlvl {v.dlvl}"
+        turn = c.get("turn", 0)
+        if m.patrol_from >= 0 and 0 < turn - m.patrol_from < 50:
+            _count(m, key, turn - m.patrol_from)
+            _count(m, "patrol turns", turn - m.patrol_from)
+        m.patrol_from = turn
+        if m.stats.get(key, 0) >= PATROL_TURNS:
+            return None
+        dist = distances(v)
+        if m.patrol_to is None or m.patrol_to[0] != v.dlvl or (m.patrol_to[1], m.patrol_to[2]) == v.pos \
+                or (m.patrol_to[1], m.patrol_to[2]) not in dist:
+            far = [(d, p) for p, d in dist.items() if (v.dlvl, *p) in m.visited]
+            if not far:
+                return None
+            m.patrol_to = (v.dlvl, *max(far)[1])
+        goal = (m.patrol_to[1], m.patrol_to[2])
+        path = bfs(v, lambda x, y: (x, y) == goal)
+        if not path:
+            m.patrol_to = None
+            return None
+        keys, note = _step(v, m, path, f"patrol toward {goal} (XL {c.get('xlvl')} on dlvl {v.dlvl})")
+        return (keys, note) if keys else None
+
     def _dig_down(self, v: View, c: dict):
         """No known way down and a pick-axe in the pack: dig through the floor
         (13 of 128 games carried one; two of them searched walls for 2,500
@@ -1829,6 +1870,10 @@ class Engine:
             if keys:
                 self.note = "search dead ends: " + note
                 return self._stuck_guard(v, keys, note)
+        patrol = self._patrol(v, c)
+        if patrol:
+            self.note = patrol[1]
+            return self._stuck_guard(v, patrol[0], patrol[1])
         if self.orders["descend"]:
             safe = c.get("hp", 0) * 5 >= c.get("hpmax", 1) * 3 and not c.get("mobile_hostiles")
             keys, note = r_go_down(v, m, {"start_dlvl": v.dlvl, "may_cross": safe})
