@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 1 of 3; held-out seed this round 8000 (128 games per set)
 - Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out `20261018-203302` (seed 8000, 128 games, deepest 7.37, XL 5.57)
 - Current best: the engine at the iteration 94 commit plus #enhance
-- TRY passes in a row with no new best: 3 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 4 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -80,14 +80,15 @@ So: a better instrument first, then readiness through multi-pass builds.
   per level, fighting what comes. Pass 1: the patrol routine behind
   `PILOT_PATROL=0`. Pass 2: sweep N (300, 800) and K (2, 3).
   Done 2026-10-18, dropped (iteration 103): the patrol raised XL by 0.2 to 0.3 at K 2 and lost 0.15 to 0.20 depth; at K 3 flat (-0.02, -0.03). Reverted.
-- [ ] BUILD **Altar knowledge.** Remember altars. When an altar is reachable
+- [x] BUILD **Altar knowledge.** Remember altars. When an altar is reachable
   and nothing hostile is in view, drop every unknown item on it (one `D`
   with all classes), read the flashes ("black flash" cursed, "amber" blessed),
   pick them back up, and keep the B/U/C in memory by inventory text. Uses
   in the final pass: wear unknown-curse armor only when known uncursed; read
   uncursed scrolls at full HP in a safe room (campaign 1's blind reading lost
   0.7: cursed and bad scrolls were the cost); drop known-cursed junk.
-- [ ] BUILD **Price identification.** In a shop with the keeper in view, pick
+  Built and dropped 2026-10-18 (iteration 104, with the two below): altar testing worked (139 of 256 games see an altar; 436 items tested in 128 games) but nothing used the knowledge. Reverted.
+- [x] BUILD **Price identification.** In a shop with the keeper in view, pick
   up each unknown scroll, potion and wand once, read the offered price from
   "For you, ... N zorkmids", drop it again. Map the base price (after the
   Cha and dunce-cap adjustments, and the 1-in-3 surcharge: take the lower of
@@ -99,13 +100,15 @@ So: a better instrument first, then readiness through multi-pass builds.
   charging, genocide, punishment, stinking cloud). Record in memory; a
   `#name` call is optional. Pass 1: read the quote and store the class.
   Pass 2: use the classes (below).
-- [ ] BUILD **Use what is known.** Act on identified or price-classed items:
+  Built and dropped 2026-10-18 (iteration 104): shop quotes read on stepping onto items and inverted exactly (pilot/prices.py, kept as a tool with its check); 66 quotes and 4 identifications in 128 games. Reverted from the engine.
+- [x] BUILD **Use what is known.** Act on identified or price-classed items:
   read enchant armor (class 80 after the altar says uncursed: either result
   helps), enchant weapon, remove curse; read magic mapping on arrival when
   the stairs are not seen; quaff known healing potions at critical HP with
   prayer shut; read a known teleportation scroll when losing a fight with
   prayer shut (campaign 1 found 47 of 101 deaths there); zap known attack
   wands then. Final pass measures the three knowledge builds together.
+  Done 2026-10-18, dropped (iteration 104): the three together on seed 1000 x128 -0.16 +/- 0.21 (26 better, 38 worse); uses fired 6 times in 128 games (1 good scroll, 2 teleport escapes, 3 wand zaps). Items are almost never identified by name in this engine, so the knowledge had nothing to act on. Reverted.
 - [ ] BUILD **Gold economy.** Sell spellbooks and gems in shops (drop the
   item, answer "Sell it?" with y), then buy food when carrying little (lower
   the gold gate to 60, drop the item on "You don't have enough"), then pay a
