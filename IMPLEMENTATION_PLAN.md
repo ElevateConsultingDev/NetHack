@@ -10,7 +10,7 @@ its three round reports are in `docs/pilot-loop.md`.
 ## Loop state
 
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
-- Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out: TO BE SCORED on seed 9000 x128 by round 2's first task (round 1's: `20261018-203302`, seed 8000, 7.37)
+- Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out `20261018-224138` (seed 9000, 128 games, deepest 6.85, XL 5.38)
 - Current best: the engine at the iteration 94 commit plus #enhance
 - TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
@@ -61,8 +61,9 @@ So: a better instrument first, then readiness through multi-pass builds.
 
 ## 2b. Round 2 (held-out seed 9000)
 
-- [ ] **Held-out baseline for round 2.** The base on `--seed 9000 --games 128`;
+- [x] **Held-out baseline for round 2.** The base on `--seed 9000 --games 128`;
   write the run id and numbers into Loop state. Not a TRY.
+  Done 2026-10-18: `20261018-224138`, deepest 6.85, XL 5.38; melee 62, Mines 30, starving 18, no way on 7 and 3 blocked, wand 7, invisible 1.
 - [ ] SWEEP **Dive with a depth cap.** Iteration 106's dive (take known stairs
   down before looting or exploring, HP 70%+, not hungry, nothing hostile in
   view; the code is described in its check-log row) with a new flag
