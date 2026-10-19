@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 1 of 3; held-out seed this round 8000 (128 games per set)
 - Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out `20261018-203302` (seed 8000, 128 games, deepest 7.37, XL 5.57)
 - Current best: the engine at the iteration 94 commit plus #enhance
-- TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 1 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -61,11 +61,12 @@ So: a better instrument first, then readiness through multi-pass builds.
 
 ## 2. Round 1 (held-out seed 8000)
 
-- [ ] SWEEP **Standing orders.** Never tuned. One variant at a time, on top of
+- [x] SWEEP **Standing orders.** Never tuned. One variant at a time, on top of
   the base: retreat_below 0.25 / 0.45; rest_below 0.35 / 0.65 / 0.8;
   fight_up_to as XL+1 / XL+3 (add an order `fight_margin` if needed); eat_at
   "Weak"; explore_fully false; eat_corpses "hungry". Then combine the two
   best. Best two go to the full pair.
+  Done 2026-10-18, nothing kept (iteration 101): ten variants, best eat_at Weak +0.23 and explore_fully false +0.16 on tuning; on the pair +0.13 and +0.11 pooled, flat; together +0.04, flat. fight_margin 1 is the only clear loss (-0.11 +/- 0.05). The defaults are near optimal.
 - [ ] TRY **Learned avoidance.** Replace the fixed difficulty limit for a
   fight with the danger table: an adjacent monster whose (name, gap band)
   death rate's lower bound is over a threshold is treated like the avoid
