@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 3 of 3; held-out seed this round 10000 (128 games per set)
 - Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-085932` (seed 10000, 128 games, deepest 7.20, XL 5.62)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
-- TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 1 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -64,10 +64,12 @@ So: a better instrument first, then readiness through multi-pass builds.
 - [x] **Held-out baseline for round 3.** The best on `--seed 10000 --games 128`;
   write the run id and numbers into Loop state. Not a TRY.
   Done 2026-10-19: `20261019-085932`, deepest 7.20, XL 5.62; melee 93, no way on 9 and 5 blocked, Mines 7, wand 6, starving 6, invisible 2. Load 6; no time-limit game, longest 111 s.
-- [ ] TRY **Walk away from slow monsters.** Adjacent and above the fight limit,
+- [x] TRY **Walk away from slow monsters.** Adjacent and above the fight limit,
   a monster slower than the pilot (speed under 12: mimics 3, zombies 6 to 8,
   molds 0) is stepped away from, not fought. B003753104 (XL 1, 8 HP) traded
   blows with a small mimic until it died.
+  2026-10-19 cause: the standing orders escalate any adjacent monster above the fight limit, and the rules brain answers "fight"; spoiler() already marks the ones slower than the pilot (outrun). Step away from those first.
+  Dropped (iteration 124): pooled +0.02 +/- 0.05; melee 104 -> 102 and 93 -> 94.
 - [ ] TRY **The early heavy pack.** B00375397 is refused a squeeze at turn 913,
   XL 2: find what it picked up that weighs that much (replay its inventory)
   and stop picking that up.
