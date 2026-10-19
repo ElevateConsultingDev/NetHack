@@ -51,12 +51,13 @@ So: a better instrument first, then readiness through multi-pass builds.
   bucket counts. Needs `pilot.batch --orders '<json>'` (apply with
   `engine.set_orders` at game start) and `--env '<json>'`. A self-check.
   Done 2026-10-18: `pilot.batch --orders '<json>' --env '<json>'` (orders applied with set_orders at game start, unknown names rejected; env set before the worker pool so every game inherits it; both recorded in the run file); `python3 -m pilot.sweep '<json list>' --base RUN` runs one batch per variant, pairs each with the baseline by game index, prints a table by depth gain with XL, buckets and any time-limit games, and writes sweep-NAME.json. `--check` passes; a 2-game smoke run recorded its orders and env.
-- [ ] **1.4 Danger table.** `python3 -m pilot.danger <runs...>` reads the
+- [x] **1.4 Danger table.** `python3 -m pilot.danger <runs...>` reads the
   tactic outcomes (`pilot.ledger.rows`) and writes `pilot/danger.json`:
   for each monster name and each gap band (difficulty minus XL: <=0, 1-2,
   3+), tries, melee deaths within 20 turns, and the rate with a lower
   confidence bound. Build it from every rules run of seeds 1000 and 5000 on
   disk. Prints the 20 worst rows.
+  Done 2026-10-18: `python3 -m pilot.danger` reads 112 plain rules runs of seeds 1000 and 5000 (never 6000+), merges per-turn melee decisions into fights (same monster, same game, under 20 turns apart), and writes pilot/danger.json: 303,414 fights in 339 (monster, gap) rows with a Wilson lower bound. Worst by lower bound: werewolf at gap 1-2 (88% of 74 fights end in death within 20 turns), fire ant and soldier ant at 1-2 (79%), black unicorn, dwarf lord, white unicorn; soldier ants kill 74% even at gap 0 or less (449 fights), fire ants 46%. The monster matters more than the gap.
 
 ## 2. Round 1 (held-out seed 8000)
 

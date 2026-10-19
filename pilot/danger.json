@@ -1,0 +1,2039 @@
+{
+ "runs": 112,
+ "table": {
+  "Green-elf|1-2": {
+   "deaths": 13,
+   "low": 0.034,
+   "rate": 0.058,
+   "tries": 225
+  },
+  "Green-elf|<=0": {
+   "deaths": 18,
+   "low": 0.087,
+   "rate": 0.134,
+   "tries": 134
+  },
+  "Grey-elf|1-2": {
+   "deaths": 9,
+   "low": 0.222,
+   "rate": 0.391,
+   "tries": 23
+  },
+  "Grey-elf|<=0": {
+   "deaths": 1,
+   "low": 0.006,
+   "rate": 0.031,
+   "tries": 32
+  },
+  "Keystone Kop|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "Kop Kaptain|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "Kop Lieutenant|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "Kop Sergeant|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "Mordor orc|1-2": {
+   "deaths": 2,
+   "low": 0.01,
+   "rate": 0.036,
+   "tries": 55
+  },
+  "Mordor orc|<=0": {
+   "deaths": 61,
+   "low": 0.046,
+   "rate": 0.058,
+   "tries": 1048
+  },
+  "Uruk-hai|1-2": {
+   "deaths": 40,
+   "low": 0.132,
+   "rate": 0.176,
+   "tries": 227
+  },
+  "Uruk-hai|<=0": {
+   "deaths": 55,
+   "low": 0.038,
+   "rate": 0.049,
+   "tries": 1132
+  },
+  "Woodland-elf|1-2": {
+   "deaths": 22,
+   "low": 0.09,
+   "rate": 0.133,
+   "tries": 165
+  },
+  "Woodland-elf|<=0": {
+   "deaths": 58,
+   "low": 0.18,
+   "rate": 0.227,
+   "tries": 256
+  },
+  "acid blob|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 87
+  },
+  "acid blob|<=0": {
+   "deaths": 2,
+   "low": 0.0,
+   "rate": 0.001,
+   "tries": 2015
+  },
+  "acolyte|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 27
+  },
+  "air elemental|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "ape|1-2": {
+   "deaths": 8,
+   "low": 0.015,
+   "rate": 0.03,
+   "tries": 268
+  },
+  "ape|<=0": {
+   "deaths": 22,
+   "low": 0.027,
+   "rate": 0.04,
+   "tries": 547
+  },
+  "attendant|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "baby crocodile|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 114
+  },
+  "baby crocodile|<=0": {
+   "deaths": 5,
+   "low": 0.004,
+   "rate": 0.01,
+   "tries": 525
+  },
+  "baby long worm|1-2": {
+   "deaths": 1,
+   "low": 0.003,
+   "rate": 0.02,
+   "tries": 51
+  },
+  "baby long worm|<=0": {
+   "deaths": 1,
+   "low": 0.002,
+   "rate": 0.011,
+   "tries": 88
+  },
+  "barrow wight|1-2": {
+   "deaths": 20,
+   "low": 0.141,
+   "rate": 0.211,
+   "tries": 95
+  },
+  "barrow wight|<=0": {
+   "deaths": 1,
+   "low": 0.007,
+   "rate": 0.038,
+   "tries": 26
+  },
+  "bat|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 101
+  },
+  "bat|<=0": {
+   "deaths": 17,
+   "low": 0.003,
+   "rate": 0.005,
+   "tries": 3677
+  },
+  "black light|<=0": {
+   "deaths": 1,
+   "low": 0.207,
+   "rate": 1.0,
+   "tries": 1
+  },
+  "black naga hatchling|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 43
+  },
+  "black naga hatchling|<=0": {
+   "deaths": 2,
+   "low": 0.001,
+   "rate": 0.005,
+   "tries": 417
+  },
+  "black naga|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "black unicorn|1-2": {
+   "deaths": 77,
+   "low": 0.711,
+   "rate": 0.802,
+   "tries": 96
+  },
+  "black unicorn|<=0": {
+   "deaths": 14,
+   "low": 0.037,
+   "rate": 0.061,
+   "tries": 228
+  },
+  "brown pudding|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 114
+  },
+  "brown pudding|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 154
+  },
+  "bugbear|1-2": {
+   "deaths": 56,
+   "low": 0.085,
+   "rate": 0.109,
+   "tries": 513
+  },
+  "bugbear|<=0": {
+   "deaths": 146,
+   "low": 0.1,
+   "rate": 0.117,
+   "tries": 1252
+  },
+  "carnivorous ape|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 11
+  },
+  "carnivorous ape|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 5
+  },
+  "cave spider|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 141
+  },
+  "cave spider|<=0": {
+   "deaths": 10,
+   "low": 0.001,
+   "rate": 0.003,
+   "tries": 3820
+  },
+  "centipede|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 260
+  },
+  "centipede|<=0": {
+   "deaths": 6,
+   "low": 0.003,
+   "rate": 0.006,
+   "tries": 1027
+  },
+  "chameleon|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "chickatrice|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 111
+  },
+  "chickatrice|<=0": {
+   "deaths": 1,
+   "low": 0.004,
+   "rate": 0.021,
+   "tries": 48
+  },
+  "cockatrice|1-2": {
+   "deaths": 39,
+   "low": 0.285,
+   "rate": 0.371,
+   "tries": 105
+  },
+  "cockatrice|<=0": {
+   "deaths": 1,
+   "low": 0.01,
+   "rate": 0.059,
+   "tries": 17
+  },
+  "coyote|1-2": {
+   "deaths": 1,
+   "low": 0.012,
+   "rate": 0.067,
+   "tries": 15
+  },
+  "coyote|<=0": {
+   "deaths": 113,
+   "low": 0.035,
+   "rate": 0.042,
+   "tries": 2699
+  },
+  "crocodile|1-2": {
+   "deaths": 2,
+   "low": 0.012,
+   "rate": 0.043,
+   "tries": 46
+  },
+  "crocodile|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 73
+  },
+  "dingo|1-2": {
+   "deaths": 5,
+   "low": 0.015,
+   "rate": 0.034,
+   "tries": 147
+  },
+  "dingo|<=0": {
+   "deaths": 12,
+   "low": 0.007,
+   "rate": 0.012,
+   "tries": 969
+  },
+  "djinni|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "dog|<=0": {
+   "deaths": 13,
+   "low": 0.011,
+   "rate": 0.02,
+   "tries": 664
+  },
+  "dust vortex|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 141
+  },
+  "dust vortex|<=0": {
+   "deaths": 5,
+   "low": 0.009,
+   "rate": 0.021,
+   "tries": 243
+  },
+  "dwarf king|<=0": {
+   "deaths": 1,
+   "low": 0.006,
+   "rate": 0.032,
+   "tries": 31
+  },
+  "dwarf lord|1-2": {
+   "deaths": 52,
+   "low": 0.687,
+   "rate": 0.8,
+   "tries": 65
+  },
+  "dwarf lord|<=0": {
+   "deaths": 2,
+   "low": 0.017,
+   "rate": 0.061,
+   "tries": 33
+  },
+  "dwarf mummy|1-2": {
+   "deaths": 2,
+   "low": 0.016,
+   "rate": 0.059,
+   "tries": 34
+  },
+  "dwarf mummy|<=0": {
+   "deaths": 27,
+   "low": 0.054,
+   "rate": 0.078,
+   "tries": 344
+  },
+  "dwarf zombie|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 183
+  },
+  "dwarf zombie|<=0": {
+   "deaths": 9,
+   "low": 0.002,
+   "rate": 0.003,
+   "tries": 2820
+  },
+  "dwarf|1-2": {
+   "deaths": 1,
+   "low": 0.002,
+   "rate": 0.01,
+   "tries": 101
+  },
+  "dwarf|<=0": {
+   "deaths": 36,
+   "low": 0.025,
+   "rate": 0.035,
+   "tries": 1033
+  },
+  "earth elemental|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "electric eel|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 27
+  },
+  "elf mummy|1-2": {
+   "deaths": 4,
+   "low": 0.029,
+   "rate": 0.074,
+   "tries": 54
+  },
+  "elf mummy|<=0": {
+   "deaths": 2,
+   "low": 0.012,
+   "rate": 0.043,
+   "tries": 46
+  },
+  "elf zombie|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 54
+  },
+  "elf zombie|<=0": {
+   "deaths": 8,
+   "low": 0.002,
+   "rate": 0.005,
+   "tries": 1766
+  },
+  "energy vortex|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "ettin mummy|1-2": {
+   "deaths": 5,
+   "low": 0.079,
+   "rate": 0.179,
+   "tries": 28
+  },
+  "ettin mummy|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "ettin zombie|1-2": {
+   "deaths": 5,
+   "low": 0.016,
+   "rate": 0.036,
+   "tries": 137
+  },
+  "ettin zombie|<=0": {
+   "deaths": 4,
+   "low": 0.03,
+   "rate": 0.077,
+   "tries": 52
+  },
+  "fire ant|1-2": {
+   "deaths": 166,
+   "low": 0.73,
+   "rate": 0.79,
+   "tries": 210
+  },
+  "fire ant|<=0": {
+   "deaths": 107,
+   "low": 0.393,
+   "rate": 0.455,
+   "tries": 235
+  },
+  "fire elemental|1-2": {
+   "deaths": 1,
+   "low": 0.207,
+   "rate": 1.0,
+   "tries": 1
+  },
+  "fire giant|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "flaming sphere|1-2": {
+   "deaths": 1,
+   "low": 0.022,
+   "rate": 0.125,
+   "tries": 8
+  },
+  "flaming sphere|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "flesh golem|1-2": {
+   "deaths": 1,
+   "low": 0.061,
+   "rate": 0.333,
+   "tries": 3
+  },
+  "fog cloud|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 132
+  },
+  "fog cloud|<=0": {
+   "deaths": 7,
+   "low": 0.002,
+   "rate": 0.004,
+   "tries": 1639
+  },
+  "forest centaur|1-2": {
+   "deaths": 5,
+   "low": 0.032,
+   "rate": 0.074,
+   "tries": 68
+  },
+  "forest centaur|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 61
+  },
+  "fox|<=0": {
+   "deaths": 48,
+   "low": 0.005,
+   "rate": 0.007,
+   "tries": 7094
+  },
+  "freezing sphere|1-2": {
+   "deaths": 22,
+   "low": 0.422,
+   "rate": 0.579,
+   "tries": 38
+  },
+  "freezing sphere|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 10
+  },
+  "gargoyle|1-2": {
+   "deaths": 26,
+   "low": 0.268,
+   "rate": 0.371,
+   "tries": 70
+  },
+  "gargoyle|<=0": {
+   "deaths": 7,
+   "low": 0.231,
+   "rate": 0.438,
+   "tries": 16
+  },
+  "garter snake|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 212
+  },
+  "garter snake|<=0": {
+   "deaths": 42,
+   "low": 0.01,
+   "rate": 0.013,
+   "tries": 3201
+  },
+  "gas spore|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 163
+  },
+  "gas spore|<=0": {
+   "deaths": 5,
+   "low": 0.008,
+   "rate": 0.018,
+   "tries": 275
+  },
+  "gecko|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 476
+  },
+  "gecko|<=0": {
+   "deaths": 88,
+   "low": 0.006,
+   "rate": 0.007,
+   "tries": 12641
+  },
+  "gelatinous cube|1-2": {
+   "deaths": 32,
+   "low": 0.206,
+   "rate": 0.281,
+   "tries": 114
+  },
+  "gelatinous cube|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 33
+  },
+  "ghoul|1-2": {
+   "deaths": 1,
+   "low": 0.0,
+   "rate": 0.002,
+   "tries": 459
+  },
+  "ghoul|<=0": {
+   "deaths": 15,
+   "low": 0.013,
+   "rate": 0.021,
+   "tries": 702
+  },
+  "giant ant|1-2": {
+   "deaths": 54,
+   "low": 0.112,
+   "rate": 0.144,
+   "tries": 376
+  },
+  "giant ant|<=0": {
+   "deaths": 234,
+   "low": 0.061,
+   "rate": 0.069,
+   "tries": 3392
+  },
+  "giant bat|1-2": {
+   "deaths": 61,
+   "low": 0.188,
+   "rate": 0.236,
+   "tries": 259
+  },
+  "giant bat|<=0": {
+   "deaths": 96,
+   "low": 0.019,
+   "rate": 0.024,
+   "tries": 4075
+  },
+  "giant beetle|1-2": {
+   "deaths": 58,
+   "low": 0.21,
+   "rate": 0.264,
+   "tries": 220
+  },
+  "giant beetle|<=0": {
+   "deaths": 68,
+   "low": 0.098,
+   "rate": 0.123,
+   "tries": 553
+  },
+  "giant eel|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 14
+  },
+  "giant mummy|<=0": {
+   "deaths": 1,
+   "low": 0.207,
+   "rate": 1.0,
+   "tries": 1
+  },
+  "giant rat|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 215
+  },
+  "giant rat|<=0": {
+   "deaths": 98,
+   "low": 0.012,
+   "rate": 0.014,
+   "tries": 6844
+  },
+  "giant spider|1-2": {
+   "deaths": 32,
+   "low": 0.049,
+   "rate": 0.069,
+   "tries": 467
+  },
+  "giant spider|<=0": {
+   "deaths": 16,
+   "low": 0.109,
+   "rate": 0.172,
+   "tries": 93
+  },
+  "giant zombie|1-2": {
+   "deaths": 1,
+   "low": 0.046,
+   "rate": 0.25,
+   "tries": 4
+  },
+  "giant zombie|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "giant|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 4
+  },
+  "glass piercer|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "gnome king|<=0": {
+   "deaths": 47,
+   "low": 0.101,
+   "rate": 0.133,
+   "tries": 354
+  },
+  "gnome lord|1-2": {
+   "deaths": 31,
+   "low": 0.099,
+   "rate": 0.138,
+   "tries": 224
+  },
+  "gnome lord|<=0": {
+   "deaths": 87,
+   "low": 0.04,
+   "rate": 0.05,
+   "tries": 1754
+  },
+  "gnome mummy|1-2": {
+   "deaths": 44,
+   "low": 0.171,
+   "rate": 0.223,
+   "tries": 197
+  },
+  "gnome mummy|<=0": {
+   "deaths": 7,
+   "low": 0.005,
+   "rate": 0.011,
+   "tries": 638
+  },
+  "gnome zombie|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 112
+  },
+  "gnome zombie|<=0": {
+   "deaths": 4,
+   "low": 0.0,
+   "rate": 0.001,
+   "tries": 3120
+  },
+  "gnome|1-2": {
+   "deaths": 112,
+   "low": 0.289,
+   "rate": 0.337,
+   "tries": 332
+  },
+  "gnome|<=0": {
+   "deaths": 79,
+   "low": 0.02,
+   "rate": 0.025,
+   "tries": 3191
+  },
+  "gnomish wizard|<=0": {
+   "deaths": 57,
+   "low": 0.083,
+   "rate": 0.106,
+   "tries": 536
+  },
+  "goblin|<=0": {
+   "deaths": 12,
+   "low": 0.001,
+   "rate": 0.001,
+   "tries": 12634
+  },
+  "gold golem|<=0": {
+   "deaths": 94,
+   "low": 0.219,
+   "rate": 0.262,
+   "tries": 359
+  },
+  "golden naga hatchling|<=0": {
+   "deaths": 49,
+   "low": 0.06,
+   "rate": 0.078,
+   "tries": 625
+  },
+  "gray ooze|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 142
+  },
+  "gray ooze|<=0": {
+   "deaths": 5,
+   "low": 0.001,
+   "rate": 0.003,
+   "tries": 1678
+  },
+  "gray unicorn|1-2": {
+   "deaths": 5,
+   "low": 0.035,
+   "rate": 0.081,
+   "tries": 62
+  },
+  "gray unicorn|<=0": {
+   "deaths": 63,
+   "low": 0.12,
+   "rate": 0.151,
+   "tries": 418
+  },
+  "green slime|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "gremlin|1-2": {
+   "deaths": 32,
+   "low": 0.33,
+   "rate": 0.438,
+   "tries": 73
+  },
+  "gremlin|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "grid bug|<=0": {
+   "deaths": 91,
+   "low": 0.004,
+   "rate": 0.005,
+   "tries": 19705
+  },
+  "guardian naga hatchling|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 115
+  },
+  "guardian naga hatchling|<=0": {
+   "deaths": 1,
+   "low": 0.0,
+   "rate": 0.002,
+   "tries": 480
+  },
+  "hell hound pup|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "hill giant|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "hill orc|1-2": {
+   "deaths": 1,
+   "low": 0.004,
+   "rate": 0.021,
+   "tries": 48
+  },
+  "hill orc|<=0": {
+   "deaths": 97,
+   "low": 0.021,
+   "rate": 0.025,
+   "tries": 3833
+  },
+  "hobbit|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 43
+  },
+  "hobbit|<=0": {
+   "deaths": 5,
+   "low": 0.001,
+   "rate": 0.003,
+   "tries": 1924
+  },
+  "hobgoblin|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 99
+  },
+  "hobgoblin|<=0": {
+   "deaths": 106,
+   "low": 0.025,
+   "rate": 0.03,
+   "tries": 3524
+  },
+  "homunculus|1-2": {
+   "deaths": 1,
+   "low": 0.001,
+   "rate": 0.004,
+   "tries": 274
+  },
+  "homunculus|<=0": {
+   "deaths": 46,
+   "low": 0.011,
+   "rate": 0.015,
+   "tries": 3160
+  },
+  "horned devil|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "horse|1-2": {
+   "deaths": 4,
+   "low": 0.011,
+   "rate": 0.029,
+   "tries": 137
+  },
+  "horse|<=0": {
+   "deaths": 9,
+   "low": 0.054,
+   "rate": 0.1,
+   "tries": 90
+  },
+  "housecat|<=0": {
+   "deaths": 27,
+   "low": 0.023,
+   "rate": 0.033,
+   "tries": 827
+  },
+  "human mummy|1-2": {
+   "deaths": 20,
+   "low": 0.309,
+   "rate": 0.444,
+   "tries": 45
+  },
+  "human mummy|<=0": {
+   "deaths": 4,
+   "low": 0.102,
+   "rate": 0.25,
+   "tries": 16
+  },
+  "human zombie|<=0": {
+   "deaths": 6,
+   "low": 0.002,
+   "rate": 0.004,
+   "tries": 1587
+  },
+  "hunter|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "ice vortex|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 66
+  },
+  "ice vortex|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 39
+  },
+  "iguana|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 521
+  },
+  "iguana|<=0": {
+   "deaths": 146,
+   "low": 0.014,
+   "rate": 0.017,
+   "tries": 8686
+  },
+  "imp|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 224
+  },
+  "imp|<=0": {
+   "deaths": 64,
+   "low": 0.061,
+   "rate": 0.078,
+   "tries": 824
+  },
+  "incubus|1-2": {
+   "deaths": 1,
+   "low": 0.003,
+   "rate": 0.018,
+   "tries": 56
+  },
+  "incubus|<=0": {
+   "deaths": 1,
+   "low": 0.036,
+   "rate": 0.2,
+   "tries": 5
+  },
+  "iron piercer|1-2": {
+   "deaths": 3,
+   "low": 0.02,
+   "rate": 0.058,
+   "tries": 52
+  },
+  "iron piercer|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 172
+  },
+  "jackal|<=0": {
+   "deaths": 131,
+   "low": 0.006,
+   "rate": 0.007,
+   "tries": 19840
+  },
+  "jaguar|1-2": {
+   "deaths": 9,
+   "low": 0.01,
+   "rate": 0.02,
+   "tries": 453
+  },
+  "jaguar|<=0": {
+   "deaths": 96,
+   "low": 0.12,
+   "rate": 0.144,
+   "tries": 666
+  },
+  "killer bee|1-2": {
+   "deaths": 176,
+   "low": 0.205,
+   "rate": 0.233,
+   "tries": 754
+  },
+  "killer bee|<=0": {
+   "deaths": 281,
+   "low": 0.155,
+   "rate": 0.173,
+   "tries": 1627
+  },
+  "kitten|<=0": {
+   "deaths": 30,
+   "low": 0.01,
+   "rate": 0.015,
+   "tries": 2011
+  },
+  "kobold lord|<=0": {
+   "deaths": 2,
+   "low": 0.0,
+   "rate": 0.001,
+   "tries": 1591
+  },
+  "kobold mummy|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 176
+  },
+  "kobold mummy|<=0": {
+   "deaths": 4,
+   "low": 0.001,
+   "rate": 0.003,
+   "tries": 1258
+  },
+  "kobold shaman|<=0": {
+   "deaths": 7,
+   "low": 0.002,
+   "rate": 0.004,
+   "tries": 1605
+  },
+  "kobold zombie|<=0": {
+   "deaths": 8,
+   "low": 0.001,
+   "rate": 0.001,
+   "tries": 5512
+  },
+  "kobold|<=0": {
+   "deaths": 2,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 6499
+  },
+  "large cat|<=0": {
+   "deaths": 4,
+   "low": 0.008,
+   "rate": 0.019,
+   "tries": 206
+  },
+  "large dog|<=0": {
+   "deaths": 12,
+   "low": 0.021,
+   "rate": 0.037,
+   "tries": 324
+  },
+  "large kobold|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 146
+  },
+  "large kobold|<=0": {
+   "deaths": 6,
+   "low": 0.001,
+   "rate": 0.002,
+   "tries": 3133
+  },
+  "large mimic|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 7
+  },
+  "large mimic|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "leather golem|<=0": {
+   "deaths": 90,
+   "low": 0.373,
+   "rate": 0.439,
+   "tries": 205
+  },
+  "lemure|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 5
+  },
+  "leocrotta|1-2": {
+   "deaths": 37,
+   "low": 0.604,
+   "rate": 0.74,
+   "tries": 50
+  },
+  "leocrotta|<=0": {
+   "deaths": 37,
+   "low": 0.651,
+   "rate": 0.787,
+   "tries": 47
+  },
+  "leprechaun|1-2": {
+   "deaths": 1,
+   "low": 0.001,
+   "rate": 0.007,
+   "tries": 144
+  },
+  "leprechaun|<=0": {
+   "deaths": 15,
+   "low": 0.004,
+   "rate": 0.006,
+   "tries": 2535
+  },
+  "lichen|<=0": {
+   "deaths": 57,
+   "low": 0.002,
+   "rate": 0.003,
+   "tries": 21947
+  },
+  "little dog|<=0": {
+   "deaths": 17,
+   "low": 0.005,
+   "rate": 0.008,
+   "tries": 2008
+  },
+  "lizard|1-2": {
+   "deaths": 18,
+   "low": 0.022,
+   "rate": 0.034,
+   "tries": 528
+  },
+  "lizard|<=0": {
+   "deaths": 10,
+   "low": 0.006,
+   "rate": 0.01,
+   "tries": 977
+  },
+  "long worm tail|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "long worm|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 29
+  },
+  "lynx|1-2": {
+   "deaths": 41,
+   "low": 0.416,
+   "rate": 0.526,
+   "tries": 78
+  },
+  "lynx|<=0": {
+   "deaths": 13,
+   "low": 0.129,
+   "rate": 0.213,
+   "tries": 61
+  },
+  "manes|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 81
+  },
+  "manes|<=0": {
+   "deaths": 6,
+   "low": 0.001,
+   "rate": 0.002,
+   "tries": 2615
+  },
+  "monkey|1-2": {
+   "deaths": 2,
+   "low": 0.002,
+   "rate": 0.006,
+   "tries": 333
+  },
+  "monkey|<=0": {
+   "deaths": 16,
+   "low": 0.005,
+   "rate": 0.008,
+   "tries": 2099
+  },
+  "mountain centaur|1-2": {
+   "deaths": 1,
+   "low": 0.061,
+   "rate": 0.333,
+   "tries": 3
+  },
+  "mountain nymph|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 246
+  },
+  "mountain nymph|<=0": {
+   "deaths": 13,
+   "low": 0.009,
+   "rate": 0.015,
+   "tries": 863
+  },
+  "mumak|1-2": {
+   "deaths": 36,
+   "low": 0.523,
+   "rate": 0.655,
+   "tries": 55
+  },
+  "mumak|<=0": {
+   "deaths": 4,
+   "low": 0.09,
+   "rate": 0.222,
+   "tries": 18
+  },
+  "neanderthal|<=0": {
+   "deaths": 1,
+   "low": 0.095,
+   "rate": 0.5,
+   "tries": 2
+  },
+  "newt|<=0": {
+   "deaths": 72,
+   "low": 0.002,
+   "rate": 0.002,
+   "tries": 31221
+  },
+  "ogre king|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "ogre lord|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 8
+  },
+  "ogre|1-2": {
+   "deaths": 7,
+   "low": 0.11,
+   "rate": 0.219,
+   "tries": 32
+  },
+  "ogre|<=0": {
+   "deaths": 4,
+   "low": 0.077,
+   "rate": 0.19,
+   "tries": 21
+  },
+  "orc mummy|1-2": {
+   "deaths": 80,
+   "low": 0.338,
+   "rate": 0.404,
+   "tries": 198
+  },
+  "orc mummy|<=0": {
+   "deaths": 64,
+   "low": 0.176,
+   "rate": 0.22,
+   "tries": 291
+  },
+  "orc shaman|<=0": {
+   "deaths": 3,
+   "low": 0.002,
+   "rate": 0.006,
+   "tries": 470
+  },
+  "orc zombie|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 229
+  },
+  "orc zombie|<=0": {
+   "deaths": 39,
+   "low": 0.014,
+   "rate": 0.019,
+   "tries": 2101
+  },
+  "orc-captain|<=0": {
+   "deaths": 1,
+   "low": 0.001,
+   "rate": 0.007,
+   "tries": 152
+  },
+  "orc|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "owlbear|1-2": {
+   "deaths": 40,
+   "low": 0.169,
+   "rate": 0.223,
+   "tries": 179
+  },
+  "owlbear|<=0": {
+   "deaths": 45,
+   "low": 0.187,
+   "rate": 0.243,
+   "tries": 185
+  },
+  "panther|1-2": {
+   "deaths": 17,
+   "low": 0.162,
+   "rate": 0.25,
+   "tries": 68
+  },
+  "panther|<=0": {
+   "deaths": 2,
+   "low": 0.008,
+   "rate": 0.028,
+   "tries": 71
+  },
+  "paper golem|<=0": {
+   "deaths": 14,
+   "low": 0.006,
+   "rate": 0.011,
+   "tries": 1300
+  },
+  "piranha|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "pit viper|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 4
+  },
+  "plains centaur|1-2": {
+   "deaths": 3,
+   "low": 0.011,
+   "rate": 0.033,
+   "tries": 91
+  },
+  "plains centaur|<=0": {
+   "deaths": 14,
+   "low": 0.033,
+   "rate": 0.054,
+   "tries": 257
+  },
+  "pony|1-2": {
+   "deaths": 56,
+   "low": 0.108,
+   "rate": 0.138,
+   "tries": 405
+  },
+  "pony|<=0": {
+   "deaths": 70,
+   "low": 0.034,
+   "rate": 0.043,
+   "tries": 1625
+  },
+  "pyrolisk|1-2": {
+   "deaths": 10,
+   "low": 0.15,
+   "rate": 0.263,
+   "tries": 38
+  },
+  "pyrolisk|<=0": {
+   "deaths": 1,
+   "low": 0.004,
+   "rate": 0.02,
+   "tries": 49
+  },
+  "python|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 30
+  },
+  "python|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "quantum mechanic|1-2": {
+   "deaths": 1,
+   "low": 0.001,
+   "rate": 0.008,
+   "tries": 128
+  },
+  "quasit|1-2": {
+   "deaths": 53,
+   "low": 0.27,
+   "rate": 0.34,
+   "tries": 156
+  },
+  "quasit|<=0": {
+   "deaths": 19,
+   "low": 0.106,
+   "rate": 0.161,
+   "tries": 118
+  },
+  "quivering blob|1-2": {
+   "deaths": 1,
+   "low": 0.001,
+   "rate": 0.005,
+   "tries": 217
+  },
+  "quivering blob|<=0": {
+   "deaths": 1,
+   "low": 0.001,
+   "rate": 0.003,
+   "tries": 322
+  },
+  "rabid rat|1-2": {
+   "deaths": 35,
+   "low": 0.576,
+   "rate": 0.714,
+   "tries": 49
+  },
+  "rabid rat|<=0": {
+   "deaths": 113,
+   "low": 0.062,
+   "rate": 0.075,
+   "tries": 1514
+  },
+  "raven|1-2": {
+   "deaths": 5,
+   "low": 0.015,
+   "rate": 0.034,
+   "tries": 146
+  },
+  "raven|<=0": {
+   "deaths": 82,
+   "low": 0.245,
+   "rate": 0.296,
+   "tries": 277
+  },
+  "red naga hatchling|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 9
+  },
+  "red naga hatchling|<=0": {
+   "deaths": 2,
+   "low": 0.001,
+   "rate": 0.004,
+   "tries": 534
+  },
+  "red naga|1-2": {
+   "deaths": 1,
+   "low": 0.03,
+   "rate": 0.167,
+   "tries": 6
+  },
+  "red naga|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "rock mole|1-2": {
+   "deaths": 2,
+   "low": 0.003,
+   "rate": 0.009,
+   "tries": 216
+  },
+  "rock mole|<=0": {
+   "deaths": 55,
+   "low": 0.019,
+   "rate": 0.024,
+   "tries": 2280
+  },
+  "rock piercer|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 186
+  },
+  "rock piercer|<=0": {
+   "deaths": 44,
+   "low": 0.018,
+   "rate": 0.024,
+   "tries": 1839
+  },
+  "rope golem|1-2": {
+   "deaths": 18,
+   "low": 0.048,
+   "rate": 0.075,
+   "tries": 241
+  },
+  "rope golem|<=0": {
+   "deaths": 8,
+   "low": 0.016,
+   "rate": 0.031,
+   "tries": 260
+  },
+  "roshi|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "rothe|1-2": {
+   "deaths": 2,
+   "low": 0.002,
+   "rate": 0.006,
+   "tries": 322
+  },
+  "rothe|<=0": {
+   "deaths": 128,
+   "low": 0.028,
+   "rate": 0.033,
+   "tries": 3885
+  },
+  "rust monster|1-2": {
+   "deaths": 10,
+   "low": 0.092,
+   "rate": 0.164,
+   "tries": 61
+  },
+  "rust monster|<=0": {
+   "deaths": 1,
+   "low": 0.061,
+   "rate": 0.333,
+   "tries": 3
+  },
+  "sasquatch|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "scorpion|1-2": {
+   "deaths": 4,
+   "low": 0.085,
+   "rate": 0.211,
+   "tries": 19
+  },
+  "scorpion|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 6
+  },
+  "sergeant|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "sergeant|<=0": {
+   "deaths": 1,
+   "low": 0.207,
+   "rate": 1.0,
+   "tries": 1
+  },
+  "sewer rat|<=0": {
+   "deaths": 136,
+   "low": 0.015,
+   "rate": 0.018,
+   "tries": 7468
+  },
+  "shark|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "shocking sphere|<=0": {
+   "deaths": 3,
+   "low": 0.019,
+   "rate": 0.056,
+   "tries": 54
+  },
+  "shrieker|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 64
+  },
+  "shrieker|<=0": {
+   "deaths": 15,
+   "low": 0.004,
+   "rate": 0.007,
+   "tries": 2144
+  },
+  "small mimic|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 32
+  },
+  "small mimic|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 4
+  },
+  "snake|1-2": {
+   "deaths": 3,
+   "low": 0.004,
+   "rate": 0.012,
+   "tries": 241
+  },
+  "snake|<=0": {
+   "deaths": 23,
+   "low": 0.045,
+   "rate": 0.066,
+   "tries": 347
+  },
+  "soldier ant|1-2": {
+   "deaths": 157,
+   "low": 0.727,
+   "rate": 0.789,
+   "tries": 199
+  },
+  "soldier ant|<=0": {
+   "deaths": 331,
+   "low": 0.695,
+   "rate": 0.737,
+   "tries": 449
+  },
+  "soldier|1-2": {
+   "deaths": 5,
+   "low": 0.052,
+   "rate": 0.119,
+   "tries": 42
+  },
+  "soldier|<=0": {
+   "deaths": 4,
+   "low": 0.168,
+   "rate": 0.4,
+   "tries": 10
+  },
+  "stalker|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 4
+  },
+  "steam vortex|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "stone giant|1-2": {
+   "deaths": 3,
+   "low": 0.052,
+   "rate": 0.15,
+   "tries": 20
+  },
+  "stone giant|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "straw golem|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 214
+  },
+  "straw golem|<=0": {
+   "deaths": 26,
+   "low": 0.015,
+   "rate": 0.022,
+   "tries": 1209
+  },
+  "student|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "succubus|1-2": {
+   "deaths": 21,
+   "low": 0.566,
+   "rate": 0.75,
+   "tries": 28
+  },
+  "succubus|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 2
+  },
+  "tengu|1-2": {
+   "deaths": 3,
+   "low": 0.009,
+   "rate": 0.027,
+   "tries": 110
+  },
+  "tengu|<=0": {
+   "deaths": 1,
+   "low": 0.002,
+   "rate": 0.014,
+   "tries": 73
+  },
+  "thug|<=0": {
+   "deaths": 3,
+   "low": 0.438,
+   "rate": 1.0,
+   "tries": 3
+  },
+  "tiger|1-2": {
+   "deaths": 4,
+   "low": 0.032,
+   "rate": 0.08,
+   "tries": 50
+  },
+  "tiger|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 33
+  },
+  "troll|1-2": {
+   "deaths": 8,
+   "low": 0.355,
+   "rate": 0.615,
+   "tries": 13
+  },
+  "troll|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "vampire bat|1-2": {
+   "deaths": 32,
+   "low": 0.281,
+   "rate": 0.376,
+   "tries": 85
+  },
+  "vampire bat|<=0": {
+   "deaths": 23,
+   "low": 0.091,
+   "rate": 0.134,
+   "tries": 172
+  },
+  "violet fungus|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 157
+  },
+  "violet fungus|<=0": {
+   "deaths": 5,
+   "low": 0.003,
+   "rate": 0.006,
+   "tries": 782
+  },
+  "warg|1-2": {
+   "deaths": 10,
+   "low": 0.106,
+   "rate": 0.189,
+   "tries": 53
+  },
+  "warg|<=0": {
+   "deaths": 2,
+   "low": 0.082,
+   "rate": 0.286,
+   "tries": 7
+  },
+  "warhorse|1-2": {
+   "deaths": 4,
+   "low": 0.138,
+   "rate": 0.333,
+   "tries": 12
+  },
+  "warhorse|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "warrior|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "watchman|1-2": {
+   "deaths": 7,
+   "low": 0.354,
+   "rate": 0.636,
+   "tries": 11
+  },
+  "water moccasin|1-2": {
+   "deaths": 1,
+   "low": 0.207,
+   "rate": 1.0,
+   "tries": 1
+  },
+  "water moccasin|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "water nymph|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 187
+  },
+  "water nymph|<=0": {
+   "deaths": 4,
+   "low": 0.002,
+   "rate": 0.004,
+   "tries": 941
+  },
+  "werejackal|1-2": {
+   "deaths": 4,
+   "low": 0.127,
+   "rate": 0.308,
+   "tries": 13
+  },
+  "werejackal|<=0": {
+   "deaths": 115,
+   "low": 0.05,
+   "rate": 0.06,
+   "tries": 1915
+  },
+  "wererat|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 125
+  },
+  "wererat|<=0": {
+   "deaths": 53,
+   "low": 0.021,
+   "rate": 0.028,
+   "tries": 1918
+  },
+  "werewolf|1-2": {
+   "deaths": 65,
+   "low": 0.785,
+   "rate": 0.878,
+   "tries": 74
+  },
+  "werewolf|<=0": {
+   "deaths": 108,
+   "low": 0.367,
+   "rate": 0.427,
+   "tries": 253
+  },
+  "white unicorn|1-2": {
+   "deaths": 50,
+   "low": 0.678,
+   "rate": 0.794,
+   "tries": 63
+  },
+  "white unicorn|<=0": {
+   "deaths": 5,
+   "low": 0.013,
+   "rate": 0.031,
+   "tries": 163
+  },
+  "winter wolf cub|1-2": {
+   "deaths": 91,
+   "low": 0.555,
+   "rate": 0.636,
+   "tries": 143
+  },
+  "winter wolf cub|<=0": {
+   "deaths": 7,
+   "low": 0.03,
+   "rate": 0.062,
+   "tries": 113
+  },
+  "winter wolf|1-2": {
+   "deaths": 6,
+   "low": 0.067,
+   "rate": 0.143,
+   "tries": 42
+  },
+  "winter wolf|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "wolf|1-2": {
+   "deaths": 65,
+   "low": 0.19,
+   "rate": 0.236,
+   "tries": 275
+  },
+  "wolf|<=0": {
+   "deaths": 125,
+   "low": 0.145,
+   "rate": 0.171,
+   "tries": 732
+  },
+  "wood golem|<=0": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 21
+  },
+  "wood nymph|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 253
+  },
+  "wood nymph|<=0": {
+   "deaths": 8,
+   "low": 0.006,
+   "rate": 0.011,
+   "tries": 703
+  },
+  "wraith|1-2": {
+   "deaths": 15,
+   "low": 0.209,
+   "rate": 0.326,
+   "tries": 46
+  },
+  "wraith|<=0": {
+   "deaths": 3,
+   "low": 0.082,
+   "rate": 0.231,
+   "tries": 13
+  },
+  "wumpus|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 3
+  },
+  "xan|1-2": {
+   "deaths": 2,
+   "low": 0.009,
+   "rate": 0.032,
+   "tries": 62
+  },
+  "xorn|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  },
+  "yeti|1-2": {
+   "deaths": 15,
+   "low": 0.116,
+   "rate": 0.185,
+   "tries": 81
+  },
+  "yeti|<=0": {
+   "deaths": 4,
+   "low": 0.017,
+   "rate": 0.044,
+   "tries": 90
+  },
+  "zruty|1-2": {
+   "deaths": 0,
+   "low": 0.0,
+   "rate": 0.0,
+   "tries": 1
+  }
+ }
+}
