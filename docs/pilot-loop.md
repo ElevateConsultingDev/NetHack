@@ -189,6 +189,22 @@ Buckets on the best (20261019-003024 and 20261019-003753, 256 games): melee 191,
 
 **Untried ideas and combinations.** (1) Walk away from slow monsters above the fight limit instead of fighting (B003753104). (2) Find what makes the early pack heavy (B00375397) and stop picking it up. (3) Why B00375353 gave up searching at turn 1120. (4) Sokoban, still untouched. Round 3 runs these on held-out seed 10000.
 
+### Campaign 2, round 3 report (2026-10-19), and the campaign's end
+
+**Stop:** no gains, six TRYs in a row without a new best (iterations 124 to 129). Target (10 on both sets) not reached. Round 3 was the last round, so the loop ends here.
+
+**Baselines against the best.** Nothing was kept this round, so the best is round 2's engine: seed 1000 x128 20261019-003024 at 7.88 (XL 5.67), held-out seed 10000 x128 20261019-085932 at 7.20 (XL 5.62).
+
+**What round 3 tried, by lesson:**
+- Slow monsters above the fight limit are rarely what kills (124: 1,915 step-aways, flat).
+- Each "no way on" drill found a real defect (a never-opened bag, 125; a boulder in a dark corridor, 126 and 127), and each fix freed or changed its game without moving the bucket on both sets. The bucket is many small causes.
+- The standing orders are still at their optimum (128: the same two lead on tuning and fade on held out as in iteration 101).
+- Near misses do not always add up (129: two weakly positive fixes together are flat).
+
+**Campaign 2 in one paragraph.** Over 29 iterations, the pilot went from 6.98 to 7.88 levels on the tuning set and from 6.85 to 7.90 on round 2's held-out set (pooled +0.97 +/- 0.21, XL +0.48), all of it in round 2: heavy body armor (109), the hunger prayer gamble (110), Excalibur (111), refused diagonals remembered as steps (116), and dwarves out of the Mines below XL 8 (117). Every keep came from drilling one game to its actual cause; no tactic, standing-order change or readiness build moved depth. Melee is now 75% of all endings; diving is still the only lever that moves depth by itself, and it is paid for in XL (106 to 108, 122). The open question for Dave stands: whether to trade XL for depth by diving.
+
+**Replays worth watching:** B23321394 (Excalibur, dlvl 9 -> 22), B00375374 (dwarf out of the Mines, 8 -> 19), B00250227 (freed doorway stall, 5 -> 9).
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
