@@ -100,6 +100,22 @@ Buckets on the best (20261018-181737 / 181827): melee 81, Mines 21, no way on 10
 
 **Untried ideas and near misses that would combine.** No cheap engine change is left with evidence behind it. What remains is either locked (#enhance), a build larger than a pass (buying food with a gold economy, identification by shop price, the Sokoban branch, a readiness package), or a confirmation question: do the four equal-and-opposite candidates have a direction on a third held-out set? Round 3 is that confirmation round, short by design: the baseline on seed 7000, the four washes re-measured there (kept only if tuning does not fall and seed 7000 rises past its margin), and #enhance if Dave answers. If none confirms, the loop ends on round 3 and the larger builds go to Dave as the next shape of work.
 
+### Round 3 report (2026-10-18), and the loop's end
+
+**Stop:** no TRY left. Round 3 was the confirmation round the round 2 Review asked for, and the last round allowed; the loop ends here.
+
+**Baselines against the best.** Round 3 kept nothing: the best stays the engine of iteration 94 (iteration 89's numbers), tuning 20261018-181737 at 7.25 and seed 7000 20261018-183938 at 6.67. The four candidates that had shown equal and opposite moves in round 2 were re-measured on seed 7000 and none has a direction: dagger recovery -0.53, cloaks +0.05, the pet wait +0.06, careful Excalibur -0.12 (tuning -0.30, -0.20, +0.05, +0.05). They were noise.
+
+**What the three rounds did to the pilot.** Round 1 (iterations 60 to 81): 6.91 -> 7.32 average deepest over the 128 fixed games of seeds 1000 and 5000 (tuning 7.02 -> 7.33, held-out 6.81 -> 7.31, the held-out gain real at +0.50 +/- 0.20), no-way-on stalls 16 -> 6, vault guard deaths 4 -> 0, two shopkeeper deaths removed, six behaviour changes and four correctness fixes kept. Round 2 (82 to 96): flat, three keeps (stairs hidden under objects, eating further afield, the handless fix), stalls on the harder seed 6000 set 10 -> 8. Round 3 (97 to 100): nothing. 41 candidates measured in all, 9 behaviour changes and 7 correctness fixes kept.
+
+**What the loop learned, for whoever picks it up.**
+- The pilot dies in fights it starts at full HP against fast monsters above its level, two or more levels deeper than its XL belongs (about 60% of deaths); no in-fight rule found moves depth (eight measured). The fix is readiness, and the readiness that costs nothing (#enhance) is blocked on a question to Dave; the readiness that costs turns or carries risk (armor upgrades, scroll reading, wand engraving, Excalibur) measured flat or worse at this depth.
+- Stalls are now 3 to 8 per 64 games, each with its own mechanism, and the last six fixes that freed their games cost 0.2 to 0.4 levels elsewhere: the freed pilots walk into worse fights. The stall bucket is no longer where depth is lost.
+- 64 games per set resolve 0.3 levels; four candidates moved 0.2 to 0.3 one way on tuning and the other way held out and all four proved to be noise on a third set. A candidate worth keeping needs both sets to agree, and the cheap candidates left do not.
+- Larger builds are the next shape of work: a gold economy (sell spellbooks, buy food, pay for protection), identification by shop price, the Sokoban branch, and a readiness package with #enhance at its base. None fits a one-pass change; each is a design for Dave.
+
+**Questions still open for Dave:** keep #enhance (XL +0.19 and +0.23 real on both sets, depth flat); the keep rule (fixed 0.25 against a paired test); the target depth.
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)

@@ -298,10 +298,11 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
 
 ## 3. Finish
 
-- [ ] **Report.** When a stop condition in the spec's "Done" is met: write
+- [x] **Report.** When a stop condition in the spec's "Done" is met: write
   the end of the round in `docs/pilot-loop.md` under "Round 1" (which stop,
   baselines against best on both sets, what was kept and dropped, games to
   replay).
+  Round 3 report done 2026-10-18: nothing confirmed; the loop ends after three rounds at 7.25 (seed 1000) / 6.67 (seed 7000), from 7.02 / (seed 5000) 6.81 at the start. See docs/pilot-loop.md "Round 3 report".
   Round 2 report done 2026-10-18: stopped on an empty TRY list; flat (-0.08 tuning, +0.14 seed 6000); three keeps (87, 89, 94), eleven drops. See docs/pilot-loop.md "Round 2 report".
   Done 2026-10-18: round 1 stopped on no gains after eight TRYs; best 7.33 / 7.31 (7.32 over 128) from 7.02 / 6.81 (6.91); six behaviour changes and four correctness fixes kept, sixteen candidates dropped. See docs/pilot-loop.md "Round 1 report".
 - [x] **Review.** When Report is ticked and another round is allowed: do the
