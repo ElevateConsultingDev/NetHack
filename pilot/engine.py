@@ -141,6 +141,7 @@ class Memory:
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
+    enhance: bool = False                         # "You feel more confident in your weapon skills": #enhance pending
     handless: bool = False                        # polymorphed into a form that cannot open doors, engrave or wield
     vault_until: int = 0                          # turn until which a vault guard is being followed out
     cross_level: int = -1                         # a searched-out level: survivable traps count as walkable from now on
@@ -485,6 +486,9 @@ def mechanics(v: View, memory: Memory) -> tuple[str | None, str] | None:
         # A --More-- can be showing while a prompt (getlin, y/n) is already
         # pending behind it: dismiss it first, or typed answers are eaten.
         return "\r", "dismiss --More--"
+    if v.kind == "menu" and v.ctx.get("how") == "one" and any("skill" in i["text"].lower() for i in v.ctx.get("items", [])):
+        first = next((i["key"] for i in v.ctx.get("items", []) if i["selectable"] and i["key"]), None)
+        return (first, "advance the first skill offered") if first else ("\x1b", "no skill to advance")
     if v.kind == "menu" and v.ctx.get("how") == "any" and memory.loot_classes:
         return _pick_from_menu(v, memory), "take the wanted items"
     if memory.engraving:
@@ -1336,6 +1340,11 @@ class Engine:
                     return keys, []
             return None, [f"prompt: {v.kind} {v.ctx.get('prompt') or ''!r} choices {v.ctx.get('choices') or ''!r}"]
 
+        if self.memory.enhance:
+            self.memory.enhance = False
+            _count(self.memory, "skills enhanced")
+            self.note = "enhance the weapon skill"
+            return "#enhance\n", []
         self.memory.tinning = False  # The kit's prompts, if any, came before this command prompt.
         c = checks(v, self.memory)
         self.last_checks = c
@@ -1402,6 +1411,8 @@ class Engine:
         (--More-- ones too: that's where a prayer's result shows)."""
         m, turn = self.memory, v.status.get("turn", 0)
         for msg in v.s.get("messages", []):
+            if "more confident in your" in msg:
+                m.enhance = True  # A skill can be advanced: free, no turn (iteration 80: XL +0.2 on both sets).
             if "follow me" in msg:  # A vault guard: drop the gold and walk out behind him (4 of 128 games died fighting him).
                 m.vault_until = turn + 150
             if closed_for_inventory(msg) and v.pos:

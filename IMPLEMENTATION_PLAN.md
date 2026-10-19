@@ -10,7 +10,7 @@ its three round reports are in `docs/pilot-loop.md`.
 ## Loop state
 
 - Campaign 2, round 1 of 3; held-out seed this round 8000 (128 games per set)
-- Baselines (the only "before"): TO BE SCORED by task 1.1 (128 games on seed 1000 and on seed 8000, with #enhance adopted)
+- Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out `20261018-203302` (seed 8000, 128 games, deepest 7.37, XL 5.57)
 - Current best: the engine at the iteration 94 commit plus #enhance
 - TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
@@ -30,13 +30,14 @@ So: a better instrument first, then readiness through multi-pass builds.
 
 ## 1. Setup and tools (not TRYs)
 
-- [ ] **1.1 Adopt #enhance and re-score the baselines.** Re-apply iteration
+- [x] **1.1 Adopt #enhance and re-score the baselines.** Re-apply iteration
   80's code (in git history: `git log --oneline --grep "enhance"` and the
   check-log row; "You feel more confident in your" sets a flag, #enhance at
   the next command prompt, the skill menu answered with its first item).
   Then run the rules pilot on `--seed 1000 --games 128` and on `--seed 8000
   --games 128` and write both run ids, deepest and XL into Loop state as the
   baselines. Commit and push.
+  Done 2026-10-18: #enhance re-applied (177 skill advances across the pair); seed 1000 x128 `20261018-202858` 6.98 / XL 5.27 (melee 74, Mines 24, starving 12, no way on 11, wand 4, praying 3); seed 8000 x128 `20261018-203302` 7.37 / XL 5.57 (melee 83, Mines 24, starving 10, no way on 6, invisible 3, praying 1, wand 1). Load was 100 to 126 (the uboat loop); no time-limit game, longest 104 s.
 - [ ] **1.2 Pooled comparison.** `python3 -m pilot.compare --pool A1 B1 A2 B2`
   pairs A1 with B1 and A2 with B2 by game, pools the per-game depth and XL
   differences, prints each set's mean and SE, the pooled mean and SE, and the
