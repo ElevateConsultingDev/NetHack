@@ -69,6 +69,25 @@ Buckets on the best (20261018-154632 / 154726): died in melee/other 68, died in 
 
 Round 2 runs on held-out seed 6000. The no-gains stop stays at 8.
 
+### Round 2 report (2026-10-18)
+
+**Stop:** no TRY left (six TRYs in a row without a new best when the list ran out). The target was not reached.
+
+**Baselines against the best.** Round start 20261018-154632 (tuning 7.33) and 20261018-170335 (seed 6000, 5.95): 6.64 over the 128 games. Best 20261018-181737 / 181827: tuning 7.25 (-0.08 +/- 0.10, 6 better, 6 worse), seed 6000 6.09 (+0.14 +/- 0.22, 8 better, 5 worse); 6.67 over the 128 games. Round 2 was flat. Stalls on seed 6000 10 -> 8 (two statue-and-box stairs found); starvation 11 -> 9; two brain-loop labels became deaths.
+
+**Kept:** 87 (stairs hidden under objects: read "There is a staircase here", stand on every object square before giving up a level), 89 (eat fresh kills up to 20 steps away unless a hostile is within 8; marginal), 94 (a handless pilot at critical HP fights instead of looping on Elbereth; correctness).
+
+**Dropped, by what they taught:**
+- Pre-contact tactics are closed: the stairs before contact (82) fired 3 times in 128 games; Elbereth before contact (83) cost turns and kills on both sets.
+- Four equal-and-opposite pairs (pet wait 84, careful Excalibur 86, cloaks 93, dagger recovery 96): each moved about 0.2 to 0.3 on both sets in opposite directions. At 64 games a change that reshuffles paths without a direction looks exactly like this; none is a lead.
+- Stall mechanisms found and fixed in replay but paid for elsewhere: the sessile-kill memory (88 B, 91: held out -0.16 and -0.19), the blocker throw, the kick limit and the potion shed (95: -0.41 / -0.25 together, -0.22 / -0.20 potions alone), the boulder push (85). The freed pilots go on to worse fights; the paired cost is real.
+- Readiness via items stays closed: engrave-testing wands (90, -0.11 / -0.19: lightning blinds, create monster summons), buying food (92: never fired, the pilots are poor when they pass shops).
+- No case on the baselines: daggers already looted, protection unaffordable (13 priests met, none payable), Mines' End absent, glob deaths gone.
+
+**Where the pilot stands.** 102 of 128 games end in melee (81 main dungeon, 21 Mines), the same fight as in round 1: full HP against a fast monster above its level, two or more levels below where its XL belongs. Seed 6000 is a harder set (5.95 to 6.09 against 7.3 on seeds 1000 and 5000) and holds most of the stalls (8 of 11), each with its own mechanism (a door given up after six kicks, a pocket shut by the weight rule, a floating eye in the only corridor, a mold remembered after a kill from range). Fixing them one by one costs more than it earns at this noise level.
+
+**Replays worth watching:** 20261018-170335/B17033520 (statue on the stairs, 9,934 turns) and B17033528 (box on the stairs); 20261018-173311/B17331140 (the remembered mold) and B17331115 (the floating eye); 20261018-181827/B18182702 (six kicks) and B18182757 (the weight pocket).
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
