@@ -158,6 +158,28 @@ score, the target, the "must never change" list.
 **The Review may change:** the TRY list and its order, the no gains stop
 count, combination tasks, and tools for seeing why the pilot fails.
 
+## Campaign 2 (from 2026-10-18; overrides the sections above where they differ)
+
+Campaign 1 (rounds 1 to 3, iterations 60 to 100) ended with the loop's report in `docs/pilot-loop.md`. Dave asked for a bigger second campaign and delegated the open questions ("I trust you"); these are the decisions.
+
+**Seed sets: 128 games each.** Tuning `--seed 1000 --games 128`, held out `--seed 8000 --games 128` in round 1, `--seed 9000` in round 2, `--seed 10000` in round 3. 64 games could not tell a 0.15 gain from noise (campaign 1 buried four such candidates on a third set). Run with `--parallel 16`; a pair takes about four minutes.
+
+**Keep rule (replaces "When a candidate becomes the new best" clauses 1 and 2).** Pool the per-game depth differences of both sets (256 games). Keep when:
+1. the pooled mean gain is at least 2 standard errors above zero, and neither set falls by more than its own 2 standard errors; or
+2. the targeted bucket shrank on both sets and the pooled change is no worse than -1 standard error (a correctness or bucket fix that does not cost depth); or
+3. the correctness exception as before (a verified defect, no game worse on either set).
+XL is a guard: a candidate whose pooled XL falls by 2 standard errors is not kept. `pilot.compare` prints each set; pool them with `python3 -m pilot.compare --pool A1 B1 A2 B2` once the tools task adds it.
+
+**Multi-pass builds.** A task marked BUILD may span passes: each pass ends with a commit of working code behind a default-off order or flag (behaviour unchanged at the default, both baselines reproduce exactly), and a note under the task saying what is done and what is next. Only the task's final pass turns the flag on and measures; that pass counts as the TRY.
+
+**Sweeps.** A task marked SWEEP runs many order or flag variants in one pass through the sweep tool, on the tuning set only, and sends at most the best two to the full pair. A SWEEP counts as one TRY.
+
+**Target:** average deepest 10 on both sets (unchanged; ascension is the goal behind it).
+
+**#enhance is adopted** as part of the base (iteration 80's code, XL +0.19 and +0.23 real). **Pushing:** kept changes are pushed to `elevate` as before.
+
+**Rounds:** up to 3 again, with the Review between them; the no-gains stop is 6 TRYs (each TRY now costs more, and a SWEEP tests many variants).
+
 ## Style
 
 No em dashes or double hyphen dashes in anything written (docs, comments,

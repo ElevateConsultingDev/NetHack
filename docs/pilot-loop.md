@@ -116,6 +116,10 @@ Buckets on the best (20261018-181737 / 181827): melee 81, Mines 21, no way on 10
 
 **Questions still open for Dave:** keep #enhance (XL +0.19 and +0.23 real on both sets, depth flat); the keep rule (fixed 0.25 against a paired test); the target depth.
 
+## Campaign 2 (from 2026-10-18)
+
+Dave asked for a bigger second loop and delegated the open questions. Campaign 2 changes the instrument (128 games per set, a pooled paired keep rule, a sweep tool for many variants per pass) and attacks readiness through multi-pass builds (learned avoidance from the tactic ledger, active leveling, altar and price identification, using known items, a gold economy, Sokoban as a stretch). #enhance is adopted into the base. Plan: `IMPLEMENTATION_PLAN.md`; campaign 1's plan: `docs/PLAN-campaign-1.md`; rules: `specs/PILOT-SPEC.md` "Campaign 2".
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
