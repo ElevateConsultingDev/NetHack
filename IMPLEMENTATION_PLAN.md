@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
 - Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-003753` (seed 9000, 128 games, deepest 7.90, XL 5.93)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
-- TRY passes in a row with no new best: 2 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 3 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -120,6 +120,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-19 cause: 9 of 25 "no way on" stalls had been refused a tight diagonal ("carrying too much to get through", over 600 weight); with no junk to drop the engine routes around tight corners for good, and B00302416 (scale mail worn) is boxed into a Mines pocket. Take off and leave the body armor instead.
   Dropped (iteration 119): armor shedding plus a wider junk list pooled -0.13 +/- 0.14 (no way on 10 -> 8, 15 -> 13; armor shed 94 times); junk list only pooled -0.01 +/- 0.09.
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-19 cause: in B00375395 (a hidden-stairs stall) one corridor square blocked for good by a peaceful at turn 1910 cuts the level in half; every secret door is on the far side. Re-test iteration 112's 100-turn expiry for peaceful blocks now that iteration 116 removed the stuck guard's walls.
+  Dropped (iteration 120): pooled +0.05 +/- 0.10, no way on 10 -> 13 and 15 -> 12; flat twice, retired.
 - [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
