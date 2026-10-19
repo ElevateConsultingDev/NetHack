@@ -10,8 +10,8 @@ its three round reports are in `docs/pilot-loop.md`.
 ## Loop state
 
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
-- Baselines (the only "before"): tuning `20261019-002049` (seed 1000, 128 games, deepest 7.93, XL 5.65); held out `20261019-002502` (seed 9000, 128 games, deepest 7.60, XL 5.63)
-- Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116)
+- Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-003753` (seed 9000, 128 games, deepest 7.90, XL 5.93)
+- Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
 - TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
@@ -108,6 +108,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-19 cause: the stuck guard reads a refused diagonal step as a wall and blocks the target square for good (B23345327, iteration 113's drill); remember the refused step instead, together with iteration 113's door line (its near miss, re-pooled as its row asked).
   KEPT (iteration 116, bucket clause): no way on 14 -> 13 and 17 -> 10, pooled +0.12 +/- 0.16; B23345327 freed (dlvl 5 -> 9).
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-19 cause: the Mines bucket (19 and 33) is almost all dwarves (49 of 55): _leave_mines exempts dwarves, and 46 of their Mines deaths came under XL 8. Send dwarves out below XL 8 too (variant: below XL 5).
+  KEPT (iteration 117, bucket clause): Mines 19 -> 4 and 36 -> 4, pooled +0.12 +/- 0.11, XL +0.16 +/- 0.06 real. XL 5 variant -0.11 on tuning. Replay B00375374 (8 -> 19).
 - [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.

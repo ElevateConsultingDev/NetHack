@@ -1167,6 +1167,7 @@ def _key(why: str) -> str:
 DEFAULT_ORDERS = {
     "fight_up_to": None,        # melee adjacent hostiles up to this difficulty (None: your level + fight_margin)
     "fight_margin": 2,          # with fight_up_to None: fight up to difficulty XL + this
+    "dwarf_mines_xl": 8,        # a dwarf (or gnome) leaves the Gnomish Mines below this XL too
     "excalibur": True,          # lawful, XL 5+: dip the long sword into known fountains
     "hunger_gamble": 500,       # Weak with no safe food: pray this many turns after the last prayer (None: never)
     "avoid": sorted(DONT_MELEE),  # never melee these
@@ -1632,8 +1633,9 @@ class Engine:
         """The Mines' gnomes and dwarves are peaceful only to dwarves and
         gnomes; anyone else under XL 8 dies there (5 of 16 seeded games).
         Go back up, and never take that staircase down again."""
-        if v.status.get("dungeon") != "The Gnomish Mines" or v.status.get("race") in ("dwarf", "gnome") \
-                or (c["xlvl"] or 0) >= 8:
+        # Peaceful gnomes did not save dwarves: 49 of 130 dwarf games died in the Mines, 46 under XL 8.
+        need = int(self.orders["dwarf_mines_xl"]) if v.status.get("race") in ("dwarf", "gnome") else 8
+        if v.status.get("dungeon") != "The Gnomish Mines" or (c["xlvl"] or 0) >= need:
             return None
         m = self.memory
         if m.last_down and m.last_down[0] == v.dlvl - 1:
