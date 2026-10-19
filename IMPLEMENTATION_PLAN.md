@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 3 of 3; held-out seed this round 10000 (128 games per set)
 - Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-085932` (seed 10000, 128 games, deepest 7.20, XL 5.62)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
-- TRY passes in a row with no new best: 5 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 6 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -88,8 +88,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-19 cause: the standing orders were swept (iteration 101) for a pilot without heavy armor, Excalibur or the prayer gambles; melee is 75% and the fight thresholds may have moved. SWEEP fight_margin 3, retreat_below 0.25, explore_fully false, eat_at Weak.
   Nothing kept (iteration 128): eat_at Weak pooled +0.05 +/- 0.26, explore_fully false pooled -0.02 +/- 0.12; both lead on tuning and fade on held out, as in iteration 101.
-- [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
+  2026-10-19 cause: two verified defects whose fixes were up on both sets but under 2 SE alone: a never-opened bag weighing the pack past a squeeze (125, +0.05 / +0.14) and fighting a too-tough foe it could outrun (124, +0.03 / +0.00). Combine them, as 113 was combined into 116.
+  Dropped (iteration 129): pooled +0.02 +/- 0.09. Sixth TRY with no new best: round 3 stops here.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
 
 ## 2b. Round 2 (held-out seed 9000)
