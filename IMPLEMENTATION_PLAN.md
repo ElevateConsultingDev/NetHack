@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-181737` (seed 1000, deepest 7.25, XL 5.09); held out `20261018-183938` (seed 7000, deepest 6.67, XL 5.00)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 94 commit (iteration 89's numbers; handless pilots fight at critical HP)
-- TRY passes in a row with no new best: 3 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 4 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -55,8 +55,9 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
 - [x] TRY **Pet wait, confirmed.** Iteration 84's code (+0.25 seed 6000,
   -0.25 tuning), same test.
   Done 2026-10-18, buried (iteration 99): +0.05 tuning, +0.06 seed 7000, flat.
-- [ ] TRY **Careful Excalibur, confirmed.** Iteration 86's code (+0.16 seed
+- [x] TRY **Careful Excalibur, confirmed.** Iteration 86's code (+0.16 seed
   6000, -0.17 tuning), same test.
+  Done 2026-10-18, buried (iteration 100): +0.05 tuning, -0.12 seed 7000.
 - [!] blocked TRY **#enhance** (iteration 80's code; waiting on Dave's answer).
 
 ### Round 2 (from 2026-10-18; held-out seed 6000)
