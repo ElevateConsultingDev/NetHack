@@ -142,8 +142,6 @@ class Memory:
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
-    price_cands: dict = field(default_factory=dict)  # (class, appearance) -> set of item names its shop quotes allow
-    quoted: set = field(default_factory=set)      # (dlvl, x, y) shop squares already stepped on for a quote
     enhance: bool = False                         # "You feel more confident in your weapon skills": #enhance pending
     handless: bool = False                        # polymorphed into a form that cannot open doors, engrave or wield
     vault_until: int = 0                          # turn until which a vault guard is being followed out
@@ -1153,8 +1151,6 @@ ROUTINES = {
 ALTAR_TEST = os.environ.get("PILOT_ALTAR") == "1"
 BUC_WORDS = ("cursed", "blessed", "uncursed")
 
-PRICE_ID = os.environ.get("PILOT_PRICE") == "1"  # price identification in shops (campaign 2 build)
-
 HUNGER_RANK = ["", "Hungry", "Weak", "Fainting", "Fainted"]
 
 
@@ -1455,17 +1451,6 @@ class Engine:
                 m.tin_smell = "decaying substance"
             if "too hard to dig in" in msg:
                 m.undiggable.add(v.dlvl)
-            if PRICE_ID and "for sale" in msg:
-                from .prices import SALE, candidates, kind
-                q = SALE.search(msg)
-                k = kind(q.group(2)) if q else None
-                if k:
-                    cands = candidates(k[0], int(q.group(3)), v.status.get("cha") or 10, int(q.group(1) or 1))
-                    old_c = m.price_cands.get(k)
-                    m.price_cands[k] = cands if old_c is None else (old_c & cands or cands)
-                    _count(m, "shop quotes read")
-                    if len(m.price_cands[k]) == 1:
-                        _count(m, "items identified by price")
             if v.pos and msg.startswith("There is a staircase down here"):
                 # Under a box or a statue the '>' is never drawn (B17033528 stood on it for 9,000 turns).
                 m.features[(v.dlvl, *v.pos)] = "staircase down"
@@ -1602,29 +1587,6 @@ class Engine:
         path = bfs(v, lambda x, y: (x, y) in altars)
         if path and len(path) <= 25:
             keys, note = _step(v, m, path, "walk to the altar to test items")
-            if keys:
-                return keys, note
-        return None
-
-    def _price_walk(self, v: View, c: dict):
-        """In a shop with its keeper in view, step onto each unidentified magic item whose
-        appearance is not yet pinned down: the game quotes its price, _read_messages inverts it."""
-        m = self.memory
-        if not PRICE_ID or c.get("visible_hostiles") or not v.pos \
-                or not any(c2["kind"] == "monster" and c2["name"] == "shopkeeper" for c2 in v.cells.values()):
-            return None
-        from .prices import kind
-        m.quoted.add((v.dlvl, *v.pos))
-
-        def wanted(x, y):
-            cell = v.cells.get((x, y))
-            if not cell or cell["kind"] != "object" or (v.dlvl, x, y) not in m.shop_items or (v.dlvl, x, y) in m.quoted:
-                return False
-            k = kind(cell["name"])
-            return k is not None and len(m.price_cands.get(k, (1, 2))) > 1
-        path = bfs(v, wanted)
-        if path and len(path) <= 15:
-            keys, note = _step(v, m, path, f"step onto the {v.cells[path[-1]]['name']} for its price")
             if keys:
                 return keys, note
         return None
@@ -1865,10 +1827,6 @@ class Engine:
         wear = self._wear_armor(v, c)
         if wear:
             return self._stuck_guard(v, wear[0], wear[1])
-        quote = self._price_walk(v, c)
-        if quote:
-            self.note = quote[1]
-            return self._stuck_guard(v, quote[0], quote[1])
         test = self._altar_test(v, c)
         if test:
             self.note = test[1]
