@@ -11,6 +11,7 @@ from __future__ import annotations
 from .spoilers import spoiler
 from .tactics import Tracker, classify
 
+import os
 import re
 from collections import deque
 from dataclasses import dataclass, field

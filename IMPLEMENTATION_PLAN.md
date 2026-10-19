@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 1 of 3; held-out seed this round 8000 (128 games per set)
 - Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out `20261018-203302` (seed 8000, 128 games, deepest 7.37, XL 5.57)
 - Current best: the engine at the iteration 94 commit plus #enhance
-- TRY passes in a row with no new best: 2 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 3 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -73,12 +73,13 @@ So: a better instrument first, then readiness through multi-pass builds.
   list (no melee; back off, Elbereth if it respects it, stairs if near).
   Sweep the threshold (0.15, 0.25, 0.35) through the sweep tool first.
   Done 2026-10-18, dropped (iteration 102): threshold 0.25 -0.15 +/- 0.08, 0.45 -0.05 +/- 0.03 on tuning; more avoidance, more loss. 0.15 not run (the trend is monotone). The fast killers come back.
-- [ ] BUILD **Active leveling.** Campaign 1's XL gate waited in place and
+- [x] BUILD **Active leveling.** Campaign 1's XL gate waited in place and
   met one weak monster per 70 turns. Instead, when dlvl minus XL is 2 or
   more and the level is explored: patrol (walk to the farthest explored
   squares in turn, then back up a level and patrol there) for up to N turns
   per level, fighting what comes. Pass 1: the patrol routine behind
   `PILOT_PATROL=0`. Pass 2: sweep N (300, 800) and K (2, 3).
+  Done 2026-10-18, dropped (iteration 103): the patrol raised XL by 0.2 to 0.3 at K 2 and lost 0.15 to 0.20 depth; at K 3 flat (-0.02, -0.03). Reverted.
 - [ ] BUILD **Altar knowledge.** Remember altars. When an altar is reachable
   and nothing hostile is in view, drop every unknown item on it (one `D`
   with all classes), read the flashes ("black flash" cursed, "amber" blessed),
