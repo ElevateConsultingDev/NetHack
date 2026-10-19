@@ -88,7 +88,7 @@ So: a better instrument first, then readiness through multi-pass builds.
   uncursed scrolls at full HP in a safe room (campaign 1's blind reading lost
   0.7: cursed and bad scrolls were the cost); drop known-cursed junk.
   Built 2026-10-18 (measured with "Use what is known"): `Engine._altar_test` behind `PILOT_ALTAR=1` walks to a known altar within 25 steps and drops each scroll, potion, ring, amulet and wand whose name carries no curse word, one a turn; the game names each blessed, uncursed or cursed, and loot takes them back. Drill: 139 of 256 games see an altar (median turn 1,077) carrying about 1.6 unknown scrolls and potions. Off: replays identically. On, 16 games: 30 tests, no errors, 102 of 127 magic items end with their curse status known.
-- [ ] BUILD **Price identification.** In a shop with the keeper in view, pick
+- [x] BUILD **Price identification.** In a shop with the keeper in view, pick
   up each unknown scroll, potion and wand once, read the offered price from
   "For you, ... N zorkmids", drop it again. Map the base price (after the
   Cha and dunce-cap adjustments, and the 1-in-3 surcharge: take the lower of
@@ -100,6 +100,7 @@ So: a better instrument first, then readiness through multi-pass builds.
   charging, genocide, punishment, stinking cloud). Record in memory; a
   `#name` call is optional. Pass 1: read the quote and store the class.
   Pass 2: use the classes (below).
+  Built 2026-10-18 (measured with "Use what is known"): no pickup needed, the game quotes a price when the pilot steps onto a shop item (objnam.c doname_with_price). `pilot/prices.py` inverts a quote exactly (shk.c get_cost: base, the 4/3 surcharge on some unidentified items, the charisma factor) over the class's base prices read from objects.c, with a self-check; `Engine._price_walk` behind `PILOT_PRICE=1` steps onto each shop item whose appearance is not pinned down, and `_read_messages` keeps memory.price_cands[(class, appearance)] as the intersection of its quotes. Off: replays identically. On, 32 games: 13 quotes in 7 games, 1 outright identification; shops with magic items are uncommon at these depths.
 - [ ] BUILD **Use what is known.** Act on identified or price-classed items:
   read enchant armor (class 80 after the altar says uncursed: either result
   helps), enchant weapon, remove curse; read magic mapping on arrival when
