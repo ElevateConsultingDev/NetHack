@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 3 of 3; held-out seed this round 10000 (128 games per set)
 - Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-085932` (seed 10000, 128 games, deepest 7.20, XL 5.62)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
-- TRY passes in a row with no new best: 2 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 3 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -75,9 +75,11 @@ So: a better instrument first, then readiness through multi-pass builds.
   and stop picking that up.
   2026-10-19 cause: at the refusal B00375397 carries about 465 known (banded mail 250, sword, shield, three potions) plus a bag of unknown contents, never opened; over 600 refuses a squeeze. Treat bags as dead weight (dropped first when a squeeze is refused, not picked up in the Mines).
   Dropped (iteration 125): pooled +0.09 +/- 0.09; no way on 10 -> 9 and 14 -> 14. B00375397 freed (dlvl 3 -> 8).
-- [ ] TRY **The early give-up.** B00375353 stalls on dlvl 3 at turn 1120 after
+- [x] TRY **The early give-up.** B00375353 stalls on dlvl 3 at turn 1120 after
   a few hundred turns of searching: find why the search ended (probe it) and
   fix that.
+  2026-10-19 cause: a teleport trap put B00375353 in a dark corridor whose only way on is east past a boulder; step_ok plans a boulder push only into known floor, and dark corridor beyond is blank, so the push is never tried and the level reads explored. Allow pushes into unknown squares.
+  Dropped (iteration 126): pooled -0.14 +/- 0.26 (-0.65 and +0.36); the drilled game was not freed. A narrower form (only once the level reads explored with no stairs known) is untried.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
