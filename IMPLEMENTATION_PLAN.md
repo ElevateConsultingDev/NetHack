@@ -10,9 +10,9 @@ its three round reports are in `docs/pilot-loop.md`.
 ## Loop state
 
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
-- Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out `20261018-224138` (seed 9000, 128 games, deepest 6.85, XL 5.38)
-- Current best: the engine at the iteration 94 commit plus #enhance
-- TRY passes in a row with no new best: 2 (the stop is 6, or no TRY left)
+- Baselines (the only "before"): tuning `20261018-230705` (seed 1000, 128 games, deepest 7.23, XL 5.41); held out `20261018-231039` (seed 9000, 128 games, deepest 7.04, XL 5.52)
+- Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109)
+- TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -76,7 +76,11 @@ So: a better instrument first, then readiness through multi-pass builds.
   +0.2 to +0.3 XL, dive spent 0.8; together they may keep the depth and pass
   the guard.
   Done 2026-10-18, dropped (iteration 108): N 800 -0.48 depth / -0.42 XL, N 300 -0.21 / -0.30; worse than either alone.
-- [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-18 cause: melee deaths at AC 6 to 3 while heavy body armor lies on the floor; SAFE_ARMOR stops at chain mail's weight, so banded, splint and plate mail (always identified, well within a Valkyrie's capacity) are never picked up (seen in the replays about 40 times in 128 games).
+  KEPT (iteration 109): pooled +0.22 +/- 0.09, XL +0.14 +/- 0.05; seed 1000 7.23 (+0.26), seed 9000 7.04 (+0.19); body armor worn 76 -> 89 and 71 -> 94. Replay B23070591 (4 -> 12). Follow up: swapping worn armor for a better piece (a leather jacket kept over plate mail) is untried.
+- [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
 

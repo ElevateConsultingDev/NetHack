@@ -1035,11 +1035,12 @@ def r_loot(v: View, memory: Memory, args: dict):
 # identification, so nothing nasty hides behind them (the worst is a cursed
 # piece stuck on). Skipped: gloves (fumbling), random helmets (opposite
 # alignment), random boots (levitation, fumbling), cloaks (for now).
-# Appearance or name -> slot. Body armor up to chain mail's weight.
+# Appearance or name -> slot. Body armor up to plate mail (450 of a Valkyrie's 950).
 SAFE_ARMOR = {
     "leather jacket": "body", "leather armor": "body", "studded leather armor": "body",
     "ring mail": "body", "crude ring mail": "body", "orcish ring mail": "body", "scale mail": "body",
     "chain mail": "body", "crude chain mail": "body", "orcish chain mail": "body", "mithril-coat": "body",
+    "banded mail": "body", "splint mail": "body", "plate mail": "body",
     "orcish helm": "helmet", "iron skull cap": "helmet", "dwarvish iron helm": "helmet", "hard hat": "helmet",
     "elven leather helm": "helmet", "leather hat": "helmet", "dented pot": "helmet",
     "low boots": "boots", "walking shoes": "boots", "high boots": "boots", "jackboots": "boots",
