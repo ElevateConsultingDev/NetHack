@@ -261,6 +261,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: a pilot pocketed by its own weight rule (shed unknown potions at a failed squeeze) and a door given up after six kicks (kick 20). Dropped (iteration 95): -0.41 / -0.25 together, -0.22 / -0.20 potions alone; both stalls freed, the rest of the games worse.
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  Add a fresh copy of this task each time it is used.
+  2026-10-18: no candidate (not counted). The "poisoned by a rotted glob" deaths (desperate meals) are not on the current baselines; excluding globs from desperate meals is a one-line tweak to bundle with a later candidate. Ideas with evidence are running out; the next pass takes one more or declares none worth a pass, so the Report and the round 3 Review can run.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
