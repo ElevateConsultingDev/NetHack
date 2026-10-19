@@ -9,10 +9,10 @@ its three round reports are in `docs/pilot-loop.md`.
 
 ## Loop state
 
-- Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
-- Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-003753` (seed 9000, 128 games, deepest 7.90, XL 5.93)
+- Campaign 2, round 3 of 3; held-out seed this round 10000 (128 games per set)
+- Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out: to be scored on seed 10000 by round 3's first task (round 2's was `20261019-003753`, seed 9000, 7.90, XL 5.93)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
-- TRY passes in a row with no new best: 6 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -58,6 +58,24 @@ So: a better instrument first, then readiness through multi-pass builds.
   confidence bound. Build it from every rules run of seeds 1000 and 5000 on
   disk. Prints the 20 worst rows.
   Done 2026-10-18: `python3 -m pilot.danger` reads 112 plain rules runs of seeds 1000 and 5000 (never 6000+), merges per-turn melee decisions into fights (same monster, same game, under 20 turns apart), and writes pilot/danger.json: 303,414 fights in 339 (monster, gap) rows with a Wilson lower bound. Worst by lower bound: werewolf at gap 1-2 (88% of 74 fights end in death within 20 turns), fire ant and soldier ant at 1-2 (79%), black unicorn, dwarf lord, white unicorn; soldier ants kill 74% even at gap 0 or less (449 fights), fire ants 46%. The monster matters more than the gap.
+
+## 2c. Round 3 (held-out seed 10000)
+
+- [ ] **Held-out baseline for round 3.** The best on `--seed 10000 --games 128`;
+  write the run id and numbers into Loop state. Not a TRY.
+- [ ] TRY **Walk away from slow monsters.** Adjacent and above the fight limit,
+  a monster slower than the pilot (speed under 12: mimics 3, zombies 6 to 8,
+  molds 0) is stepped away from, not fought. B003753104 (XL 1, 8 HP) traded
+  blows with a small mimic until it died.
+- [ ] TRY **The early heavy pack.** B00375397 is refused a squeeze at turn 913,
+  XL 2: find what it picked up that weighs that much (replay its inventory)
+  and stop picking that up.
+- [ ] TRY **The early give-up.** B00375353 stalls on dlvl 3 at turn 1120 after
+  a few hundred turns of searching: find why the search ended (probe it) and
+  fix that.
+- [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+- [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
 
 ## 2b. Round 2 (held-out seed 9000)
 
@@ -207,7 +225,7 @@ So: a better instrument first, then readiness through multi-pass builds.
 
 ## 3. Finish
 
-- [x] **Report.** When a stop condition in the spec's "Done" is met: write
+- [ ] **Report.** When a stop condition in the spec's "Done" is met: write
   the end of the round in `docs/pilot-loop.md` under "Campaign 2, round N
   report" (which stop, baselines against best on both sets, what was kept
   and dropped, games to replay).
@@ -220,12 +238,14 @@ So: a better instrument first, then readiness through multi-pass builds.
   "TRY passes in a row with no new best" to 0, untick Report, and leave a
   fresh unticked copy of this Review task under it.
   Done 2026-10-18: round 1 reviewed (docs/pilot-loop.md "Review, campaign 2 round 1"); round 2 planned on seed 9000.
-- [ ] **Review.** When Report is ticked and another round is allowed: do the
+- [x] **Review.** When Report is ticked and another round is allowed: do the
   spec's "Rounds" steps 1 to 4. Then add the next round's tasks, set Round to
   the next one with its held-out seed (10000), put a task first
   in section 2 to score the best on the new held-out seed at 128 games, set
   "TRY passes in a row with no new best" to 0, untick Report, and leave a
   fresh unticked copy of this Review task under it.
+  Done 2026-10-19: round 2 reviewed (docs/pilot-loop.md "Review, campaign 2 round 2"); round 3 planned on seed 10000 (section 2c). Round 3 is the last: after its Report the loop ends.
+- [ ] **Review.** (Round 3 is the last round; after its Report the loop ends, so this copy is not expected to run.)
 
 ## Questions for Dave
 

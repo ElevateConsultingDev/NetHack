@@ -175,6 +175,20 @@ Dave asked for a bigger second loop and delegated the open questions. Campaign 2
 
 **Replays worth watching:** B23321394 (Excalibur, dlvl 9 -> 22), B00375374 (dwarf out of the Mines, 8 -> 19), B00250227 (freed doorway stall, 5 -> 9).
 
+### Review, campaign 2 round 2 (2026-10-19)
+
+Buckets on the best (20261019-003024 and 20261019-003753, 256 games): melee 191, no way on 25, starvation 12, wands 13, Mines 8. Drilled the three shallowest of melee (B00375301, B003753104, B003024103) and of no way on (B00375397, B00375353, B00375395).
+
+**Where does the pilot still lose levels, and the likeliest cause?**
+- Melee: B003753104 (XL 1, 8 of 16 HP) stands and trades blows with a small mimic, speed 3, until it dies: the rules brain's answer to "too tough, adjacent" is to fight it, where walking away from a monster that slow is free. B003024103 (XL 3) dies to a kobold's spear in three turns from 24 HP, and B00375301 to a rolling boulder trap at full HP: bad luck, nothing to fix.
+- No way on: B00375397 is refused a squeeze at turn 913 (XL 2): its pack is over 600 that early, so something heavy is being picked up. B00375353 stalls at turn 1120 after a few hundred turns of searching on dlvl 3: the give-up came early; why is not yet known. B00375395 is iteration 120's (a peaceful's block halving the level), flat twice.
+
+**Did the keep rule throw away a lead that looked real?** Iteration 113 (record covered doors, +0.16 pooled, 1.6 SE) was the one near miss; folded into 116, it was kept. Nothing else came near.
+
+**Is the noise hiding gains?** The pooled SE is 0.05 to 0.2; three of the five keeps were 0.1 to 0.2 levels and passed through the bucket clause, not the 2 SE clause. Gains of 0.1 are at the edge of what 256 games can see; the bucket clause is doing its job.
+
+**Untried ideas and combinations.** (1) Walk away from slow monsters above the fight limit instead of fighting (B003753104). (2) Find what makes the early pack heavy (B00375397) and stop picking it up. (3) Why B00375353 gave up searching at turn 1120. (4) Sokoban, still untouched. Round 3 runs these on held-out seed 10000.
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
