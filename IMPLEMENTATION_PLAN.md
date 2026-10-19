@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
 - Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-003753` (seed 9000, 128 games, deepest 7.90, XL 5.93)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
-- TRY passes in a row with no new best: 5 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 6 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -132,8 +132,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-19 cause: diving gained depth (+0.49) but cost XL in weak pilots (iteration 106); an Excalibur pilot is not weak, yet it still clears every level. Dive only with Excalibur wielded (variant: only while dlvl - XL <= 2).
   Dropped (iteration 122): pooled +0.04 +/- 0.14, XL -0.17 +/- 0.06 real; the gap-2 variant -0.05 on tuning.
-- [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
+  2026-10-19 cause: 18 of 190 melee deaths came 500 to 700 turns after the last prayer, where the critical-HP gamble (700) still waits; the hunger gamble at 500 was kept (iteration 110). Gamble at 500 (variant 400).
+  Dropped (iteration 123): pooled -0.01 +/- 0.05; 400 -0.02 on tuning. Sixth TRY with no new best: round 2 stops here.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
 
 ## 2. Round 1 (held-out seed 8000)
