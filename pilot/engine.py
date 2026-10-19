@@ -140,6 +140,7 @@ class Memory:
     dead_doors: set = field(default_factory=set)  # doors we gave up on
     locked: set = field(default_factory=set)      # (dlvl, x, y) doors the game told us are locked
     pending_dir: str = ""                         # direction key for an "In what direction?" still to come
+    no_diag: set = field(default_factory=set)     # (dlvl, ax, ay, bx, by) diagonal steps the game refused
     no_squeeze: bool = False                      # too heavy for tight diagonals and nothing left to drop
     cross_traps: bool = False                     # this decision only: a known survivable trap counts as walkable
     enhance: bool = False                         # "You feel more confident in your weapon skills": #enhance pending
@@ -269,6 +270,8 @@ class View:
         if not self.walkable(*b):
             return False
         diagonal = a[0] != b[0] and a[1] != b[1]
+        if diagonal and self.memory and (self.dlvl, *a, *b) in self.memory.no_diag:
+            return False
         if diagonal and self.memory and self.memory.no_squeeze \
                 and not self.walkable(a[0], b[1]) and not self.walkable(b[0], a[1]):
             return False  # "You are carrying too much to get through."
@@ -1465,6 +1468,8 @@ class Engine:
                 m.features[(v.dlvl, *v.pos)] = "staircase down"
             elif v.pos and msg.startswith("There is a staircase up here"):
                 m.features[(v.dlvl, *v.pos)] = "staircase up"
+            elif v.pos and msg.startswith("There is an open door here"):
+                m.features[(v.dlvl, *v.pos)] = "open door"  # A corpse on it hides the door (iteration 113).
             if msg.startswith("You can't go down here") and v.pos:
                 # The stairs we remembered here are gone (a mimic, or a
                 # level number shared with another branch): forget them,
@@ -1963,7 +1968,11 @@ class Engine:
         if m.stuck >= 5:
             m.stuck = 0
             d = DIRS.get(keys[-1:]) if keys else None
-            if d:
+            if d and keys in DIRS and d[0] and d[1]:
+                # A refused diagonal step (a door hidden under a corpse, a tight squeeze) says
+                # nothing about the square: blocking it for good walled B23345327 into a doorway.
+                m.no_diag.add((v.dlvl, *v.pos, v.pos[0] + d[0], v.pos[1] + d[1]))
+            elif d:
                 m.blocked.add((v.dlvl, v.pos[0] + d[0], v.pos[1] + d[1]))
                 if keys[0] in "o\x04":
                     m.dead_doors.add((v.dlvl, v.pos[0] + d[0], v.pos[1] + d[1]))
