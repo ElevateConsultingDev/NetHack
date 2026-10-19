@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
 - Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-003753` (seed 9000, 128 games, deepest 7.90, XL 5.93)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
-- TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 1 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -112,6 +112,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-19 cause: the Mines bucket (19 and 33) is almost all dwarves (49 of 55): _leave_mines exempts dwarves, and 46 of their Mines deaths came under XL 8. Send dwarves out below XL 8 too (variant: below XL 5).
   KEPT (iteration 117, bucket clause): Mines 19 -> 4 and 36 -> 4, pooled +0.12 +/- 0.11, XL +0.16 +/- 0.06 real. XL 5 variant -0.11 on tuning. Replay B00375374 (8 -> 19).
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-19 cause: the water demon and water moccasins from fountain dips kill 10 of 256 games (as many as soldier ants); the pilot dips at any "fine" HP (B003024110 at 43 of 62) with or without a prayer left. Dip only at full HP with the prayer gate open (variant: full HP only).
+  Dropped (iteration 118): full HP and prayer -0.34 on tuning; full HP only pooled -0.15 +/- 0.14. Delaying the dip costs more than the dip deaths.
 - [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
