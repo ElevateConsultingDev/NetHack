@@ -8,8 +8,8 @@ one task, then stops.
    left off. You are on branch `ai-player`; if not, switch to it. Read
    `docs/pilot.md` once for how the pilot and its tools work.
 2. If a stop condition in the spec's "Done" is already met (target reached
-   on both sets, "TRY passes in a row with no new best" is 8 or more, or no
-   unchecked TRY task is left):
+   on both sets, "TRY passes in a row with no new best" is 6 or more, or no
+   unchecked TRY task is left; a SWEEP or a BUILD's final pass counts as a TRY):
    - Report not ticked: do Report as this pass's task.
    - Report ticked, and the target was reached, or this is round 3, or the
      last Review found no new idea: output `<promise>PILOT DONE</promise>`
@@ -32,10 +32,17 @@ one task, then stops.
      fix is the smallest diff that removes that cause; one engine change
      per pass, cheap variants of it allowed in the same pass.
    - Measure every candidate on both sets: `python3 -m pilot.batch --brain
-     rules --seed 1000 --games 64 --parallel 16` and the same with the
-     round's held-out seed, then `python3 -m pilot.compare <baseline>
-     <candidate>` for each. Judge only by the spec's keep rule. Never lower
-     the game counts.
+     rules --seed 1000 --games 128 --parallel 16` and the same with the
+     round's held-out seed, then `python3 -m pilot.compare --pool <base1>
+     <cand1> <base2> <cand2>` (or `pilot.compare` per set until the tools
+     task adds `--pool`). Judge only by the spec's keep rule (campaign 2:
+     pooled paired test). Never lower the game counts.
+   - A BUILD task may take several passes: each pass commits working code
+     behind a default-off flag (both baselines reproduce exactly at the
+     default) and leaves a note under the task saying what is done and what
+     is next; only the final pass turns it on and measures. A SWEEP runs its
+     variants through `pilot.sweep` on the tuning set and sends at most the
+     best two to the full pair.
    - A new best: update "Loop state" (baselines, best, set "TRY passes in a
      row with no new best" to 0). A TRY with no new best adds 1 to it and
      the code change is reverted (`git checkout -- <files>`), keeping any
@@ -60,7 +67,7 @@ one task, then stops.
 7. Commit everything from this pass in one commit with a plain message
    saying what changed and the result. End the message with:
 
-       Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+       Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 
    If the candidate was kept: `git push elevate ai-player`. Push nothing
    else, ever. Never rewrite history.
