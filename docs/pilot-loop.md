@@ -120,6 +120,26 @@ Buckets on the best (20261018-181737 / 181827): melee 81, Mines 21, no way on 10
 
 Dave asked for a bigger second loop and delegated the open questions. Campaign 2 changes the instrument (128 games per set, a pooled paired keep rule, a sweep tool for many variants per pass) and attacks readiness through multi-pass builds (learned avoidance from the tactic ledger, active leveling, altar and price identification, using known items, a gold economy, Sokoban as a stretch). #enhance is adopted into the base. Plan: `IMPLEMENTATION_PLAN.md`; campaign 1's plan: `docs/PLAN-campaign-1.md`; rules: `specs/PILOT-SPEC.md` "Campaign 2".
 
+### Campaign 2, round 1 report (2026-10-18)
+
+**Stop:** no gains, six TRYs in a row without a new best (iterations 101 to 106). Target not reached.
+
+**Baselines against the best.** Nothing was kept, so the best is the base: #enhance adopted, seed 1000 x128 20261018-202858 at 6.98 (XL 5.27), seed 8000 x128 20261018-203302 at 7.37 (XL 5.57).
+
+**What the round built (kept as tools):** 128-game baselines; `pilot.compare --pool` (and the fix to game pairing, which collided past game 99); `pilot.sweep` with `pilot.batch --orders/--env`; the danger table (`pilot.danger`, 303,414 fights); `pilot/prices.py` (exact shop-price inversion); a `fight_margin` standing order; foreground measurement in PROMPT.md.
+
+**What it tried, by lesson:**
+- The standing orders are near their optimum (101: ten variants, nothing past noise; `fight_margin 1` is the only clear loss).
+- Avoiding the deadly fights loses depth (102): the killers are faster and come back.
+- More XL by patrolling loses depth (103): the extra fights kill more than the levels save.
+- Knowledge without identification by use is worth nothing (104): altar tests and price quotes worked; the pilot used what it learned six times in 128 games.
+- The gold economy works and barely fires (105): one sale per 128 games at these depths.
+- Depth can be bought (106): diving gets +0.49 levels (real) by arriving 0.83 XL weaker (real); the XL guard refuses it; asked Dave.
+
+**Where the pilot stands.** Nothing in the base changed, so the buckets are the baselines': melee 157 of 256 (61%), Mines 48, starvation 22, no way on 17. Every attack on the melee bucket so far, in three rounds and this one, has moved XL or the buckets and not depth, except diving, which moves depth by spending XL.
+
+**Replays worth watching:** 20261018-223134 (always-dive: deeper, younger deaths), 20261018-214557 (patrol: XL up, depth down), 20261018-220523 (the knowledge builds walking to altars and shops).
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)

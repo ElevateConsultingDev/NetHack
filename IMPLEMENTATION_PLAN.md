@@ -128,10 +128,11 @@ So: a better instrument first, then readiness through multi-pass builds.
 
 ## 3. Finish
 
-- [ ] **Report.** When a stop condition in the spec's "Done" is met: write
+- [x] **Report.** When a stop condition in the spec's "Done" is met: write
   the end of the round in `docs/pilot-loop.md` under "Campaign 2, round N
   report" (which stop, baselines against best on both sets, what was kept
   and dropped, games to replay).
+  Round 1 report done 2026-10-18: stopped on no gains after six TRYs; nothing kept beyond #enhance and the tools; diving is the one real depth gain and fails the XL guard. See docs/pilot-loop.md "Campaign 2, round 1 report".
 - [ ] **Review.** When Report is ticked and another round is allowed: do the
   spec's "Rounds" steps 1 to 4. Then add the next round's tasks, set Round to
   the next one with its held-out seed (9000, then 10000), put a task first
