@@ -140,6 +140,16 @@ Dave asked for a bigger second loop and delegated the open questions. Campaign 2
 
 **Replays worth watching:** 20261018-223134 (always-dive: deeper, younger deaths), 20261018-214557 (patrol: XL up, depth down), 20261018-220523 (the knowledge builds walking to altars and shops).
 
+### Review, campaign 2 round 1 (2026-10-18)
+
+**Where does the pilot still lose levels, and the likeliest cause?** The melee bucket (61%), as before: fights at full HP against fast monsters a level or two above the pilot. Nothing this round touched that without a cost elsewhere.
+
+**Did a rule throw away a lead that looked real?** Two leads point in opposite directions on the same axis. Diving (106) bought +0.49 depth (real) and spent 0.83 XL (real). Patrolling (103) bought +0.20 to +0.28 XL and spent 0.15 to 0.20 depth. Each was refused alone; neither has been tried with the other, nor in a narrow form. Early levels (dlvl 1 to 4) give little experience and cost turns and food; diving only there may keep most of the depth gain without the XL loss, and patrolling only where the pilot is far behind may pay back the XL.
+
+**Is the noise hiding gains?** At 128 games a set, the pooled SE is about 0.1 to 0.2 for most candidates; 106's +0.49 was clearly visible, so noise is no longer what hides gains. Candidates are simply flat.
+
+**Untried ideas and combinations.** (1) Diving with a depth cap (dive on dlvl up to 3, 5 or 7, then play as now): a SWEEP. (2) Dive plus patrol: the depth of the one, the XL of the other. (3) Sokoban, the stretch build, untouched. Round 2 runs these on held-out seed 9000. Diving changes the game's tempo, so the XL guard will judge each.
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
