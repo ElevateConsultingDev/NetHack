@@ -269,10 +269,11 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy of this task each time it is used.
   2026-10-18: walk to where a thrown dagger should lie (42 of 128 end with no throwing weapon). Dropped (iteration 96): -0.30 / +0.31, a wash with 7,383 extra steps. No further idea worth a pass this round; the TRY list ends here so the Report and Review can run.
-- [ ] TRY **Re-drill after a new best.** After every kept TRY, rerun the
+- [x] TRY **Re-drill after a new best.** After every kept TRY, rerun the
   buckets tool on the new baselines and, if the order of the buckets
   changed, reorder the TRY list above and say so. Add a fresh unchecked
   copy below it each time it is used.
+  Done 2026-10-18 (round 2, not counted): on 20261018-181737 / 181827 the order is unchanged: melee 81 (63%), Mines 21, stalls 10 and 1 blocked, starving 9, praying 3, wand 3. No TRY task is left; the Report follows.
 
 ## 3. Finish
 
