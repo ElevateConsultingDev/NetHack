@@ -10,8 +10,8 @@ its three round reports are in `docs/pilot-loop.md`.
 ## Loop state
 
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
-- Baselines (the only "before"): tuning `20261018-230705` (seed 1000, 128 games, deepest 7.23, XL 5.41); held out `20261018-231039` (seed 9000, 128 games, deepest 7.04, XL 5.52)
-- Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109)
+- Baselines (the only "before"): tuning `20261018-231807` (seed 1000, 128 games, deepest 7.30, XL 5.47); held out `20261018-232544` (seed 9000, 128 games, deepest 7.15, XL 5.50)
+- Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110)
 - TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
@@ -80,6 +80,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-18 cause: melee deaths at AC 6 to 3 while heavy body armor lies on the floor; SAFE_ARMOR stops at chain mail's weight, so banded, splint and plate mail (always identified, well within a Valkyrie's capacity) are never picked up (seen in the replays about 40 times in 128 games).
   KEPT (iteration 109): pooled +0.22 +/- 0.09, XL +0.14 +/- 0.05; seed 1000 7.23 (+0.26), seed 9000 7.04 (+0.19); body armor worn 76 -> 89 and 71 -> 94. Replay B23070591 (4 -> 12). Follow up: swapping worn armor for a better piece (a leather jacket kept over plate mail) is untried.
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-18 cause: starvation (13 and 20 games): every one was Weak again 400 to 900 turns after the prayer that fed it, with the 1000-turn gate shut and nothing safe to eat. (Armor upgrades were drilled first: only 8 of 128 games stepped on better body armor, too few.)
+  KEPT (iteration 110, bucket clause): pray when Weak 500+ turns after the last prayer; starving 13 -> 7 and 20 -> 10, pooled +0.09 +/- 0.05. Replay B23254489.
 - [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.

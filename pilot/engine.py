@@ -1157,6 +1157,7 @@ def _key(why: str) -> str:
 DEFAULT_ORDERS = {
     "fight_up_to": None,        # melee adjacent hostiles up to this difficulty (None: your level + fight_margin)
     "fight_margin": 2,          # with fight_up_to None: fight up to difficulty XL + this
+    "hunger_gamble": 500,       # Weak with no safe food: pray this many turns after the last prayer (None: never)
     "avoid": sorted(DONT_MELEE),  # never melee these
     "eat_at": "Hungry",         # eat known-safe food at this hunger ("never" to stop)
     "rest_below": 0.5,          # rest when HP is below this fraction and nothing's in view
@@ -1756,6 +1757,14 @@ class Engine:
             if c["safe_food"]:
                 m.pending_food = c["safe_food"][0]["letter"]
                 return "e", f"standing order: eat ({c['hunger']})"
+            since = (c["turn"] - m.last_pray_turn) if m.last_pray_turn is not None else None
+            if hunger >= HUNGER_RANK.index("Weak") and o["hunger_gamble"] is not None and not m.prayer_broken \
+                    and c["turn"] >= m.luck_bad_until and since is not None and since >= o["hunger_gamble"]:
+                # All 33 starvations of a 256-game pair came this way: Weak again 400 to 900
+                # turns after the prayer that fed us, gate shut, dead. The timeout is rnz(350):
+                # at 500 turns a prayer succeeds about seven times in eight.
+                _count(m, "prayer gamble (hunger)")
+                return r_pray(v, m, {})[0], "standing order: pray (Weak, the gate is probably open)"
             if hunger >= HUNGER_RANK.index("Weak"):
                 # Weak with nothing safe to eat and the prayer gate shut:
                 # asking the brain ended 17 of 128 games as stalls (the rules
