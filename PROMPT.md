@@ -37,6 +37,14 @@ one task, then stops.
      <cand1> <base2> <cand2>` (or `pilot.compare` per set until the tools
      task adds `--pool`). Judge only by the spec's keep rule (campaign 2:
      pooled paired test). Never lower the game counts.
+   - Run every batch, sweep variant and replay in the FOREGROUND, one
+     command per batch with a timeout of 600000 ms (a 128-game batch takes
+     about 4 minutes). Never put a measurement in the background and end the
+     turn to wait for it: the loop's stop hook re-feeds this prompt at once,
+     and a pass that waits that way spends hundreds of empty turns. A sweep
+     is run as one foreground `pilot.batch` call per variant (the sweep tool
+     prints its table from finished runs with `--runs`), not as one long
+     background job.
    - A BUILD task may take several passes: each pass commits working code
      behind a default-off flag (both baselines reproduce exactly at the
      default) and leaves a note under the task saying what is done and what

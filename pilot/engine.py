@@ -1153,7 +1153,8 @@ def _key(why: str) -> str:
     return re.sub(r"\d+", "#", why)
 
 DEFAULT_ORDERS = {
-    "fight_up_to": None,        # melee adjacent hostiles up to this difficulty (None: your level + 2)
+    "fight_up_to": None,        # melee adjacent hostiles up to this difficulty (None: your level + fight_margin)
+    "fight_margin": 2,          # with fight_up_to None: fight up to difficulty XL + this
     "avoid": sorted(DONT_MELEE),  # never melee these
     "eat_at": "Hungry",         # eat known-safe food at this hunger ("never" to stop)
     "rest_below": 0.5,          # rest when HP is below this fraction and nothing's in view
@@ -1720,7 +1721,7 @@ class Engine:
                     if keys:
                         return keys, "standing order: " + note
                     break
-        limit = o["fight_up_to"] if o["fight_up_to"] is not None else (c["xlvl"] or 1) + 2
+        limit = o["fight_up_to"] if o["fight_up_to"] is not None else (c["xlvl"] or 1) + int(o["fight_margin"])
         # This fight order outranks an ordered Elbereth on purpose: yielding
         # to it let kobold zombies and jackals kill XL 1 pilots resting on a
         # smudged engraving (iteration 36a, -0.44 / -0.27 levels).
