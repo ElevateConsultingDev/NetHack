@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
 - Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out `20261018-224138` (seed 9000, 128 games, deepest 6.85, XL 5.38)
 - Current best: the engine at the iteration 94 commit plus #enhance
-- TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 1 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -64,12 +64,13 @@ So: a better instrument first, then readiness through multi-pass builds.
 - [x] **Held-out baseline for round 2.** The base on `--seed 9000 --games 128`;
   write the run id and numbers into Loop state. Not a TRY.
   Done 2026-10-18: `20261018-224138`, deepest 6.85, XL 5.38; melee 62, Mines 30, starving 18, no way on 7 and 3 blocked, wand 7, invisible 1.
-- [ ] SWEEP **Dive with a depth cap.** Iteration 106's dive (take known stairs
+- [x] SWEEP **Dive with a depth cap.** Iteration 106's dive (take known stairs
   down before looting or exploring, HP 70%+, not hungry, nothing hostile in
   view; the code is described in its check-log row) with a new flag
   `PILOT_DIVE_MAXDLVL`: dive only while dlvl is at most 3, 5, 7. Early levels
   give little experience and cost turns and food. Best two to the pair; the
   XL guard judges.
+  Done 2026-10-18, nothing kept (iteration 107): caps 3 / 5 / 7 gave +0.10 / +0.24 / +0.41 depth and -0.44 / -0.33 / -0.67 XL on tuning; cap 5 pooled +0.23 +/- 0.19, XL -0.44 real. About 1.5 XL per level at every cap.
 - [ ] TRY **Dive plus patrol.** The best dive cap with iteration 103's patrol
   (commit 3e13bbdf5, `PILOT_PATROL_TURNS` 300 / 800 at K 2): patrol gave
   +0.2 to +0.3 XL, dive spent 0.8; together they may keep the depth and pass
