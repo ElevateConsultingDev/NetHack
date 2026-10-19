@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
 - Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-003753` (seed 9000, 128 games, deepest 7.90, XL 5.93)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
-- TRY passes in a row with no new best: 3 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 4 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -124,6 +124,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-19 cause: in B00375395 (a hidden-stairs stall) one corridor square blocked for good by a peaceful at turn 1910 cuts the level in half; every secret door is on the far side. Re-test iteration 112's 100-turn expiry for peaceful blocks now that iteration 116 removed the stuck guard's walls.
   Dropped (iteration 120): pooled +0.05 +/- 0.10, no way on 10 -> 13 and 15 -> 12; flat twice, retired.
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-19 cause: melee (101 and 87) and the pilot never wears a cloak, though every cloak is safe in 3.6 (the random four are protection, invisibility, magic resistance, displacement) and MC blocks some poison stings (soldier ants, the top killer); 31 of 128 tuning games saw one, mummy wrappings 182 times. Wear cloaks over body armor.
+  Dropped (iteration 121): pooled +0.05 +/- 0.15; 120 cloaks worn, mostly mummy wrappings.
 - [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
