@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 1 of 3; held-out seed this round 8000 (128 games per set)
 - Baselines (the only "before"): tuning `20261018-202858` (seed 1000, 128 games, deepest 6.98, XL 5.27); held out `20261018-203302` (seed 8000, 128 games, deepest 7.37, XL 5.57)
 - Current best: the engine at the iteration 94 commit plus #enhance
-- TRY passes in a row with no new best: 4 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 5 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -109,11 +109,12 @@ So: a better instrument first, then readiness through multi-pass builds.
   prayer shut (campaign 1 found 47 of 101 deaths there); zap known attack
   wands then. Final pass measures the three knowledge builds together.
   Done 2026-10-18, dropped (iteration 104): the three together on seed 1000 x128 -0.16 +/- 0.21 (26 better, 38 worse); uses fired 6 times in 128 games (1 good scroll, 2 teleport escapes, 3 wand zaps). Items are almost never identified by name in this engine, so the knowledge had nothing to act on. Reverted.
-- [ ] BUILD **Gold economy.** Sell spellbooks and gems in shops (drop the
+- [x] BUILD **Gold economy.** Sell spellbooks and gems in shops (drop the
   item, answer "Sell it?" with y), then buy food when carrying little (lower
   the gold gate to 60, drop the item on "You don't have enough"), then pay a
   temple priest for protection when gold reaches 400 times (XL plus one)
   (#chat, answer the donation prompt). Each part behind its own flag.
+  Done 2026-10-18, dropped (iteration 105): protection unaffordable (median gold 76); selling books and buying food work but fire about once per 128 games; pooled +0.01 +/- 0.03, flat. Reverted.
 - [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
   Add a fresh copy each time it is used.
