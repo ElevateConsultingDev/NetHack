@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
 - Baselines (the only "before"): tuning `20261018-233213` (seed 1000, 128 games, deepest 7.70, XL 5.53); held out `20261018-233453` (seed 9000, 128 games, deepest 7.59, XL 5.69)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111)
-- TRY passes in a row with no new best: 3 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 4 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -100,6 +100,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-19 cause: only 56 of 256 games got Excalibur; 27 lawful XL 5 games had a fountain in view on the level where they reached XL 5 and never dipped: a sessile mold in view blocks the dip (it checks every visible hostile), e.g. B23321390 with a red mold in sight for 168 of 400 turns.
   Dropped (iteration 114): mobile hostiles only, pooled +0.03 +/- 0.06, Excaliburs 28 -> 31 and 28 -> 27. The dip runs only between routines; next try it from the standing orders.
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-19 cause: the dip is checked only in the default activity, between routines; in B23321390 loot and explore routines filled almost every turn after XL 5 with a fountain on the level. Try it as a standing order (ahead of routines), mobile hostiles only.
+  Dropped (iteration 115): pooled +0.02 +/- 0.08; dips barely moved (160 -> 172, 192 -> 175). Excalibur is limited by fountains, not scheduling.
 - [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
