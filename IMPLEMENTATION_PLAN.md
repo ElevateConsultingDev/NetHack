@@ -38,10 +38,11 @@ So: a better instrument first, then readiness through multi-pass builds.
   --games 128` and write both run ids, deepest and XL into Loop state as the
   baselines. Commit and push.
   Done 2026-10-18: #enhance re-applied (177 skill advances across the pair); seed 1000 x128 `20261018-202858` 6.98 / XL 5.27 (melee 74, Mines 24, starving 12, no way on 11, wand 4, praying 3); seed 8000 x128 `20261018-203302` 7.37 / XL 5.57 (melee 83, Mines 24, starving 10, no way on 6, invisible 3, praying 1, wand 1). Load was 100 to 126 (the uboat loop); no time-limit game, longest 104 s.
-- [ ] **1.2 Pooled comparison.** `python3 -m pilot.compare --pool A1 B1 A2 B2`
+- [x] **1.2 Pooled comparison.** `python3 -m pilot.compare --pool A1 B1 A2 B2`
   pairs A1 with B1 and A2 with B2 by game, pools the per-game depth and XL
   differences, prints each set's mean and SE, the pooled mean and SE, and the
   verdict under the campaign 2 keep rule. A self-check with made-up runs.
+  Done 2026-10-18: `python3 -m pilot.compare --pool A1 B1 A2 B2` prints each set and the pooled mean and SE with a keep / flat / drop verdict; `--check` tests it. Found and fixed on the way: games were matched by the last two characters of their names, which collide in a 128-game run (games 0 to 27 against 100 to 127); they are now matched by index. Old 64-game comparisons are unchanged (iteration 62 still reads -0.02 +/- 0.04).
 - [ ] **1.3 Sweep tool.** `python3 -m pilot.sweep '<json list>' --seed 1000
   --games 128 --name NAME`: each list item is a dict of standing-order
   overrides and/or `PILOT_*` environment flags; runs one batch per variant
