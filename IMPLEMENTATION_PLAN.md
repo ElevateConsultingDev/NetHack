@@ -10,7 +10,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 - Baselines (the only "before"): tuning `20261018-181737` (seed 1000, deepest 7.25, XL 5.09); held out `20261018-183938` (seed 7000, deepest 6.67, XL 5.00)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 94 commit (iteration 89's numbers; handless pilots fight at critical HP)
-- TRY passes in a row with no new best: 1 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 2 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -49,8 +49,9 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   thrown dagger should lie): +0.31 on seed 6000, -0.30 on tuning. Keep only
   if tuning does not fall past its margin and seed 7000 rises past its own.
   Done 2026-10-18, buried (iteration 97): -0.30 tuning, -0.53 seed 7000.
-- [ ] TRY **Cloaks, confirmed.** Iteration 93's code (+0.20 seed 6000,
+- [x] TRY **Cloaks, confirmed.** Iteration 93's code (+0.20 seed 6000,
   -0.20 tuning), same test.
+  Done 2026-10-18, buried (iteration 98): -0.20 tuning, +0.05 seed 7000.
 - [ ] TRY **Pet wait, confirmed.** Iteration 84's code (+0.25 seed 6000,
   -0.25 tuning), same test.
 - [ ] TRY **Careful Excalibur, confirmed.** Iteration 86's code (+0.16 seed
