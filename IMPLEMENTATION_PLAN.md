@@ -7,7 +7,7 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## Loop state
 
 - Round: 3 of 3; held-out seed this round 7000
-- Baselines (the only "before"): tuning `20261018-181737` (seed 1000, deepest 7.25, XL 5.09); held out: TO BE SCORED on seed 7000 by round 3's first task (round 2's held-out best was `20261018-181827`, seed 6000, 6.09)
+- Baselines (the only "before"): tuning `20261018-181737` (seed 1000, deepest 7.25, XL 5.09); held out `20261018-183938` (seed 7000, deepest 6.67, XL 5.00)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 94 commit (iteration 89's numbers; handless pilots fight at critical HP)
 - TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
@@ -41,9 +41,10 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
 
 ### Round 3 (from 2026-10-18; held-out seed 7000; confirmation round, the last)
 
-- [ ] **Held-out baseline for round 3.** Run the best engine on `--seed 7000
+- [x] **Held-out baseline for round 3.** Run the best engine on `--seed 7000
   --games 64 --parallel 16` and write the run id and numbers into "Loop
   state". Not a TRY.
+  Done 2026-10-18: `20261018-183938`, deepest 6.67, XL 5.00; melee 38, Mines 9, starving 6, no way on 3 and 1 blocked, praying 3, wand 3, invisible 1.
 - [ ] TRY **Dagger recovery, confirmed.** Iteration 96's code (walk to where a
   thrown dagger should lie): +0.31 on seed 6000, -0.30 on tuning. Keep only
   if tuning does not fall past its margin and seed 7000 rises past its own.
