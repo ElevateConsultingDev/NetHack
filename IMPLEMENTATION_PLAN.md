@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 3 of 3; held-out seed this round 10000 (128 games per set)
 - Baselines (the only "before"): tuning `20261019-003024` (seed 1000, 128 games, deepest 7.88, XL 5.67); held out `20261019-085932` (seed 10000, 128 games, deepest 7.20, XL 5.62)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111) plus refused diagonals remembered as steps (iteration 116) plus dwarves out of the Mines below XL 8 (iteration 117)
-- TRY passes in a row with no new best: 3 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 4 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -80,7 +80,11 @@ So: a better instrument first, then readiness through multi-pass builds.
   fix that.
   2026-10-19 cause: a teleport trap put B00375353 in a dark corridor whose only way on is east past a boulder; step_ok plans a boulder push only into known floor, and dark corridor beyond is blank, so the push is never tried and the level reads explored. Allow pushes into unknown squares.
   Dropped (iteration 126): pooled -0.14 +/- 0.26 (-0.65 and +0.36); the drilled game was not freed. A narrower form (only once the level reads explored with no stairs known) is untried.
-- [ ] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+- [x] TRY **Your own idea**: from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-19 cause: iteration 126's drill (B00375353, a boulder in a dark corridor between the pilot and the stairs); pushes into dark squares everywhere rerouted every game, so allow them only once a level is searched out with no way on, like the trap reopen.
+  Dropped (iteration 127): pooled -0.01 +/- 0.01; 19 levels reopened, none to the stairs.
+- [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
 
