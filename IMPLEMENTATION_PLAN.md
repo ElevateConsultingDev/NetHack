@@ -80,13 +80,14 @@ So: a better instrument first, then readiness through multi-pass builds.
   per level, fighting what comes. Pass 1: the patrol routine behind
   `PILOT_PATROL=0`. Pass 2: sweep N (300, 800) and K (2, 3).
   Done 2026-10-18, dropped (iteration 103): the patrol raised XL by 0.2 to 0.3 at K 2 and lost 0.15 to 0.20 depth; at K 3 flat (-0.02, -0.03). Reverted.
-- [ ] BUILD **Altar knowledge.** Remember altars. When an altar is reachable
+- [x] BUILD **Altar knowledge.** Remember altars. When an altar is reachable
   and nothing hostile is in view, drop every unknown item on it (one `D`
   with all classes), read the flashes ("black flash" cursed, "amber" blessed),
   pick them back up, and keep the B/U/C in memory by inventory text. Uses
   in the final pass: wear unknown-curse armor only when known uncursed; read
   uncursed scrolls at full HP in a safe room (campaign 1's blind reading lost
   0.7: cursed and bad scrolls were the cost); drop known-cursed junk.
+  Built 2026-10-18 (measured with "Use what is known"): `Engine._altar_test` behind `PILOT_ALTAR=1` walks to a known altar within 25 steps and drops each scroll, potion, ring, amulet and wand whose name carries no curse word, one a turn; the game names each blessed, uncursed or cursed, and loot takes them back. Drill: 139 of 256 games see an altar (median turn 1,077) carrying about 1.6 unknown scrolls and potions. Off: replays identically. On, 16 games: 30 tests, no errors, 102 of 127 magic items end with their curse status known.
 - [ ] BUILD **Price identification.** In a shop with the keeper in view, pick
   up each unknown scroll, potion and wand once, read the offered price from
   "For you, ... N zorkmids", drop it again. Map the base price (after the

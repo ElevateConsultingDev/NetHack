@@ -1146,6 +1146,11 @@ ROUTINES = {
 }
 
 
+# Altar knowledge (campaign 2 build): drop untested scrolls, potions, rings, amulets and wands on a
+# known altar so the game marks each blessed, uncursed or cursed; loot picks them back up.
+ALTAR_TEST = os.environ.get("PILOT_ALTAR") == "1"
+BUC_WORDS = ("cursed", "blessed", "uncursed")
+
 HUNGER_RANK = ["", "Hungry", "Weak", "Fainting", "Fainted"]
 
 
@@ -1563,6 +1568,29 @@ class Engine:
             return "W", f"wear the {i['text']}"
         return None
 
+    def _altar_test(self, v: View, c: dict):
+        """Walk to a known altar within 25 steps and drop each untested item on it, one a turn."""
+        m = self.memory
+        if not ALTAR_TEST or c.get("visible_hostiles") or not v.pos:
+            return None
+        untested = [i for i in v.s.get("inventory", []) if i["class"] in "?!=\"/"
+                    and not any(w in i["text"] for w in BUC_WORDS) and "unpaid" not in i["text"]]
+        if not untested:
+            return None
+        altars = [(x, y) for (d, x, y), n in m.features.items() if d == v.dlvl and n == "altar"]
+        if not altars:
+            return None
+        if v.pos in altars:
+            m.pending_item = untested[0]["letter"]
+            _count(m, "altar-tested an item")
+            return "d", f"drop the {untested[0]['text']} on the altar to learn its curse"
+        path = bfs(v, lambda x, y: (x, y) in altars)
+        if path and len(path) <= 25:
+            keys, note = _step(v, m, path, "walk to the altar to test items")
+            if keys:
+                return keys, note
+        return None
+
     def _dig_down(self, v: View, c: dict):
         """No known way down and a pick-axe in the pack: dig through the floor
         (13 of 128 games carried one; two of them searched walls for 2,500
@@ -1799,6 +1827,10 @@ class Engine:
         wear = self._wear_armor(v, c)
         if wear:
             return self._stuck_guard(v, wear[0], wear[1])
+        test = self._altar_test(v, c)
+        if test:
+            self.note = test[1]
+            return self._stuck_guard(v, test[0], test[1])
         burdened = v.status.get("encumbrance", "") != ""
         # Hostiles we never melee (a floating eye in the way) don't stop
         # looting, even next to us (they only hurt if hit; paths never walk
