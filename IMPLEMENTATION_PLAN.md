@@ -12,7 +12,7 @@ its three round reports are in `docs/pilot-loop.md`.
 - Campaign 2, round 2 of 3; held-out seed this round 9000 (128 games per set)
 - Baselines (the only "before"): tuning `20261018-233213` (seed 1000, 128 games, deepest 7.70, XL 5.53); held out `20261018-233453` (seed 9000, 128 games, deepest 7.59, XL 5.69)
 - Current best: the engine at the iteration 94 commit plus #enhance plus heavy body armor (iteration 109) plus the hunger prayer gamble at 500 turns (iteration 110) plus Excalibur (iteration 111)
-- TRY passes in a row with no new best: 0 (the stop is 6, or no TRY left)
+- TRY passes in a row with no new best: 1 (the stop is 6, or no TRY left)
   (TRY, SWEEP and the final pass of a BUILD count; a new best resets it to 0)
 
 ## What campaign 1 taught (the reasons for this plan)
@@ -88,6 +88,10 @@ So: a better instrument first, then readiness through multi-pass builds.
   cause not covered above; describe it in one line here before trying it.
   2026-10-18 cause: melee (79 and 63) is lost on damage, and the Valkyrie's standard answer was never used: dipping the long sword into a fountain at XL 5+ (102 of 128 games reach it) for Excalibur. (Mines deaths drilled first: spread over a dozen killers, no single cause.)
   KEPT (iteration 111): pooled +0.41 +/- 0.12, XL +0.12; 56 Excaliburs in 256 games, those games +2.5 levels; 9 games lost to water demons or moccasins. Follow up: retreat from a water demon or moccasins instead of fighting them. Replay B23321394 (9 -> 22).
+- [x] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
+  cause not covered above; describe it in one line here before trying it.
+  2026-10-18 cause: 31 of 256 games end "no way on", 9 with the '>' on the pilot's own map; B23345327 is walled into a Minetown shop doorway by two squares in memory.blocked, and peaceful blocks never expire.
+  Dropped (iteration 112): expiring peaceful blocks after 100 turns, pooled +0.02 +/- 0.07; the drilled game stayed stuck, so the blocks there came from elsewhere (likely the stuck guard). Follow up: log which code adds each blocked square in the 9 games before changing anything.
 - [ ] TRY **Your own idea** (fresh copy): from the biggest bucket's drill, the likeliest
   cause not covered above; describe it in one line here before trying it.
 - [ ] BUILD **Sokoban, level 1 (stretch).** As described in round 1's list.
