@@ -6,11 +6,11 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 
 ## Loop state
 
-- Round: 2 of 3; held-out seed this round 6000
-- Baselines (the only "before"): tuning `20261018-181737` (seed 1000, deepest 7.25, XL 5.09); held out `20261018-181827` (seed 6000, deepest 6.09, XL 4.81; a harder set of dungeons than seed 5000)
+- Round: 3 of 3; held-out seed this round 7000
+- Baselines (the only "before"): tuning `20261018-181737` (seed 1000, deepest 7.25, XL 5.09); held out: TO BE SCORED on seed 7000 by round 3's first task (round 2's held-out best was `20261018-181827`, seed 6000, 6.09)
 - Buckets on the baselines (`python3 -m pilot.buckets 20261018-154632 20261018-154726`): died in melee/other 68, died in the Mines 33, starving 8, wand or bolt 7, stall: no way on 6, praying 3, invisible monster 2, brain loop 1
 - Current best: the engine at the iteration 94 commit (iteration 89's numbers; handless pilots fight at critical HP)
-- TRY passes in a row with no new best: 6 (the stop is 8, or no TRY left)
+- TRY passes in a row with no new best: 0 (the stop is 8, or no TRY left)
   (only tasks marked TRY count; a TRY with no new best adds 1, a new best resets it to 0)
 
 ## 1. Tools (do these first: every later task leans on them)
@@ -38,6 +38,22 @@ Iterations continue the numbering in `docs/pilot-loop.md` (last: 59).
 ## 2. Tries (each is a TRY: drill first, one engine change, both seed sets)
 
 Order follows the buckets: melee first, Mines, then stalls, then hunger.
+
+### Round 3 (from 2026-10-18; held-out seed 7000; confirmation round, the last)
+
+- [ ] **Held-out baseline for round 3.** Run the best engine on `--seed 7000
+  --games 64 --parallel 16` and write the run id and numbers into "Loop
+  state". Not a TRY.
+- [ ] TRY **Dagger recovery, confirmed.** Iteration 96's code (walk to where a
+  thrown dagger should lie): +0.31 on seed 6000, -0.30 on tuning. Keep only
+  if tuning does not fall past its margin and seed 7000 rises past its own.
+- [ ] TRY **Cloaks, confirmed.** Iteration 93's code (+0.20 seed 6000,
+  -0.20 tuning), same test.
+- [ ] TRY **Pet wait, confirmed.** Iteration 84's code (+0.25 seed 6000,
+  -0.25 tuning), same test.
+- [ ] TRY **Careful Excalibur, confirmed.** Iteration 86's code (+0.16 seed
+  6000, -0.17 tuning), same test.
+- [!] blocked TRY **#enhance** (iteration 80's code; waiting on Dave's answer).
 
 ### Round 2 (from 2026-10-18; held-out seed 6000)
 
@@ -277,7 +293,7 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
 
 ## 3. Finish
 
-- [x] **Report.** When a stop condition in the spec's "Done" is met: write
+- [ ] **Report.** When a stop condition in the spec's "Done" is met: write
   the end of the round in `docs/pilot-loop.md` under "Round 1" (which stop,
   baselines against best on both sets, what was kept and dropped, games to
   replay).
@@ -291,12 +307,13 @@ Order follows the buckets: melee first, Mines, then stalls, then hunger.
   untick Report, and leave a fresh unticked copy of this Review task under
   it.
   Done 2026-10-18: round 1 reviewed (docs/pilot-loop.md "Review, round 1"); round 2 planned on held-out seed 6000.
-- [ ] **Review.** When Report is ticked and another round is allowed: do the
+- [x] **Review.** When Report is ticked and another round is allowed: do the
   spec's "Rounds" steps 1 to 4. Then add the next round's tasks, set Round
   to the next one with its held-out seed (7000), put a task first in section
   2 to score the best on the new held-out seed, set "TRY passes in a row
   with no new best" to 0, untick Report, and leave a fresh unticked copy of
   this Review task under it.
+  Done 2026-10-18: round 2 reviewed (docs/pilot-loop.md "Review, round 2"); round 3 is a short confirmation round on seed 7000. This is the last round allowed: after its Report the loop ends.
 
 ## Questions for Dave
 

@@ -88,6 +88,18 @@ Round 2 runs on held-out seed 6000. The no-gains stop stays at 8.
 
 **Replays worth watching:** 20261018-170335/B17033520 (statue on the stairs, 9,934 turns) and B17033528 (box on the stairs); 20261018-173311/B17331140 (the remembered mold) and B17331115 (the floating eye); 20261018-181827/B18182702 (six kicks) and B18182757 (the weight pocket).
 
+### Review, round 2 (2026-10-18)
+
+Buckets on the best (20261018-181737 / 181827): melee 81, Mines 21, no way on 10 and 1 blocked, starving 9, praying 3, wand or bolt 3. The shallowest deaths in the two big buckets were drilled through the round (a kitten at dlvl 3, an imp at dlvl 4, ants at dlvl 4 to 8; dwarves in the Mines at XL 3 to 4).
+
+**Where does the pilot still lose levels, and the likeliest cause?** As in round 1: a fight at full HP against a fast monster above its level, two or more levels deeper than its XL. Nothing in round 2 touched that; the round's gains were in the small buckets (stairs under objects, starvation).
+
+**Did a rule throw away a lead that looked real?** Possibly one: dagger recovery (96) was +0.31 +/- 0.24 on seed 6000 and -0.30 on tuning, and three other candidates (pet wait, careful Excalibur, cloaks) had the same shape. At 64 games a change that reshuffles paths looks like that whether or not it helps; a fresh held-out set is the only way to tell. #enhance (80) still waits on Dave.
+
+**Is the noise hiding gains?** Yes, at this size. The round's kept changes were within one standard error each and the round summed to -0.08 / +0.14; the drops were mostly 0.2 to 0.4 on one set and the opposite on the other. 64 games per set cannot separate a 0.15 gain from noise, and a 0.15 gain is what the remaining cheap ideas can offer. Twice 64 (both sets agreeing) is the real test, and the round's candidates failed it.
+
+**Untried ideas and near misses that would combine.** No cheap engine change is left with evidence behind it. What remains is either locked (#enhance), a build larger than a pass (buying food with a gold economy, identification by shop price, the Sokoban branch, a readiness package), or a confirmation question: do the four equal-and-opposite candidates have a direction on a third held-out set? Round 3 is that confirmation round, short by design: the baseline on seed 7000, the four washes re-measured there (kept only if tuning does not fall and seed 7000 rises past its margin), and #enhance if Dave answers. If none confirms, the loop ends on round 3 and the larger builds go to Dave as the next shape of work.
+
 ## Check log
 
 (Newest first: date, iteration, journal A/B deepest with vs without, held-out deepest vs previous.)
