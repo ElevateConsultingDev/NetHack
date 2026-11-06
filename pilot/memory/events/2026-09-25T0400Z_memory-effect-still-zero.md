@@ -13,4 +13,4 @@ Haiku played the same 32 dungeons (seed 3000) with conclusions.md (run 20260924-
 Whatever the conclusions say, Haiku's decisions with them do not reach deeper than its decisions without them, at this sample size. Either the lessons are not the ones that matter for depth, or the engine decides depth and the brain's calls are too few or too late to move it, or the effect is under 0.4 levels and needs hundreds of games to see.
 
 ## What is being tested next
-`pilot.strat`: training batches on seeds 4100, 4200, 4300 with a reflection (new stratum) after each, and a 64-game test on seed 3000 after every stratum against a no-conclusions base. A rising curve is the Stratigraph working; a flat one says the reflection is not producing lessons that transfer.
+The curve: training batches on seeds 4100, 4200, 4300 with a reflection (new version) after each, and a 64-game test on seed 3000 after every version against a no-conclusions base. A rising curve is the memory working; a flat one says the reflection is not producing lessons that transfer.

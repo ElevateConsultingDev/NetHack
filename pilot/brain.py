@@ -132,7 +132,7 @@ def _brief(c: dict, events: list[str], s: dict, chat: str | None, orders: dict, 
     return "\n".join(parts)
 
 
-MEMORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")  # the Stratigraph (see memory/STRATIGRAPH.md)
+MEMORY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory")  # the brain's memory (see memory/README.md)
 JOURNAL = os.path.join(MEMORY, "conclusions.md")  # the brain's current strategy
 
 
@@ -195,7 +195,7 @@ def recall(c: dict, events: list[str], s: dict, root: str | None = None, cap: in
 
 
 def _journal(path: str | None = None) -> str:
-    """The brain's current strategy (conclusions.md, or a given stratum), read fresh for every game."""
+    """The brain's current strategy (conclusions.md, or a given version), read fresh for every game."""
     try:
         with open(path or os.environ.get("PILOT_CONCLUSIONS") or JOURNAL) as f:
             return "\n\nYOUR CONCLUSIONS (what past runs mean for how to play; follow them):\n" + f.read()

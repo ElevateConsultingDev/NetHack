@@ -7,7 +7,7 @@ slug_story: prayer sequence not instantly safe
 
 # Conclusions: the brain's current strategy
 
-What the run record means for how the brain should play. The brain (Haiku or Qwen) reads this file at the start of every game. `python3 -m pilot.reflect <run>` revises it after a batch, archiving the previous version first (see STRATIGRAPH.md); humans edit it too. Lineage: this is the former `pilot/journal.md`, carried over as the first stratum.
+What the run record means for how the brain should play. The brain (Haiku or Qwen) reads this file at the start of every game. `python3 -m pilot.reflect <run>` revises it after a batch, archiving the previous version first; humans edit it too. Lineage: this is the former `pilot/journal.md`, carried over as the first version.
 
 ## Lessons for the brain
 

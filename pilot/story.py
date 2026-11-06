@@ -6,7 +6,7 @@ Two charts. ENGINE: average deepest level of the rules brain on the fixed
 seed sets over time, each run a dot, each kept engine fix a marker on the
 day it landed (from the git log). BRAIN: the model arms on the test seeds
 (with and without conclusions, per brain) so the memory's effect and the
-strata can be read as a curve. Every value is also in the tables below.
+versions can be read as a curve. Every value is also in the tables below.
 """
 
 from __future__ import annotations
@@ -103,7 +103,7 @@ def main() -> None:
             name = f"{b} {'with' if with_c else 'without'} conclusions"
             pts = [(run_time(r["run"]), r["deepest"], f"{r['run']}: deepest {r['deepest']:.2f}, XL {r['xl']:.2f}, "
                     f"{r['games']} games, {r['calls']} brain calls, {r['failed']} failed"
-                    + (f", stratum {os.path.basename(r['conclusions'])}" if r.get("conclusions") else ""))
+                    + (f", version {os.path.basename(r['conclusions'])}" if r.get("conclusions") else ""))
                    for r in sorted(runs, key=lambda r: r["run"])
                    if r["brain"] == b and r["seed"] == 3000 and r["games"] >= 32 and bool(r["journal"]) == with_c]
             if pts:
@@ -131,7 +131,7 @@ details{{margin:8px 0 16px}} table{{border-collapse:collapse;font-size:13px}} td
 {chart("Engine: rules brain on the fixed seed sets (64 games each)", engine, fixes)}
 {chart("Brain: model arms on the test seeds (seed 3000, same 32 dungeons)", brain)}
 {table("All runs", rows)}
-<p class="sub">The brain chart is the Stratigraph's report card: a rising "with conclusions" line while "without" stays flat means the strata are teaching something that transfers.</p>
+<p class="sub">The brain chart is the memory's report card: a rising "with conclusions" line while "without" stays flat means the versions are teaching something that transfers.</p>
 </body></html>"""
     path = os.path.join(BATCH, "story.html")
     with open(path, "w") as f:

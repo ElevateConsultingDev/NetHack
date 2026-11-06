@@ -1,10 +1,9 @@
-# The brain's memory (a Stratigraph)
+# The brain's memory
 
-This directory is the memory of the NetHack pilot's brain, kept as a Stratigraph: immutable events, versioned conclusions, a regenerable live edge. The protocol is `STRATIGRAPH.md`; read it first.
+This directory is the memory of the NetHack pilot's brain, kept as immutable events, versioned conclusions and a regenerable live edge.
 
 | File | What |
 |---|---|
-| `STRATIGRAPH.md` | the protocol (the genome) |
 | `conclusions.md` | the brain's current strategy: what the runs mean for how to play. The brain reads it at the start of every game. |
 | `conclusions-archive/<date>_<slug>.md` | every superseded strategy, verbatim, with what challenged it |
 | `events/<timestamp>_<slug>.md` | immutable records: one per batch (with a per-game table), plus prompt changes, discoveries and design decisions |

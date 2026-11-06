@@ -13,4 +13,4 @@ Haiku answering escalations only, with branch recall (the leaves matching each m
 With checkpoints gone, the memory neither helps nor hurts: the brain, asked only at escalations, gives the same answers as the fixed rules whether or not it is shown what past runs learned. Earlier memory designs measured negative because they rode on checkpoints, which were themselves the harm. At this engine there is nothing for a memory to improve, because the brain's decisions are not what limits depth.
 
 ## What this retires
-Further investment in what the brain is told, until the brain has decisions that move depth. The Stratigraph stays as the record and the test harness for that day.
+Further investment in what the brain is told, until the brain has decisions that move depth. The memory stays as the record for that day.

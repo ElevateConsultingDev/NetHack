@@ -508,7 +508,7 @@ def main() -> None:
     p.add_argument("--seed", type=int, help="reproducible games: game i gets seed SEED+i (same SEED = same dungeons)")
     p.add_argument("--no-journal", action="store_true", help="(default since 2026-09-25: conclusions cost depth) play without conclusions")
     p.add_argument("--with-conclusions", action="store_true", help="put memory/conclusions.md in the brain's prompt")
-    p.add_argument("--conclusions", help="play with this flat conclusions file (a stratum); implies --with-conclusions")
+    p.add_argument("--conclusions", help="play with this flat conclusions file (a version); implies --with-conclusions")
     p.add_argument("--checkpoints", action="store_true", help="consult the brain at new levels, first sights and check-ins too (they cost XL 0.5 and gained nothing, 2026-09-26)")
     p.add_argument("--no-checkpoints", action="store_true", help="(the default since 2026-09-26) escalations only")
     p.add_argument("--branches", nargs="?", const=True, metavar="DIR",
@@ -527,7 +527,7 @@ def main() -> None:
         replay(args.replay)
         return
     # The learning curve (2026-09-25) showed conclusions in the prompt cost Haiku 0.3 to 0.7 levels:
-    # off unless asked for, until a stratum beats the no-conclusions base on the test seeds.
+    # off unless asked for, until a version beats the no-conclusions base on the test seeds.
     args.no_journal = not (args.with_conclusions or args.conclusions)
     args.no_checkpoints = not args.checkpoints
     if args.no_checkpoints:
@@ -546,7 +546,7 @@ def main() -> None:
     with open(os.path.join(batch_dir, f"{run}.json"), "w") as f:  # Claim the id at once.
         json.dump({"run": run, "brain": args.brain, "games": []}, f)
     if not args.no_journal:
-        # Pin the stratum: every game of this run reads the same snapshot, whatever
+        # Pin the version: every game of this run reads the same snapshot, whatever
         # a reflection does to conclusions.md meanwhile (one Qwen arm mixed three).
         import shutil
         from .brain import JOURNAL

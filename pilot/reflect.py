@@ -1,4 +1,4 @@
-"""Reflect on a finished batch into the brain's memory (pilot/memory, a Stratigraph).
+"""Reflect on a finished batch into the brain's memory (pilot/memory).
 
     python3 -m pilot.reflect <run> [--model sonnet]
 
@@ -29,7 +29,7 @@ from .brain import JOURNAL, MEMORY
 SYSTEM = """You maintain the conclusions file (the current strategy) of a NetHack 3.6 autopilot (a Valkyrie). A deterministic ENGINE plays; a BRAIN model is consulted at checkpoints and escalations and reads this journal at the start of every game. You get the current conclusions and the records of a batch of games that just finished. Rewrite the conclusions so the next batch does better.
 
 Rules:
-- The lessons are RULES THE BRAIN CAN FOLLOW, keyed to a situation and telling it what TO DO: "<situation>: <action>" (e.g. "Dlvl 5 or deeper at XL 5 or less: set descend false and clear the level first"; "a soldier ant or killer bee in view: step_away toward the stairs up, never fight"). Not cautions, not lists of what fails, not narratives: a small model given a list of don'ts hesitates and dies sooner (the 2026-09-25 learning curve: every stratum of cautions tested below no conclusions).
+- The lessons are RULES THE BRAIN CAN FOLLOW, keyed to a situation and telling it what TO DO: "<situation>: <action>" (e.g. "Dlvl 5 or deeper at XL 5 or less: set descend false and clear the level first"; "a soldier ant or killer bee in view: step_away toward the stairs up, never fight"). Not cautions, not lists of what fails, not narratives: a small model given a list of don'ts hesitates and dies sooner (the 2026-09-25 learning curve: every version of cautions tested below no conclusions).
 - A rule needs support in at least 3 games of the records (say the count). Drop rules that lost their support. At most 12 brain rules, each one line under 200 characters.
 - The brain's memory is a TREE OF LEAVES; the engine shows the brain only the leaves matching the moment. Leaf paths (use exactly these families): monsters/<monster-name-slug> (e.g. monsters/floating-eye, monsters/soldier-ant), hunger/<hungry|weak|fainting>, dungeon/<the-gnomish-mines|the-dungeons-of-doom|sokoban>, depth/<dlvl-1-2|dlvl-3-5|dlvl-6-10|dlvl-11-plus>, escalation/<badly-hurt|critical-hp|no-way-on|prompt|failed-routine>, checkpoint/<new-level|check-in>, general.
 - Reply with the changed leaves only, each as <leaf path="monsters/floating-eye">...</leaf> holding the leaf's complete new text (1 to 3 rules, under 400 characters, "<situation>: <action>", with the game count). An empty body deletes the leaf. Leave leaves you have no new evidence about alone (do not repeat them). Then <engine>...</engine> holding the engine notes file (its title line, then the notes).
