@@ -9,7 +9,7 @@ slug_story: rest unsafe against any adjacent hostile
 
 What the run record means for how the brain should play. The brain (Haiku or Qwen) reads this file at the start of every game. `python3 -m pilot.reflect <run>` revises it after a batch, archiving the previous version first; humans edit it too. Lineage: this is the former `pilot/journal.md`, carried over as the first version.
 
-**Status (2026-09-25):** not in the brain's prompt by default. The learning curve (events/2026-09-25T0404Z_memory-curve-haiku.md) measured every version of this file below the no-conclusions base on the test seeds (-0.33 to -0.67 levels). It stays as the record and as the engine loop's notes; the reflection now writes short situation-keyed rules, and a version goes back into the prompt when it beats the base (`python3 -m pilot.strat`).
+**Status (2026-09-25):** not in the brain's prompt by default. The learning curve (events/2026-09-25T0404Z_memory-curve-haiku.md) measured every version of this file below the no-conclusions base on the test seeds (-0.33 to -0.67 levels). It stays as the record and as the engine loop's notes; the reflection now writes short situation-keyed rules, and a version goes back into the prompt when it beats the base (a learning curve).
 
 ## Lessons for the brain
 
