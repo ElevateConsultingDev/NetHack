@@ -116,7 +116,9 @@ function fitTo() {
   shown = dims.rows;
   if (term.cols !== dims.cols || term.rows !== shown + HIDE_TOP + HIDE_BOTTOM) term.resize(dims.cols, shown + HIDE_TOP + HIDE_BOTTOM);
   const cell = $('#term .xterm-screen').getBoundingClientRect().height / term.rows;
-  $('#term .xterm').style.transform = `translateY(${-HIDE_TOP * cell}px)`;
+  const x = $('#term .xterm');
+  x.style.transform = `translateY(${-HIDE_TOP * cell}px)`;
+  x.style.clipPath = `inset(${HIDE_TOP * cell}px 0 ${HIDE_BOTTOM * cell}px 0)`;  // whatever the leftover height, never a sliver of them
 }
 function zoom(step) {
   const size = Math.max(9, Math.min(40, term.options.fontSize + step));
