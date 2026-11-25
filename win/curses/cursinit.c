@@ -131,6 +131,8 @@ curses_create_main_windows()
     default:
         borders = FALSE;
     }
+    if (getenv("NETHACK_WEB"))  /* ./web draws its own frame around the map */
+        borders = FALSE;
 
     if (borders) {
         border_space = 2;

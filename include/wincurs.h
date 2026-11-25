@@ -127,6 +127,7 @@ extern void curses_putch(winid wid, int x, int y, int ch,
                          int color, int attrs);
 extern void curses_get_window_size(winid wid, int *height, int *width);
 extern boolean curses_window_has_border(winid wid);
+extern void curses_web_band(int *top, int *bottom);
 extern boolean curses_window_exists(winid wid);
 extern int curses_get_window_orientation(winid wid);
 extern void curses_get_window_xy(winid wid, int *x, int *y);

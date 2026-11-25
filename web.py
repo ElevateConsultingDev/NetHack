@@ -95,8 +95,14 @@ class Web(App):
             "chat": self.helper.lines[-300:], "busy": self.helper.busy,
             "menu": self.inventory_menu(), "asked": (lambda a: a and [a[0], sorted(a[1])])(guard.asked_letters(st)),
             "actions": {i["letter"]: guard.item_actions(i.get("class"), i["text"]) for i in st.get("inventory", [])},
+            "msgs": [self.row_text(r) for r in range(self.msg_rows())],
+            "cursor": [self.screen.cursor.y, self.screen.cursor.x] if self.screen.cursor.y < self.msg_rows() else None,
             "settings": helper.settings(), "models": helper.MODELS,
             "saves": u and {k: u[k] for k in ("items", "sel", "confirm", "naming")}, "over": self.over})
+
+    def msg_rows(self):
+        """The game's message rows at the top (cursinit.c: up to 4, the map right under)."""
+        return max(1, min(4, self.gh - 23))
 
     def resize(self, cols, rows):
         self.gw, self.gh = max(80, cols), max(24, rows)
@@ -287,10 +293,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    os.environ["NETHACK_WEB"] = "1"  # no window borders; menus keep clear of the rows the page hides
+    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)  # first: a taken port starts no game
     web = Web(sys.argv[1:])
     Handler.web = web
     threading.Thread(target=web.run, daemon=True).start()
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     srv.daemon_threads = True
     signal.signal(signal.SIGHUP, lambda *_: sys.exit())
     signal.signal(signal.SIGTERM, lambda *_: sys.exit())

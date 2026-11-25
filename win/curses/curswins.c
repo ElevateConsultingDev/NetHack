@@ -137,12 +137,40 @@ curses_create_window(int width, int height, orient orientation)
     if (starty < 0) {
         starty = 0;
     }
+    {
+        int top, bottom;
+
+        curses_web_band(&top, &bottom);
+        if (height > bottom - top)
+            height = bottom - top;
+        if (starty < top)
+            starty = top;
+        if (starty + height > bottom)
+            starty = bottom - height;
+    }
 
     win = newwin(height, width, starty, startx);
     curses_toggle_color_attr(win, DIALOG_BORDER_COLOR, NONE, ON);
     box(win, 0, 0);
     curses_toggle_color_attr(win, DIALOG_BORDER_COLOR, NONE, OFF);
     return win;
+}
+
+
+/* Under ./web (NETHACK_WEB) the browser hides the message rows and the status
+   lines and shows their text itself, so menus and popups stay between them:
+   the rows [*top, *bottom). Elsewhere that is the whole terminal. */
+
+void
+curses_web_band(int *top, int *bottom)
+{
+    *top = 0;
+    *bottom = term_rows;
+    if (!getenv("NETHACK_WEB") || !nhwins[MESSAGE_WIN].curwin
+        || !nhwins[STATUS_WIN].curwin)
+        return;
+    *top = nhwins[MESSAGE_WIN].y + nhwins[MESSAGE_WIN].height;
+    *bottom = nhwins[STATUS_WIN].y;
 }
 
 

@@ -1584,5 +1584,8 @@ menu_clear_selections(nhmenu *menu)
 static int
 menu_max_height(void)
 {
-    return term_rows - 2;
+    int top, bottom;
+
+    curses_web_band(&top, &bottom); /* the whole terminal, except under ./web */
+    return bottom - top - 2;
 }
