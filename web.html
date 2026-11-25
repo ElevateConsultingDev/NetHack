@@ -111,6 +111,17 @@ const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
 term.open($('#term'));
 term.onData(d => post('/key', {data: d}));
+// the keypad moves (vi keys), Shift+keypad runs, keypad 5 searches; while the game wants
+// typed text or a menu choice its digits stay digits
+const KEYPAD = {Numpad7: 'y', Numpad8: 'k', Numpad9: 'u', Numpad4: 'h', Numpad5: 's', Numpad6: 'l',
+                Numpad1: 'b', Numpad2: 'j', Numpad3: 'n'};
+term.attachCustomKeyEventHandler(e => {
+  const key = KEYPAD[e.code], kind = last?.state?.context?.kind;
+  if (!key || e.metaKey || e.ctrlKey || e.altKey || ['getlin', 'extcmd', 'menu'].includes(kind)) return true;
+  if (e.type === 'keydown') post('/key', {data: e.shiftKey && key !== 's' ? key.toUpperCase() : key});
+  e.preventDefault();
+  return false;  // xterm sends nothing for it
+});
 
 // the map's zoom is the text size: yours to set (- / + above the game), and kept when
 // the window or the columns change size (they change how much fits, not the size)
