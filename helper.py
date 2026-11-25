@@ -470,6 +470,7 @@ class App:
         self.holding = True  # keep this screen up through the save and restart
         self.started = time.time()
         self.snap_info = st.get("status") or {}
+        self.snap_preview = self.map_preview()  # the screen is about to go
         self.send(SAVE_KEYS)
         return True
 
@@ -505,6 +506,22 @@ class App:
         self.say("err", "Game over. Pick a checkpoint and press Enter to play on from there; q quits.")
         return True
 
+    def map_preview(self):
+        """The map as it looks now, as runs of [text, color, bold] per row, with the status."""
+        rows, buf = [], self.screen.buffer
+        for y in range(MAP_H):
+            runs, r = [], self.map_top + y
+            for x in range(MAP_W):
+                c = buf[r][x] if r < self.gh else None
+                key = (c.fg, c.bold) if c else ("default", False)
+                ch = (c.data or " ") if c else " "
+                if runs and (runs[-1][1], runs[-1][2]) == key:
+                    runs[-1][0] += ch
+                else:
+                    runs.append([ch, *key])
+            rows.append(runs)
+        return {"rows": rows, "status": self.watcher.state.get("status") or {}}
+
     def hist_path(self):
         return self.log.path[:-4] + ".helper.json" if self.log.path else None
 
@@ -519,8 +536,11 @@ class App:
         self.helper.save(self.hist_path())
         if self.hist_path() and os.path.exists(self.hist_path()):
             shutil.copy2(self.hist_path(), snap + ".helper.json")  # and the helper conversation
+        if getattr(self, "snap_preview", None):  # the map and numbers, for the saves list
+            with open(snap + ".preview.json", "w") as f:
+                json.dump(self.snap_preview, f)
         for old in saves.snapshots(SNAPS, self.save_name)[:-KEEP_SNAPS]:
-            os.unlink(old)
+            saves.remove(old)
         self.say("dim", f"Checkpoint saved (Dlvl {info.get('dlvl')}, turn {info.get('turn')}). ⌃G r goes back to the last one.")
 
     def load(self, item):
@@ -1613,6 +1633,7 @@ class App:
         except OSError:  # the terminal is already gone (window closed)
             pass
         self.watcher.close()
+        self.snap_preview = self.map_preview()
         try:
             os.kill(self.pid, signal.SIGHUP)  # NetHack saves on hangup
         except ProcessLookupError:

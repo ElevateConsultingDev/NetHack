@@ -53,9 +53,13 @@ select { background: var(--bg); color: var(--fg); border: 1px solid var(--line);
 #tip .acts { margin: 6px 0 0; }
 #saves { position: fixed; inset: 0; background: #000a; display: none; place-items: center; }
 #saves .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px;
-              width: min(720px, 94vw); max-height: 80vh; display: flex; flex-direction: column; gap: 8px; }
-#saves .list { overflow-y: auto; }
-#saves .row { display: grid; grid-template-columns: 140px 1fr 160px; gap: 8px; padding: 2px 6px; cursor: pointer; }
+              width: min(980px, 96vw); max-height: 92vh; display: flex; flex-direction: column; gap: 8px; }
+#saves .head { display: flex; align-items: center; gap: 8px; } #saves .head select { margin-left: auto; }
+#saves .list { overflow-y: auto; min-height: 120px; }
+#saves .row { display: grid; grid-template-columns: 120px 1fr 90px 60px 80px 120px; gap: 8px; padding: 2px 6px; cursor: pointer; }
+#saves .row.th { cursor: default; color: var(--dim); }
+#preview { font-size: 11px; line-height: 1.15; white-space: pre; background: var(--bg); border: 1px solid var(--line);
+           border-radius: 4px; padding: 6px; min-height: calc(21 * 1.15em + 12px); overflow: hidden; }
 #saves .row.sel { background: var(--blue); color: var(--bg); }
 @media (max-width: 1100px) { #app { grid-template-columns: 1fr; grid-template-rows: none; height: auto; } #game { height: 80vh; } .split { display: none; }
                              .col { border-left: 0; border-top: 1px solid var(--line); } #chatcol { height: 60vh; } }
@@ -87,7 +91,10 @@ select { background: var(--bg); color: var(--fg); border: 1px solid var(--line);
   </div>
 </div>
 <div id="tip"></div>
-<div id="saves"><div class="box"><div id="savestitle" class="b"></div><div class="list"></div>
+<div id="saves"><div class="box"><div class="head"><span id="savestitle" class="b"></span>
+  <select id="savesort"><option value="newest">Newest first</option><option value="deepest">Deepest first</option>
+  <option value="turns">Most turns first</option><option value="level">Highest level first</option></select></div>
+  <div class="list"></div><div id="preview" class="dim">Hover a save to see its map.</div>
   <div><button data-key="&#13;">Load</button> <button data-key="d">Delete</button> <button data-key="p">Prune to newest 3</button>
        <button id="newgame">New game</button> <button data-key="&#27;">Close</button></div></div></div>
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
@@ -350,10 +357,14 @@ function savesList(d) {
     : u.confirm === 'd' ? 'Delete this? Click Delete again to confirm.'
     : u.confirm === 'p' ? 'Keep only the newest 3 checkpoints of this character? Click Prune again.'
     : 'Saves (arrows and Enter work too)';
-  $('#saves .list').innerHTML = u.items.length ? u.items.map((it, k) =>
-    `<div class="row${k === u.sel ? ' sel' : ''}" data-sel="${k}"><span>${esc(it.char)}</span><span>${esc(it.what)}</span><span>${esc(it.when)}</span></div>`).join('')
+  if (document.activeElement !== $('#savesort')) $('#savesort').value = u.sort;
+  $('#saves .list').innerHTML = u.items.length ? '<div class="row th"><span>Character</span><span>Save</span><span>Depth</span><span>Level</span><span>HP</span><span>When</span></div>'
+    + u.items.map((it, k) => `<div class="row${k === u.sel ? ' sel' : ''}" data-sel="${k}"><span>${esc(it.char)}</span>
+      <span>${esc(it.kind === 'save' ? 'saved game' : `turn ${it.turn}`)}</span><span>${it.dlvl ? 'Dlvl ' + it.dlvl : ''}</span>
+      <span>${it.xlvl ? 'XL ' + it.xlvl : ''}</span><span>${it.hp != null ? it.hp + '/' + it.hpmax : ''}</span><span>${esc(it.when)}</span></div>`).join('')
     : '<div class="dim">No saved games or checkpoints yet.</div>';
   $('#saves .row.sel')?.scrollIntoView({block: 'nearest'});
+  if (!document.querySelector('#saves .row[data-sel]:hover')) showPreview(u.items[u.sel]);  // the mouse wins while it's on a row
 }
 
 function settings(d) {
@@ -362,6 +373,32 @@ function settings(d) {
   if (document.activeElement !== sel) sel.value = d.settings.model;
 }
 $('#model').addEventListener('change', e => { post('/settings', {model: e.target.value}); term.focus(); });
+
+// the map kept with a checkpoint, under the saves list: the selected one, or the one under the mouse
+const previews = {}, CSS = {red: '#ef6b6b', green: '#6fcf7a', brown: '#c9a15a', blue: '#6aa8ef', magenta: '#c58ae6',
+  cyan: '#5fc9d6', white: '#e6e9ee', black: '#7b8592', yellow: '#e6c35c'};
+let previewing = null;
+async function showPreview(it) {
+  const box = $('#preview');
+  if (!it || it.preview === previewing) return;
+  previewing = it.preview;
+  if (!it.preview) { box.className = 'dim'; box.textContent = 'No map kept with this one (only checkpoints made from now on have one).'; return; }
+  previews[it.preview] ??= fetch('/preview?path=' + encodeURIComponent(it.preview)).then(r => r.json()).catch(() => null);
+  const p = await previews[it.preview];
+  if (previewing !== it.preview || !p) return;
+  const st = p.status || {};
+  box.className = '';
+  box.innerHTML = `<div class="dim">${esc(st.dungeon || '')}, Dlvl ${st.dlvl} · turn ${st.turn} · XL ${st.xlvl} · HP ${st.hp}/${st.hpmax} · AC ${st.ac} · $${st.gold}</div>`
+    + p.rows.map(runs => runs.map(([t, fg, bold]) => {
+      const c = CSS[fg.replace(/^bright/, '')];
+      return c || bold ? `<span style="${c ? 'color:' + c + ';' : ''}${bold ? 'font-weight:bold' : ''}">${esc(t)}</span>` : esc(t);
+    }).join('')).join('\n');
+}
+document.addEventListener('mouseover', e => {
+  const row = e.target.closest('#saves .row[data-sel]');
+  if (row && last?.saves) showPreview(last.saves.items[+row.dataset.sel]);
+});
+$('#savesort').addEventListener('change', e => post('/saves', {sort: e.target.value}));
 
 function render(d) {
   last = d;

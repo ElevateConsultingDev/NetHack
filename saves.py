@@ -3,6 +3,7 @@
 NetHack keeps a saved game as playground/save/<uid><name>.Z; a checkpoint is a
 copy of one in playground/snapshots/ named <save file>@<turn>-D<dlvl>.
 """
+import json
 import os
 import re
 import time
@@ -39,6 +40,23 @@ def listing(saves_dir, snaps_dir):
     for i in items:
         i["mtime"] = os.path.getmtime(i["path"])
         i["when"] = time.strftime("%b %d %H:%M", time.localtime(i["mtime"]))
+    newest = {}  # a saved game is its newest checkpoint's game (one is kept on every quit)
+    for i in items:
+        if i["kind"] == "snap" and i["mtime"] >= newest.get(i["base"], {}).get("mtime", 0):
+            newest[i["base"]] = i
+    for i in items:
+        src = i if i["kind"] == "snap" else newest.get(i["base"])
+        i["preview"] = src["path"] + ".preview.json" if src and os.path.exists(src["path"] + ".preview.json") else None
+        st = {}
+        if i["preview"]:
+            try:
+                with open(i["preview"]) as f:
+                    st = json.load(f).get("status") or {}
+            except (OSError, ValueError):
+                pass
+        turn, dlvl = (os.path.basename(src["path"]).rsplit("@", 1)[-1].split("-D") if src else (None, None))
+        i.update(turn=int(turn) if turn else None, dlvl=int(dlvl) if dlvl else None,
+                 xlvl=st.get("xlvl"), dungeon=st.get("dungeon"), hp=st.get("hp"), hpmax=st.get("hpmax"))
     return sorted(items, key=lambda i: (i["char"].lower(), -i["mtime"]))
 
 
@@ -62,7 +80,7 @@ def prune(snaps_dir, save_name, keep=3):
 def remove(path):
     """Delete a save or checkpoint, and the game log kept beside a checkpoint."""
     os.unlink(path)
-    for extra in (".log", ".helper.json"):  # the game log and helper conversation kept with it
+    for extra in (".log", ".helper.json", ".preview.json"):  # the log, helper conversation and map kept with it
         if os.path.exists(path + extra):
             os.unlink(path + extra)
 

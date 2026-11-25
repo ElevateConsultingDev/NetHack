@@ -15,6 +15,7 @@ import signal
 import sys
 import threading
 import time
+import urllib.parse
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 import pyte
@@ -28,6 +29,10 @@ PORT = int(os.environ.get("NH_WEB_PORT", "8220"))  # platform-spec/ports.yaml
 PAGE = os.path.join(helper.HERE, "web.html")
 COMMANDS = {"fog": ctrl_opt("F"), "down": ctrl_opt("D"), "up": ctrl_opt("U"), "whatnow": ctrl_opt("W"),
             "checkpoint": ctrl_opt("S"), "rewind": ctrl_opt("R")}
+SORTS = {"newest": lambda i: -i["mtime"],
+         "deepest": lambda i: (-(i["dlvl"] or 0), -(i["turn"] or 0)),
+         "turns": lambda i: -(i["turn"] or 0),
+         "level": lambda i: (-(i["xlvl"] or 0), -(i["turn"] or 0))}
 SGR = {"black": 0, "red": 1, "green": 2, "brown": 3, "blue": 4, "magenta": 5, "cyan": 6, "white": 7}
 
 
@@ -72,6 +77,7 @@ class Web(App):
         self.argv, self.saving, self.over, self.snap_dlvl, self.load_target = argv, None, False, None, None
         self.holding, self.new_name, self.saves_ui, self.save_name = False, None, None, None
         self.clients = []  # one queue per browser (server-sent events)
+        self.saves_sort = "newest"  # the saves list's order (SORTS)
         self.spawn()
 
     def redraw(self):  # the helper calls this when an answer arrives
@@ -89,6 +95,10 @@ class Web(App):
     def push_state(self):
         st = self.watcher.state
         u = self.saves_ui
+        if u and u["items"]:  # in the chosen order, keeping the selected one selected
+            cur = u["items"][min(u["sel"], len(u["items"]) - 1)]
+            u["items"].sort(key=SORTS[self.saves_sort])
+            u["sel"] = u["items"].index(cur)
         self.emit("state", {
             "state": st, "fight": [l for t, l in self.fight
                                    if (st.get("status") or {}).get("turn", 0) - t <= 10],
@@ -98,7 +108,8 @@ class Web(App):
             "msgs": [self.row_text(r) for r in range(self.msg_rows())],
             "cursor": [self.screen.cursor.y, self.screen.cursor.x] if self.screen.cursor.y < self.msg_rows() else None,
             "settings": helper.settings(), "models": helper.MODELS,
-            "saves": u and {k: u[k] for k in ("items", "sel", "confirm", "naming")}, "over": self.over})
+            "saves": u and {**{k: u[k] for k in ("items", "sel", "confirm", "naming")}, "sort": self.saves_sort},
+            "over": self.over})
 
     def msg_rows(self):
         """The game's message rows at the top (cursinit.c: up to 4, the map right under)."""
@@ -230,6 +241,12 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/":
             with open(PAGE, "rb") as f:
                 return self.reply(200, f.read(), "text/html; charset=utf-8")
+        if self.path.startswith("/preview?"):  # a checkpoint's map, for the saves list
+            want = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("path", [""])[0]
+            if want not in {i["preview"] for i in saves.listing(SAVES, SNAPS) if i["preview"]}:
+                return self.reply(404)
+            with open(want, "rb") as f:
+                return self.reply(200, f.read(), "application/json")
         if self.path != "/events":
             return self.reply(404)
         self.send_response(200)
@@ -271,6 +288,8 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/saves":  # open the list, or a click on a row then a key
                 if not w.saves_ui:
                     w.open_saves()
+                if d.get("sort") in SORTS:
+                    w.saves_sort = d["sort"]
                 if "sel" in d and w.saves_ui:
                     w.saves_ui["sel"] = int(d["sel"])
                 if d.get("key") and w.saves_ui:
