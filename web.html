@@ -30,6 +30,8 @@ h3 { margin: 10px 0 4px; font-size: 12px; color: var(--dim); text-transform: upp
 h3:first-child { margin-top: 0; }
 .b { font-weight: bold; } .dim { color: var(--dim); } .green { color: var(--green); }
 .yellow { color: var(--yellow); } .red { color: var(--red); } .magenta { color: var(--magenta); }
+.legend { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+.legend b { display: inline-block; width: 1ch; text-align: center; }
 .grouprow { display: flex; margin-top: 4px; }
 .group { cursor: pointer; text-decoration: underline; }
 .more { margin-left: auto; cursor: pointer; padding: 0 8px; border-radius: 4px; color: var(--fg);
@@ -320,6 +322,15 @@ function showTip(e, key) {
   tip.style.top = (e.clientY + 14 + h > innerHeight ? e.clientY - h - 10 : e.clientY + 14) + 'px';
 }
 
+// what each symbol on the map is, in its map color; click a name to ask the helper about it
+function legendList(d) {
+  if (!d.legend.length) return '';
+  return '<h3>On the map</h3><div class="legend">' + d.legend.map(([ch, name, fg, bold]) => {
+    const c = CSS[fg.replace(/^bright/, '')];
+    return `<span><b style="${c ? 'color:' + c : ''};${bold ? '' : 'font-weight:normal'}">${esc(ch)}</b> ${T(name)}</span>`;
+  }).join('') + '</div>';
+}
+
 function inventory(d) {
   const inv = d.state.inventory || [], menu = d.menu, asked = d.asked;
   let h = menu ? `<h3 class="yellow">${esc(menu.title)}: click items, then Done</h3>`
@@ -415,7 +426,7 @@ $('#savesort').addEventListener('change', e => post('/saves', {sort: e.target.va
 function render(d) {
   last = d;
   settings(d);
-  $('#panel').innerHTML = character(d) + fight(d) + inventory(d);
+  $('#panel').innerHTML = character(d) + fight(d) + legendList(d) + inventory(d);
   $('#msgs').innerHTML = d.msgs.map((line, y) => d.cursor && d.cursor[0] === y
     ? esc(line.slice(0, d.cursor[1])) + `<span class="caret">${esc(line[d.cursor[1]] || ' ')}</span>` + esc(line.slice(d.cursor[1] + 1))
     : esc(line)).join('\n').replace(/\s+$/, '');

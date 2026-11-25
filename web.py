@@ -105,11 +105,24 @@ class Web(App):
             "chat": self.helper.lines[-300:], "busy": self.helper.busy,
             "menu": self.inventory_menu(), "asked": (lambda a: a and [a[0], sorted(a[1])])(guard.asked_letters(st)),
             "actions": {i["letter"]: guard.item_actions(i.get("class"), i["text"]) for i in st.get("inventory", [])},
+            "legend": self.legend(),
             "msgs": [self.row_text(r) for r in range(self.msg_rows())],
             "cursor": [self.screen.cursor.y, self.screen.cursor.x] if self.screen.cursor.y < self.msg_rows() else None,
             "settings": helper.settings(), "models": helper.MODELS,
             "saves": u and {**{k: u[k] for k in ("items", "sel", "confirm", "naming")}, "sort": self.saves_sort},
             "over": self.over})
+
+    def legend(self):
+        """[symbol, what it is, color, bold] for each kind of thing on the map now
+        (helper.legend), the color read off the screen where one is."""
+        out = []
+        for ch, name, y, x in helper.legend(self.watcher.state):
+            r = self.map_top + y
+            c = self.screen.buffer[r][x - 1] if 0 <= r < self.gh and x > 0 else None
+            if c and (c.data or " ").strip():
+                ch = c.data  # the symbol as drawn (the state's map can lack it, e.g. doorways)
+            out.append([ch, name, c.fg if c else "default", bool(c and c.bold)])
+        return out
 
     def msg_rows(self):
         """The game's message rows at the top (cursinit.c: up to 4, the map right under)."""
