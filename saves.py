@@ -42,6 +42,15 @@ def listing(saves_dir, snaps_dir):
     return sorted(items, key=lambda i: (i["char"].lower(), -i["mtime"]))
 
 
+def default_args(argv, saves_dir, snaps_dir):
+    """argv with -u <the character played last> added when it names no one, so a
+    start resumes that game instead of making a new one under the login name."""
+    if any(a.startswith("-u") for a in argv):
+        return argv
+    latest = max(listing(saves_dir, snaps_dir), key=lambda i: i["mtime"], default=None)
+    return argv + ["-u", latest["char"]] if latest else argv
+
+
 def prune(snaps_dir, save_name, keep=3):
     """Delete all but the newest `keep` checkpoints of one save file name; how many went."""
     old = snapshots(snaps_dir, save_name)[:-keep] if keep else snapshots(snaps_dir, save_name)

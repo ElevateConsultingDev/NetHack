@@ -295,7 +295,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     os.environ["NETHACK_WEB"] = "1"  # no window borders; menus keep clear of the rows the page hides
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)  # first: a taken port starts no game
-    web = Web(sys.argv[1:])
+    web = Web(saves.default_args(sys.argv[1:], SAVES, SNAPS))
     Handler.web = web
     threading.Thread(target=web.run, daemon=True).start()
     srv.daemon_threads = True

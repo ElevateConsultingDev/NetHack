@@ -1637,7 +1637,7 @@ class App:
 
 def main(scr):
     signal.signal(signal.SIGHUP, lambda *_: sys.exit())  # closed terminal: still save and clean up
-    app = App(scr, sys.argv[1:])
+    app = App(scr, saves.default_args(sys.argv[1:], SAVES, SNAPS))
     try:
         app.run()
     finally:
