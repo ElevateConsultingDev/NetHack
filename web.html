@@ -11,10 +11,11 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
              font: 13px/1.4 Menlo, "DejaVu Sans Mono", monospace; }
-#app { display: grid; grid-template-columns: minmax(0, 1fr) 6px var(--panel-w, 420px) 6px var(--chat-w, 460px); height: 100vh; }
+#app { display: grid; grid-template-columns: minmax(0, 1fr) 6px var(--panel-w, 420px) 6px var(--chat-w, 460px);
+       grid-template-rows: minmax(0, 1fr); height: 100vh; }  /* the columns never outgrow the window */
 .split { cursor: col-resize; background: var(--line); } .split:hover, .split.on { background: var(--blue); }
 .xterm-viewport { overflow-y: hidden !important; }  /* no scrollback, so no scrollbar */
-#game { display: flex; flex-direction: column; min-width: 0; }
+#game { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 #bar { display: flex; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px;
          padding: 3px 8px; font: inherit; cursor: pointer; }
@@ -47,7 +48,7 @@ h3:first-child { margin-top: 0; }
 #saves .list { overflow-y: auto; }
 #saves .row { display: grid; grid-template-columns: 140px 1fr 160px; gap: 8px; padding: 2px 6px; cursor: pointer; }
 #saves .row.sel { background: var(--blue); color: var(--bg); }
-@media (max-width: 1100px) { #app { grid-template-columns: 1fr; height: auto; } #game { height: 80vh; } .split { display: none; }
+@media (max-width: 1100px) { #app { grid-template-columns: 1fr; grid-template-rows: none; height: auto; } #game { height: 80vh; } .split { display: none; }
                              .col { border-left: 0; border-top: 1px solid var(--line); } #chatcol { height: 60vh; } }
 </style>
 </head>
