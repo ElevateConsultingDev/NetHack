@@ -142,6 +142,37 @@ class Web(App):
             else:
                 self.request_load(next(i for i in saves.listing(SAVES, SNAPS) if i["path"] == last[-1]))
 
+    def wait_for(self, text, other=None, timeout=3):
+        """Wait until the game's screen shows text (or other); which one, or None."""
+        end = time.time() + timeout
+        while time.time() < end:
+            with self.lock:
+                screen = "\n".join(self.row_text(r) for r in range(self.gh))
+            for t in (text, other):
+                if t and t in screen:
+                    return t
+            time.sleep(0.05)
+        return None
+
+    def drop_group(self, sym, letters):
+        """D, the class (when D asks for one), then those items, one step at a time
+        so a keystroke never lands in the wrong menu."""
+        items = "What would you like to drop?"
+        with self.lock:
+            self.send(b"D")
+        got = self.wait_for("Drop what type of items?", items)
+        if got and got != items:
+            with self.lock:
+                self.send(sym.encode() + b"\r")  # a class's symbol picks it in that menu
+            got = self.wait_for(items)
+        with self.lock:
+            if got:
+                self.send("".join(letters).encode() + b"\r")
+            else:
+                self.send(b"\x1b\x1b")
+                self.say("err", "Couldn't drop that group: the game didn't show the menus I expected.")
+            self.push_state()
+
     def run(self):
         """Game output to the browsers; the game ending or restarting."""
         while True:
@@ -238,6 +269,13 @@ class Handler(BaseHTTPRequestHandler):
                     w.saves_ui["sel"] = int(d["sel"])
                 if d.get("key") and w.saves_ui:
                     w.saves_key(d["key"].encode("latin-1", "ignore"))
+            elif self.path == "/dropgroup":  # D, then every item of that class not in use, then Enter
+                loose = [i["letter"] for i in w.watcher.state.get("inventory", [])
+                         if i.get("class") == d.get("sym") and not helper.IN_USE.search(i["text"])]
+                if (w.watcher.state.get("context") or {}).get("kind") != "command":
+                    w.say("dim", "Dropping a group works at the command prompt; finish this first.")
+                elif loose:
+                    threading.Thread(target=w.drop_group, args=(d["sym"], loose), daemon=True).start()
             elif self.path == "/item":  # an inventory action: command key, then the item
                 if d["key"] == "":  # answer the game's question with this item
                     w.send(d["letter"].encode())

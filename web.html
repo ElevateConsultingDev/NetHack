@@ -26,7 +26,10 @@ h3 { margin: 10px 0 4px; font-size: 12px; color: var(--dim); text-transform: upp
 h3:first-child { margin-top: 0; }
 .b { font-weight: bold; } .dim { color: var(--dim); } .green { color: var(--green); }
 .yellow { color: var(--yellow); } .red { color: var(--red); } .magenta { color: var(--magenta); }
-.group { cursor: pointer; text-decoration: underline; margin-top: 4px; }
+.grouprow { display: flex; margin-top: 4px; }
+.group { cursor: pointer; text-decoration: underline; }
+.more { margin-left: auto; cursor: pointer; padding: 0 6px; border-radius: 3px; color: var(--dim); }
+.more:hover { background: var(--line); color: var(--fg); }
 .item { display: flex; gap: 6px; cursor: pointer; padding: 1px 2px; border-radius: 3px; }
 .item:hover { background: var(--line); }
 .item .w { margin-left: auto; color: var(--dim); }
@@ -290,7 +293,13 @@ function inventory(d) {
     if (!items.length) continue;
     const whole = menu || asked || open.has(sym), shown = whole ? items : items.filter(i => IN_USE.test(i.text));
     const more = items.length - shown.length;
-    h += `<div class="group" data-group="${esc(sym)}">${whole ? '▾' : '▸'} ${name}${more ? ` (${more} more)` : ''}</div>`;
+    h += `<div class="grouprow"><span class="group" data-group="${esc(sym)}">${whole ? '▾' : '▸'} ${name}${more ? ` (${more} more)` : ''}</span>`
+      + (menu || asked ? '' : `<span class="more" data-groupacts="${esc(sym)}" title="Actions for the whole group">⋯</span>`) + '</div>';
+    if (popup === 'group:' + sym && !menu && !asked) {
+      const loose = items.filter(i => !IN_USE.test(i.text));
+      h += '<div class="acts">' + (loose.length ? `<button data-dropgroup="${esc(sym)}">Drop ${loose.length === items.length ? 'all' : 'all not in use'} (${loose.length})</button>` : '<span class="dim">everything here is in use</span>')
+        + `<button data-askgroup="${esc(name)}">Ask the helper</button></div>`;
+    }
     for (const i of shown) {
       let mark = ' ', cls = IN_USE.test(i.text) ? 'green' : '';
       if (menu) { const s = menu.items[i.letter]; mark = s ? '✓' : s === false ? ' ' : '·'; if (s === undefined) cls += ' off'; }
@@ -351,9 +360,12 @@ stream.addEventListener('state', m => render(JSON.parse(m.data)));
 
 // clicks
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-zoom],[data-term],[data-askterm],[data-cmd],[data-group],[data-letter],[data-keys],[data-sel],[data-key],#opensaves,#newgame');
+  const t = e.target.closest('[data-groupacts],[data-dropgroup],[data-askgroup],[data-zoom],[data-term],[data-askterm],[data-cmd],[data-group],[data-letter],[data-keys],[data-sel],[data-key],#opensaves,#newgame');
   if (!e.target.closest('#tip,[data-term]')) $('#tip').style.display = 'none';
   if (!t) return;
+  if (t.dataset.groupacts) { popup = popup === 'group:' + t.dataset.groupacts ? null : 'group:' + t.dataset.groupacts; render(last); return; }
+  if (t.dataset.dropgroup) { popup = null; post('/dropgroup', {sym: t.dataset.dropgroup}); term.focus(); return; }
+  if (t.dataset.askgroup) { popup = null; post('/ask', {q: `About my ${t.dataset.askgroup.toLowerCase()}: what should I keep, use, or drop?`}); term.focus(); return; }
   if (t.dataset.zoom) { zoom(+t.dataset.zoom); term.focus(); return; }
   if (t.dataset.term) { showTip(e, t.dataset.term); return; }
   if (t.dataset.askterm) { $('#tip').style.display = 'none'; post('/ask', {q: `Tell me about "${t.dataset.askterm}" (from my status panel), for me right now.`}); }
