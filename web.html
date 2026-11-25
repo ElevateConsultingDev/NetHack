@@ -442,6 +442,10 @@ stream.addEventListener('state', m => render(JSON.parse(m.data)));
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-groupacts],[data-dropgroup],[data-askgroup],[data-zoom],[data-term],[data-askterm],[data-cmd],[data-group],[data-letter],[data-keys],[data-sel],[data-key],#opensaves,#newgame');
   if (!e.target.closest('#tip,[data-term]')) $('#tip').style.display = 'none';
+  if (e.target.closest('#chatcol') && !e.target.closest('select,button') && getSelection().isCollapsed) {
+    $('#ask input').focus();  // a click anywhere in the helper's column: type a question (unless selecting text)
+    return;
+  }
   if (!t) return;
   if (t.dataset.groupacts) { popup = popup === 'group:' + t.dataset.groupacts ? null : 'group:' + t.dataset.groupacts; render(last); return; }
   if (t.dataset.dropgroup) { popup = null; post('/dropgroup', {sym: t.dataset.dropgroup}); term.focus(); return; }
