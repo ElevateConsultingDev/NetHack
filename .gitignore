@@ -65,3 +65,4 @@ __pycache__/
 .reflect.lock
 checkpoints/
 logs/
+helper-settings.json

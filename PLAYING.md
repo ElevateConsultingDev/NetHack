@@ -11,6 +11,8 @@ In a browser instead: `./web` (same arguments) opens http://127.0.0.1:8220 with 
 real terminal and the character, fight, inventory and helper as panels beside it. Click an
 inventory item for its actions; the buttons above the game are the ⌃G shortcuts (which also work
 there). Ctrl-C in the terminal running `./web` saves the game and keeps a checkpoint.
+The helper's model is picked at the top of its column (fable, opus, sonnet or haiku); the choice is
+saved in helper-settings.json and `./play` uses it too.
 
 Keys are Mac-style: ⌃ Control, ⌥ Option, ⇧ Shift. NetHack's Meta commands are Option
 (⌥L loots, ⌥P prays); the wrapper's own shortcuts are ⌃G followed by a letter (⌃G alone shows them in the bottom

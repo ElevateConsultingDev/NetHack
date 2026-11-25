@@ -33,6 +33,8 @@ h3:first-child { margin-top: 0; }
 .item.off { opacity: .4; }
 .acts { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px 18px; }
 #chatcol { display: flex; flex-direction: column; padding: 0; }
+#helperbar { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); color: var(--dim); }
+select { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; font: inherit; padding: 2px 4px; }
 #chat { flex: 1; overflow-y: auto; padding: 8px 10px; white-space: pre-wrap; }
 #chat .you { color: var(--blue); margin-top: 8px; } #chat .err { color: var(--red); }
 #chat .warn { color: var(--yellow); } #chat .dim { color: var(--dim); }
@@ -72,6 +74,7 @@ h3:first-child { margin-top: 0; }
   <div class="col" id="panel"></div>
   <div class="split" data-split="chat"></div>
   <div class="col" id="chatcol">
+    <div id="helperbar">Helper model <select id="model"></select></div>
     <div id="chat"></div>
     <form id="ask"><input placeholder="Ask the helper..." autocomplete="off"></form>
   </div>
@@ -327,8 +330,16 @@ function savesList(d) {
   $('#saves .row.sel')?.scrollIntoView({block: 'nearest'});
 }
 
+function settings(d) {
+  const sel = $('#model');
+  if (sel.options.length !== d.models.length) sel.innerHTML = d.models.map(m => `<option>${esc(m)}</option>`).join('');
+  if (document.activeElement !== sel) sel.value = d.settings.model;
+}
+$('#model').addEventListener('change', e => { post('/settings', {model: e.target.value}); term.focus(); });
+
 function render(d) {
   last = d;
+  settings(d);
   $('#panel').innerHTML = character(d) + fight(d) + inventory(d);
   chat(d);
   savesList(d);

@@ -95,6 +95,7 @@ class Web(App):
             "chat": self.helper.lines[-300:], "busy": self.helper.busy,
             "menu": self.inventory_menu(), "asked": (lambda a: a and [a[0], sorted(a[1])])(guard.asked_letters(st)),
             "actions": {i["letter"]: guard.item_actions(i.get("class"), i["text"]) for i in st.get("inventory", [])},
+            "settings": helper.settings(), "models": helper.MODELS,
             "saves": u and {k: u[k] for k in ("items", "sel", "confirm", "naming")}, "over": self.over})
 
     def resize(self, cols, rows):
@@ -227,6 +228,9 @@ class Handler(BaseHTTPRequestHandler):
                 w.ask(d["q"].strip())
             elif self.path == "/command" and d.get("name") in COMMANDS:
                 w.command(COMMANDS[d["name"]])
+            elif self.path == "/settings" and d.get("model") in helper.MODELS:
+                helper.save_settings(model=d["model"])
+                w.say("dim", f"The helper now uses {d['model']}.")
             elif self.path == "/saves":  # open the list, or a click on a row then a key
                 if not w.saves_ui:
                     w.open_saves()

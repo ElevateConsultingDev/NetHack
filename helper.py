@@ -40,6 +40,24 @@ SNAPS = os.path.join(HERE, "checkpoints")  # outside playground/, which a NetHac
 LOGS = os.path.join(HERE, "logs")          # one game log per character (gamelog.py)
 KEEP_SNAPS = 20  # checkpoints kept per character (prune in the saves list)
 MODEL = os.environ.get("NH_HELPER_MODEL", "sonnet")
+SETTINGS = os.path.join(HERE, "helper-settings.json")  # the helper's settings, set in ./web
+MODELS = ("fable", "opus", "sonnet", "haiku")  # claude's aliases for the latest of each
+
+
+def settings():
+    """The helper's settings (model), with defaults for any not set."""
+    try:
+        with open(SETTINGS) as f:
+            saved = json.load(f)
+    except (OSError, ValueError):
+        saved = {}
+    return {"model": MODEL, **saved}
+
+
+def save_settings(**changes):
+    with open(SETTINGS + ".tmp", "w") as f:
+        json.dump({**settings(), **changes}, f)
+    os.replace(SETTINGS + ".tmp", SETTINGS)
 HELPER_W = int(os.environ.get("NH_HELPER_WIDTH", "40"))
 def ctrl_opt(letter):
     """The bytes for Control-Option-letter (Option sends Alt: macos-option-as-alt)."""
@@ -228,7 +246,7 @@ def ask_claude(question, snapshot, session):
     """Runs claude -p (subscription login; its only tool is Read, in the logs folder,
     for the full game log); returns (answer, session)."""
     os.makedirs(LOGS, exist_ok=True)
-    cmd = ["claude", "-p", "--output-format", "json", "--model", MODEL,
+    cmd = ["claude", "-p", "--output-format", "json", "--model", settings()["model"],
            "--tools", "Read", "--allowedTools", "Read", "--setting-sources", "", "--strict-mcp-config",
            "--system-prompt", SYSTEM]
     if session:
