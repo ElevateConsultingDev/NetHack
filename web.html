@@ -37,6 +37,10 @@ h3:first-child { margin-top: 0; }
 #chat .warn { color: var(--yellow); } #chat .dim { color: var(--dim); }
 #ask { display: flex; border-top: 1px solid var(--line); }
 #ask input { flex: 1; background: var(--bg); color: var(--fg); border: 0; padding: 8px 10px; font: inherit; outline: none; }
+.term { cursor: help; border-bottom: 1px dotted transparent; } .term:hover { border-bottom-color: currentColor; }
+#tip { position: fixed; display: none; z-index: 5; max-width: 360px; background: var(--bg); border: 1px solid var(--blue);
+       border-radius: 6px; padding: 8px 10px; box-shadow: 0 6px 20px #0008; }
+#tip .acts { margin: 6px 0 0; }
 #saves { position: fixed; inset: 0; background: #000a; display: none; place-items: center; }
 #saves .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px;
               width: min(720px, 94vw); max-height: 80vh; display: flex; flex-direction: column; gap: 8px; }
@@ -58,6 +62,8 @@ h3:first-child { margin-top: 0; }
       <button data-cmd="checkpoint">Checkpoint</button>
       <button data-cmd="rewind">Back to checkpoint</button>
       <button id="opensaves">Saves</button>
+      <span style="margin-left:auto"></span>
+      <button data-zoom="-1" title="Smaller map">−</button><span id="zoomlevel" class="dim" style="align-self:center"></span><button data-zoom="1" title="Bigger map">+</button>
     </div>
     <div id="term"></div>
   </div>
@@ -69,6 +75,7 @@ h3:first-child { margin-top: 0; }
     <form id="ask"><input placeholder="Ask the helper..." autocomplete="off"></form>
   </div>
 </div>
+<div id="tip"></div>
 <div id="saves"><div class="box"><div id="savestitle" class="b"></div><div class="list"></div>
   <div><button data-key="&#13;">Load</button> <button data-key="d">Delete</button> <button data-key="p">Prune to newest 3</button>
        <button id="newgame">New game</button> <button data-key="&#27;">Close</button></div></div></div>
@@ -79,25 +86,27 @@ const $ = s => document.querySelector(s);
 const post = (path, body) => fetch(path, {method: 'POST', body: JSON.stringify(body)});
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 
-const term = new Terminal({fontSize: 15, cursorBlink: true, scrollback: 0, macOptionIsMeta: true,
+const term = new Terminal({fontSize: +(localStorageGet('nh.zoom') || 18), cursorBlink: true, scrollback: 0, macOptionIsMeta: true,
   fontFamily: 'Menlo, "DejaVu Sans Mono", monospace', theme: {background: '#0d1014', foreground: '#c8d0da'}});
 const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
 term.open($('#term'));
 term.onData(d => post('/key', {data: d}));
 
-// bigger windows mean bigger letters, not more of them (as powergrid does it)
-const WANT_COLS = 100, WANT_ROWS = 30;
+// the map's zoom is the text size: yours to set (- / + above the game), and kept when
+// the window or the columns change size (they change how much fits, not the size)
 let sized = '', settling;
+function zoom(step) {
+  const size = Math.max(9, Math.min(40, term.options.fontSize + step));
+  term.options.fontSize = size;
+  fit.fit();
+  if (step > 0 && (term.cols < 80 || term.rows < 24)) { term.options.fontSize = size - step; fit.fit(); return; }  // the game needs 80x24
+  localStorageSet('nh.zoom', size);
+  $('#zoomlevel').textContent = size;
+  refit();
+}
 function refit() {
   fit.fit();
-  const box = $('#term').getBoundingClientRect(), size = term.options.fontSize;
-  if (box.width && term.cols && term.rows) {
-    const want = Math.min(box.width / WANT_COLS / (box.width / term.cols / size),
-                          box.height / WANT_ROWS / (box.height / term.rows / size));
-    const next = Math.max(9, Math.min(26, Math.floor(want)));
-    if (next !== size) { term.options.fontSize = next; fit.fit(); }
-  }
   const now = term.cols + 'x' + term.rows;
   if (now !== sized) { sized = now; post('/resize', {cols: term.cols, rows: term.rows}); }
 }
@@ -113,7 +122,9 @@ for (const bar of document.querySelectorAll('.split')) {
     bar.classList.add('on');
     const k = bar.dataset.split, col = bar.nextElementSibling, x0 = e.clientX, w0 = col.getBoundingClientRect().width;
     const move = e => {
-      const w = Math.max(200, Math.min(innerWidth - 500, w0 - (e.clientX - x0)));
+      const other = [...document.querySelectorAll('.col')].find(c => c !== col).getBoundingClientRect().width;
+      const cell = $('#term .xterm-screen').getBoundingClientRect().width / term.cols;  // the game keeps its 80 columns
+      const w = Math.max(200, Math.min(innerWidth - other - 12 - 82 * cell - 8, w0 - (e.clientX - x0)));
       app.style.setProperty(`--${k}-w`, w + 'px');
       localStorageSet('nh.' + k, Math.round(w));
       clearTimeout(settling); settling = setTimeout(refit, 50);
@@ -122,6 +133,9 @@ for (const bar of document.querySelectorAll('.split')) {
     bar.addEventListener('pointerup', () => { bar.removeEventListener('pointermove', move); bar.classList.remove('on'); term.focus(); }, {once: true});
   });
 }
+fit.fit();
+while ((term.cols < 80 || term.rows < 24) && term.options.fontSize > 9) { term.options.fontSize--; fit.fit(); }  // a small window: fit the game first
+$('#zoomlevel').textContent = term.options.fontSize;
 refit();
 term.focus();
 
@@ -136,34 +150,131 @@ function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {
 
 function strength(s) { return 18 < s && s <= 117 ? `18/${String(s - 18).padStart(2, '0')}` : s === 118 ? '18/**' : String(s > 118 ? s - 100 : s); }
 
+// click a word in the panel: what it means, and a button to ask the helper about it here and now
+const GLOSS = {
+  'HP': 'Hit points. At 0 you die. They come back slowly on their own (faster at higher level and Con). Under 1/7 of the maximum (or under 6) counts as major trouble, so prayer can fix it.',
+  'Pw': 'Power, the energy spells cost (5 per spell level). It comes back over time, faster with high Wisdom and Intelligence.',
+  'AC': 'Armor class. Lower is better: 10 is naked. Below 0, every hit you take is also reduced by a random 1 to |AC| points, and monsters miss far more often.',
+  'Xp': 'Experience level / experience points. Each level raises max HP and Pw, to-hit, and unlocks role abilities. Level drain (some undead) takes levels away unless you resist it.',
+  '$': 'Gold. Pays shopkeepers and priests: donating 400 times your level to a temple priest can buy a point of AC (protection), and 600 times when you are poor in protection helps more.',
+  'T': 'Turns (game moves) since the game began. Many timers count in turns: prayer timeout, hunger, spell memory.',
+  'Dlvl': 'Dungeon level: how deep you are. Deeper levels make tougher monsters (together with your own experience level).',
+  'Sokoban': 'A puzzle branch going up from the level after the Oracle. Push boulders (move into them) to fill the holes. Breaking boulders, reading earth, squeezing past them or levitating over holes costs Luck. The top level holds a bag of holding or an amulet of reflection.',
+  'The Gnomish Mines': 'A branch going down from Dlvl 2 to 4. Full of gnomes, dwarves and hill orcs (peaceful to gnomes and dwarves). Minetown has a temple, shops and an altar; Mines\' End has a luckstone.',
+  'The Dungeons of Doom': 'The main dungeon. The Oracle, the Big Room, the Quest portal, Medusa and the Castle are along it.',
+  'Location': 'Where you are on the map: x is the column (1 at the left edge), y the row (0 at the top). The helper uses these to point at things.',
+  'St': 'Strength: to-hit, damage and how much you can carry. 18/01 to 18/** is exceptional strength, between 18 and 19.',
+  'Dx': 'Dexterity: to-hit, especially for thrown and fired weapons.',
+  'Co': 'Constitution: HP gained per level, HP regeneration, and carrying capacity.',
+  'In': 'Intelligence: spell success for most roles (Wizards especially).',
+  'Wi': 'Wisdom: Pw regeneration and Pw gained per level; spell success for Priests, Monks, Healers, Knights and Valkyries.',
+  'Ch': 'Charisma: shop prices, and how much some monsters charge or demand.',
+  'Carrying': 'Weight carried / weight you can carry before you are Burdened (25 x (St + Co) + 50, at most 1000). Burdened and worse slow you down and stop HP regeneration when Stressed.',
+  'Speed': 'Movement speed. 12 is normal: one move per turn. Intrinsic speed gives extra moves (fast about 4/3, very fast about 5/3).',
+  'Next level': 'Experience points needed for the next experience level.',
+  'God': 'Your god. Pray (⌥P) when in real trouble and your prayer timeout is low; sacrifice fresh corpses at a co-aligned altar for gifts and Luck.',
+  'Luck': 'From -13 to 13 (beyond 10 needs a luckstone). It touches nearly every roll: to-hit, wishes, prayer, sinks. Negative Luck makes prayer fail. Without a luckstone it drifts toward 0 every 600 turns.',
+  'Prayer timeout': 'Prayer is safe only below a limit: under 200 in major trouble (low HP, weak from hunger, stoning, strangling, sliming, lycanthropy, illness), under 100 in minor trouble, and only at 0 with no trouble. Each successful prayer resets it to about 300 to 350. Also needs Luck 0 or more and an unangered god.',
+  'Nutrition': 'Your food clock. Hungry below 150, Weak below 50, Fainting below 0. Over 1000 is Satiated, and eating past 2000 can choke you to death.',
+  'Alignment': 'Your alignment record with your god. Killing hostile monsters raises it; murder, attacking peacefuls and breaking your role\'s conduct lower it. Negative alignment makes prayer fail.',
+  'Intrinsics': 'Permanent (or long-lasting) properties from corpses, levels, prayer or worn items. Click one to see what it does.',
+  'fast': 'Intrinsic speed: about 4 moves for every 3 of a normal-speed creature.',
+  'very fast': 'Extrinsic speed (speed boots, potion): about 5 moves per 3.',
+  'fire res': 'Fire resistance: no damage from fire attacks and fire traps (your items can still burn).',
+  'cold res': 'Cold resistance: no damage from cold attacks (potions can still freeze and shatter).',
+  'sleep res': 'Sleep resistance: immune to sleep rays, sleeping gas traps and sleep spells.',
+  'shock res': 'Shock resistance: no damage from lightning and shock (rings and wands can still explode).',
+  'poison res': 'Poison resistance: poison no longer drains Str or kills outright; poisonous corpses are safe.',
+  'disint res': 'Disintegration resistance: immune to black dragon breath and disintegration.',
+  'acid res': 'Acid resistance: no damage from acid.',
+  'stoning res': 'Stoning resistance: cockatrices cannot turn you to stone.',
+  'drain res': 'Drain resistance: level drain (wraiths, vampires, Stormbringer) cannot take your levels.',
+  'sickness res': 'Sickness resistance: immune to illness and food poisoning.',
+  'magic res': 'Magic resistance: protects against touch of death, polymorph and teleport traps, destroy armor, many monster spells, and halves some magical damage. One of the two most important defenses.',
+  'reflection': 'Reflection: rays (death, lightning, disintegration and the rest) and gaze attacks bounce back. The other most important defense.',
+  'see invisible': 'See invisible: you see invisible monsters.',
+  'telepathy': 'Telepathy: while blind (a blindfold or towel works) you sense the minds of monsters on the level.',
+  'warning': 'Warning: numbers 0 to 5 on the map show nearby hostile monsters by how dangerous they are.',
+  'searching': 'Automatic searching: you search adjacent squares for hidden doors and traps every turn.',
+  'infravision': 'Infravision: you see warm-blooded monsters in the dark.',
+  'invisible': 'You are invisible: most monsters have trouble hitting you; shopkeepers will not let you in.',
+  'stealth': 'Stealth: you do not wake sleeping monsters as you move.',
+  'regeneration': 'Regeneration: you regain 1 HP every turn (and get hungrier).',
+  'teleportitis': 'Teleportitis: you teleport at random now and then (and can teleport at will from level 12, or 8 for Wizards).',
+  'teleport control': 'Teleport control: you choose where you land when you teleport.',
+  'polymorphitis': 'Polymorphitis: you polymorph at random. Dangerous without polymorph control.',
+  'polymorph control': 'Polymorph control: you choose what you become, and avoid system shock.',
+  'free action': 'Free action: paralysis and many holds cannot stop you.',
+  'life saving': 'Life saving: the next death is cancelled (the amulet is used up).',
+  'protection': 'Divine protection: extra AC from a priest donation or prayer.',
+  'clairvoyance': 'Clairvoyance: now and then you glimpse the map around you.',
+  'fast hunger': 'Hunger: you get hungry much faster than normal (a ring or amulet causes it).',
+  'aggravate': 'Aggravate monster: monsters wake and come for you.',
+  'Satiated': 'Satiated: nutrition over 1000. Eating more risks choking once past 2000. Stop eating until it clears.',
+  'Hungry': 'Hungry: nutrition under 150. Eat soon.',
+  'Weak': 'Weak: nutrition under 50. You lose Strength until you eat. Counts as major trouble for prayer.',
+  'Fainting': 'Fainting: you pass out now and then. Eat at once, or pray.',
+  'Burdened': 'Burdened: carrying more than your capacity. You are slower.',
+  'Stressed': 'Stressed: well over capacity. Much slower, and no HP regeneration.',
+  'Strained': 'Strained: far over capacity. Very slow.',
+  'Overtaxed': 'Overtaxed: barely able to move.',
+  'Overloaded': 'Overloaded: you cannot move at all.',
+  'Blind': 'Blind: you cannot see the map, only feel it. Telepathy works while blind.',
+  'Conf': 'Confused: movement goes astray, and scrolls do odd things when read.',
+  'Stun': 'Stunned: you move in random directions.',
+  'Hallu': 'Hallucinating: monsters and items look random. You cannot trust what you see.',
+  'Sick': 'Ill: fatal soon. Pray, eat a eucalyptus leaf, or apply a unicorn horn.',
+  'Slime': 'Turning into green slime: fatal soon. Pray, or burn it off with fire.',
+  'Stone': 'Turning to stone: fatal in a few turns. Eat a lizard corpse or acidic corpse, or pray.',
+  'Strngl': 'Being strangled: remove the amulet now, or pray.',
+  'Lev': 'Levitating: you cannot pick things up or go down stairs.',
+  'Fly': 'Flying.',
+  'Ride': 'Riding your steed.',
+  'tame': 'Tameness from 1 to 20. Feeding treats raises it; abuse lowers it. A pet below about 10 may go feral if left alone.',
+  'Pet': 'Your pet. Pets fight for you, can steal from shops, and tell you which items are cursed: a pet will not willingly step on a cursed item.',
+};
+const T = (key, text) => `<span class="term" data-term="${esc(key)}">${esc(text ?? key)}</span>`;
+const pv = (key, val) => `${T(key)} ${esc(val)}`;
+
 function character(d) {
   const st = d.state.status, you = d.state.player || {}, rev = d.state.reveal || {}, pray = rev.prayer;
   if (!st) return '';
   const frac = st.hp / (st.hpmax || 1), hp = frac >= 1 ? 'green' : frac >= .5 ? 'yellow' : 'red';
-  const flags = [st.hunger, st.encumbrance, ...(st.conditions || [])].filter(Boolean).join(' ');
-  let h = `<h3>Character</h3><div class="b">${esc(`${(st.gender || '').replace(/^./, c => c.toUpperCase())} ${st.race || ''} ${st.role || ''}, ${st.alignment || ''}`)}</div>
-    <div class="b ${hp}">HP ${st.hp}/${st.hpmax}</div><div>Pw ${st.pw}/${st.pwmax} &nbsp; AC ${st.ac}</div>
-    <div>Xp ${st.xlvl}/${st.exp} &nbsp; $ ${st.gold} &nbsp; T ${st.turn}</div><div>Dlvl ${st.dlvl} ${esc(st.dungeon)}</div>
-    <div class="b">Location x=${you.x} y=${you.y}</div>
-    <div>St ${strength(st.str)} Dx ${st.dex} Co ${st.con} In ${st.int} Wi ${st.wis} Ch ${st.cha}</div>
-    <div>Carrying ${st.weight}/${st.capacity} wt &nbsp; Speed ${st.speed}</div>
-    <div>Next level at ${st.next_exp} xp &nbsp; God: ${esc(st.god)}</div>`;
-  if (pray) h += `<div class="magenta">Luck ${pray.luck} &nbsp;Prayer timeout ${pray.timeout} &nbsp;Nutrition ${rev.nutrition} &nbsp;Alignment ${rev.align_record}</div>
-    <div class="magenta">Intrinsics: ${esc((rev.intrinsics || []).join(', ') || 'none')}</div>`;
+  const flags = [st.hunger, st.encumbrance, ...(st.conditions || [])].filter(Boolean);
+  const sp = ' &nbsp; ';
+  let h = `<h3>Character</h3><div class="b">${esc((st.gender || '').replace(/^./, c => c.toUpperCase()))} ${T(st.race || '')} ${T(st.role || '')}, ${T(st.alignment || '')}</div>
+    <div class="b ${hp}">${pv('HP', `${st.hp}/${st.hpmax}`)}</div><div>${pv('Pw', `${st.pw}/${st.pwmax}`)}${sp}${pv('AC', st.ac)}</div>
+    <div>${pv('Xp', `${st.xlvl}/${st.exp}`)}${sp}${pv('$', st.gold)}${sp}${pv('T', st.turn)}</div><div>${pv('Dlvl', st.dlvl)} ${T(st.dungeon || '')}</div>
+    <div class="b">${pv('Location', `x=${you.x} y=${you.y}`)}</div>
+    <div>${pv('St', strength(st.str))} ${pv('Dx', st.dex)} ${pv('Co', st.con)} ${pv('In', st.int)} ${pv('Wi', st.wis)} ${pv('Ch', st.cha)}</div>
+    <div>${pv('Carrying', `${st.weight}/${st.capacity} wt`)}${sp}${pv('Speed', st.speed)}</div>
+    <div>${T('Next level', 'Next level at')} ${esc(st.next_exp)} xp${sp}${T('God', 'God:')} ${T(st.god || '')}</div>`;
+  if (pray) h += `<div class="magenta">${pv('Luck', pray.luck)}${sp}${pv('Prayer timeout', pray.timeout)}${sp}${pv('Nutrition', rev.nutrition)}${sp}${pv('Alignment', rev.align_record)}</div>
+    <div class="magenta">${T('Intrinsics', 'Intrinsics:')} ${(rev.intrinsics || []).map(i => T(i)).join(', ') || 'none'}</div>`;
   for (const p of rev.pets || []) {
     const hunger = p.turns_until_hungry == null ? '?' : p.turns_until_hungry < 0 ? 'hungry now' : `hungry in ${p.turns_until_hungry}`;
-    h += `<div class="b">Pet: ${esc(p.name ? p.name + ' the ' + p.species : p.species)} L${p.level} HP ${p.hp}/${p.hpmax} AC ${p.ac} Spd ${p.speed}</div>
-      <div class="magenta">&nbsp; tame ${p.tameness}/20, ${hunger}, at x=${p.x} y=${p.y}${p.leashed ? ', leashed' : ''}${p.carrying.length ? ', carrying ' + esc(p.carrying.join(', ')) : ''}</div>`;
+    h += `<div class="b">${T('Pet', 'Pet:')} ${p.name ? esc(p.name) + ' the ' : ''}${T(p.species)} L${p.level} HP ${p.hp}/${p.hpmax} AC ${p.ac} Spd ${p.speed}</div>
+      <div class="magenta">&nbsp; ${T('tame')} ${p.tameness}/20, ${hunger}, at x=${p.x} y=${p.y}${p.leashed ? ', leashed' : ''}${p.carrying.length ? ', carrying ' + p.carrying.map(c => T(c)).join(', ') : ''}</div>`;
   }
-  return h + (flags ? `<div class="b yellow">${esc(flags)}</div>` : '');
+  return h + (flags.length ? `<div class="b yellow">${flags.map(f => T(f)).join(' ')}</div>` : '');
 }
 
 function fight(d) {
   const rev = d.state.reveal || {}, you = d.state.player || {};
   const near = (rev.monsters || []).filter(m => !m.tame && !m.peaceful && Math.max(Math.abs(m.x - you.x), Math.abs(m.y - you.y)) === 1);
   if (!near.length && !d.fight.length) return '';
-  return '<h3>Fight</h3>' + near.map(m => `<div class="b">${esc(m.name)} HP ${m.hp}/${m.hpmax ?? '?'}</div>`).join('')
+  return '<h3>Fight</h3>' + near.map(m => `<div class="b">${T(m.name)} HP ${m.hp}/${m.hpmax ?? '?'}</div>`).join('')
     + d.fight.map(l => `<div class="magenta">${esc(l)}</div>`).join('');
+}
+
+function showTip(e, key) {
+  const tip = $('#tip');
+  tip.innerHTML = `<div class="b">${esc(key)}</div>${GLOSS[key] ? `<div>${esc(GLOSS[key])}</div>` : ''}
+    <div class="acts"><button data-askterm="${esc(key)}">Ask the helper about it</button></div>`;
+  tip.style.display = 'block';
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, e.clientX - w / 2)) + 'px';
+  tip.style.top = (e.clientY + 14 + h > innerHeight ? e.clientY - h - 10 : e.clientY + 14) + 'px';
 }
 
 function inventory(d) {
@@ -228,9 +339,13 @@ stream.addEventListener('state', m => render(JSON.parse(m.data)));
 
 // clicks
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-cmd],[data-group],[data-letter],[data-keys],[data-sel],[data-key],#opensaves,#newgame');
+  const t = e.target.closest('[data-zoom],[data-term],[data-askterm],[data-cmd],[data-group],[data-letter],[data-keys],[data-sel],[data-key],#opensaves,#newgame');
+  if (!e.target.closest('#tip,[data-term]')) $('#tip').style.display = 'none';
   if (!t) return;
-  if (t.dataset.cmd) post('/command', {name: t.dataset.cmd});
+  if (t.dataset.zoom) { zoom(+t.dataset.zoom); term.focus(); return; }
+  if (t.dataset.term) { showTip(e, t.dataset.term); return; }
+  if (t.dataset.askterm) { $('#tip').style.display = 'none'; post('/ask', {q: `Tell me about "${t.dataset.askterm}" (from my status panel), for me right now.`}); }
+  else if (t.dataset.cmd) post('/command', {name: t.dataset.cmd});
   else if (t.id === 'opensaves') post('/saves', {});
   else if (t.id === 'newgame') { const name = prompt('New character name:'); if (name) post('/saves', {key: 'n'}).then(() => post('/saves', {key: name})).then(() => post('/saves', {key: '\r'})); }
   else if (t.dataset.sel) post('/saves', {sel: +t.dataset.sel, key: e.detail > 1 ? '\r' : ''});
