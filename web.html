@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NetHack</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+<style>
+:root { --bg: #0d1014; --panel: #151a21; --line: #262d37; --fg: #c8d0da; --dim: #7b8592;
+        --green: #6fcf7a; --yellow: #e6c35c; --red: #ef6b6b; --magenta: #c58ae6; --blue: #6aa8ef; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+             font: 13px/1.4 Menlo, "DejaVu Sans Mono", monospace; }
+#app { display: grid; grid-template-columns: minmax(0, 1fr) 340px 360px; height: 100vh; }
+#game { display: flex; flex-direction: column; min-width: 0; }
+#bar { display: flex; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+button { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 4px;
+         padding: 3px 8px; font: inherit; cursor: pointer; }
+button:hover { border-color: var(--blue); }
+#term { flex: 1; min-height: 0; padding: 4px; }
+.col { border-left: 1px solid var(--line); overflow-y: auto; padding: 8px 10px; background: var(--panel); }
+h3 { margin: 10px 0 4px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: .05em; }
+h3:first-child { margin-top: 0; }
+.b { font-weight: bold; } .dim { color: var(--dim); } .green { color: var(--green); }
+.yellow { color: var(--yellow); } .red { color: var(--red); } .magenta { color: var(--magenta); }
+.group { cursor: pointer; text-decoration: underline; margin-top: 4px; }
+.item { display: flex; gap: 6px; cursor: pointer; padding: 1px 2px; border-radius: 3px; }
+.item:hover { background: var(--line); }
+.item .w { margin-left: auto; color: var(--dim); }
+.item.off { opacity: .4; }
+.acts { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px 18px; }
+#chatcol { display: flex; flex-direction: column; padding: 0; }
+#chat { flex: 1; overflow-y: auto; padding: 8px 10px; white-space: pre-wrap; }
+#chat .you { color: var(--blue); margin-top: 8px; } #chat .err { color: var(--red); }
+#chat .warn { color: var(--yellow); } #chat .dim { color: var(--dim); }
+#ask { display: flex; border-top: 1px solid var(--line); }
+#ask input { flex: 1; background: var(--bg); color: var(--fg); border: 0; padding: 8px 10px; font: inherit; outline: none; }
+#saves { position: fixed; inset: 0; background: #000a; display: none; place-items: center; }
+#saves .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px;
+              width: min(720px, 94vw); max-height: 80vh; display: flex; flex-direction: column; gap: 8px; }
+#saves .list { overflow-y: auto; }
+#saves .row { display: grid; grid-template-columns: 140px 1fr 160px; gap: 8px; padding: 2px 6px; cursor: pointer; }
+#saves .row.sel { background: var(--blue); color: var(--bg); }
+@media (max-width: 1100px) { #app { grid-template-columns: 1fr; height: auto; } #game { height: 80vh; }
+                             .col { border-left: 0; border-top: 1px solid var(--line); } #chatcol { height: 60vh; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="game">
+    <div id="bar">
+      <button data-cmd="whatnow">What now?</button>
+      <button data-cmd="fog">Fog</button>
+      <button data-cmd="down">To &gt; stairs</button>
+      <button data-cmd="up">To &lt; stairs</button>
+      <button data-cmd="checkpoint">Checkpoint</button>
+      <button data-cmd="rewind">Back to checkpoint</button>
+      <button id="opensaves">Saves</button>
+    </div>
+    <div id="term"></div>
+  </div>
+  <div class="col" id="panel"></div>
+  <div class="col" id="chatcol">
+    <div id="chat"></div>
+    <form id="ask"><input placeholder="Ask the helper..." autocomplete="off"></form>
+  </div>
+</div>
+<div id="saves"><div class="box"><div id="savestitle" class="b"></div><div class="list"></div>
+  <div><button data-key="&#13;">Load</button> <button data-key="d">Delete</button> <button data-key="p">Prune to newest 3</button>
+       <button id="newgame">New game</button> <button data-key="&#27;">Close</button></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const post = (path, body) => fetch(path, {method: 'POST', body: JSON.stringify(body)});
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+
+const term = new Terminal({fontSize: 15, cursorBlink: true, scrollback: 0, macOptionIsMeta: true,
+  fontFamily: 'Menlo, "DejaVu Sans Mono", monospace', theme: {background: '#0d1014', foreground: '#c8d0da'}});
+const fit = new FitAddon.FitAddon();
+term.loadAddon(fit);
+term.open($('#term'));
+term.onData(d => post('/key', {data: d}));
+
+// bigger windows mean bigger letters, not more of them (as powergrid does it)
+const WANT_COLS = 100, WANT_ROWS = 30;
+let sized = '', settling;
+function refit() {
+  fit.fit();
+  const box = $('#term').getBoundingClientRect(), size = term.options.fontSize;
+  if (box.width && term.cols && term.rows) {
+    const want = Math.min(box.width / WANT_COLS / (box.width / term.cols / size),
+                          box.height / WANT_ROWS / (box.height / term.rows / size));
+    const next = Math.max(9, Math.min(26, Math.floor(want)));
+    if (next !== size) { term.options.fontSize = next; fit.fit(); }
+  }
+  const now = term.cols + 'x' + term.rows;
+  if (now !== sized) { sized = now; post('/resize', {cols: term.cols, rows: term.rows}); }
+}
+addEventListener('resize', () => { clearTimeout(settling); settling = setTimeout(refit, 150); });
+refit();
+term.focus();
+
+// panels from the game's state
+const GROUPS = [['$', 'Coins'], [')', 'Weapons'], ['[', 'Armor'], ['%', 'Food'], ['?', 'Scrolls'],
+  ['+', 'Spellbooks'], ['!', 'Potions'], ['=', 'Rings'], ['"', 'Amulets'], ['/', 'Wands'], ['(', 'Tools'],
+  ['*', 'Gems & rocks'], ['`', 'Boulders & statues'], ['0', 'Iron balls'], ['_', 'Chains']];
+const IN_USE = /\((being worn|weapon in hand|wielded|on left|on right|in quiver|lit|in use|embedded|tethered|attached|chained|alternate weapon; not wielded)/;
+let open = new Set(JSON.parse(localStorageGet('nh.open') || '[]')), popup = null, last = null;
+function localStorageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function strength(s) { return 18 < s && s <= 117 ? `18/${String(s - 18).padStart(2, '0')}` : s === 118 ? '18/**' : String(s > 118 ? s - 100 : s); }
+
+function character(d) {
+  const st = d.state.status, you = d.state.player || {}, rev = d.state.reveal || {}, pray = rev.prayer;
+  if (!st) return '';
+  const frac = st.hp / (st.hpmax || 1), hp = frac >= 1 ? 'green' : frac >= .5 ? 'yellow' : 'red';
+  const flags = [st.hunger, st.encumbrance, ...(st.conditions || [])].filter(Boolean).join(' ');
+  let h = `<h3>Character</h3><div class="b">${esc(`${(st.gender || '').replace(/^./, c => c.toUpperCase())} ${st.race || ''} ${st.role || ''}, ${st.alignment || ''}`)}</div>
+    <div class="b ${hp}">HP ${st.hp}/${st.hpmax}</div><div>Pw ${st.pw}/${st.pwmax} &nbsp; AC ${st.ac}</div>
+    <div>Xp ${st.xlvl}/${st.exp} &nbsp; $ ${st.gold} &nbsp; T ${st.turn}</div><div>Dlvl ${st.dlvl} ${esc(st.dungeon)}</div>
+    <div class="b">Location x=${you.x} y=${you.y}</div>
+    <div>St ${strength(st.str)} Dx ${st.dex} Co ${st.con} In ${st.int} Wi ${st.wis} Ch ${st.cha}</div>
+    <div>Carrying ${st.weight}/${st.capacity} wt &nbsp; Speed ${st.speed}</div>
+    <div>Next level at ${st.next_exp} xp &nbsp; God: ${esc(st.god)}</div>`;
+  if (pray) h += `<div class="magenta">Luck ${pray.luck} &nbsp;Prayer timeout ${pray.timeout} &nbsp;Nutrition ${rev.nutrition} &nbsp;Alignment ${rev.align_record}</div>
+    <div class="magenta">Intrinsics: ${esc((rev.intrinsics || []).join(', ') || 'none')}</div>`;
+  for (const p of rev.pets || []) {
+    const hunger = p.turns_until_hungry == null ? '?' : p.turns_until_hungry < 0 ? 'hungry now' : `hungry in ${p.turns_until_hungry}`;
+    h += `<div class="b">Pet: ${esc(p.name ? p.name + ' the ' + p.species : p.species)} L${p.level} HP ${p.hp}/${p.hpmax} AC ${p.ac} Spd ${p.speed}</div>
+      <div class="magenta">&nbsp; tame ${p.tameness}/20, ${hunger}, at x=${p.x} y=${p.y}${p.leashed ? ', leashed' : ''}${p.carrying.length ? ', carrying ' + esc(p.carrying.join(', ')) : ''}</div>`;
+  }
+  return h + (flags ? `<div class="b yellow">${esc(flags)}</div>` : '');
+}
+
+function fight(d) {
+  const rev = d.state.reveal || {}, you = d.state.player || {};
+  const near = (rev.monsters || []).filter(m => !m.tame && !m.peaceful && Math.max(Math.abs(m.x - you.x), Math.abs(m.y - you.y)) === 1);
+  if (!near.length && !d.fight.length) return '';
+  return '<h3>Fight</h3>' + near.map(m => `<div class="b">${esc(m.name)} HP ${m.hp}/${m.hpmax ?? '?'}</div>`).join('')
+    + d.fight.map(l => `<div class="magenta">${esc(l)}</div>`).join('');
+}
+
+function inventory(d) {
+  const inv = d.state.inventory || [], menu = d.menu, asked = d.asked;
+  let h = menu ? `<h3 class="yellow">${esc(menu.title)}: click items, then Done</h3>`
+        : asked ? `<h3 class="yellow">${esc(asked[0])} Click one</h3>` : '<h3>Inventory</h3>';
+  for (const [sym, name] of GROUPS) {
+    const items = inv.filter(i => i.class === sym);
+    if (!items.length) continue;
+    const whole = menu || asked || open.has(sym), shown = whole ? items : items.filter(i => IN_USE.test(i.text));
+    const more = items.length - shown.length;
+    h += `<div class="group" data-group="${esc(sym)}">${whole ? '▾' : '▸'} ${name}${more ? ` (${more} more)` : ''}</div>`;
+    for (const i of shown) {
+      let mark = ' ', cls = IN_USE.test(i.text) ? 'green' : '';
+      if (menu) { const s = menu.items[i.letter]; mark = s ? '✓' : s === false ? ' ' : '·'; if (s === undefined) cls += ' off'; }
+      else if (asked) { const fits = asked[1].includes(i.letter); mark = fits ? '>' : ' '; if (!fits) cls += ' off'; }
+      h += `<div class="item ${cls}" data-letter="${esc(i.letter)}"><span>${mark}${esc(i.letter)})</span><span>${esc(i.text)}</span><span class="w">${i.weight ?? ''}</span></div>`;
+      if (popup === i.letter && !menu && !asked)
+        h += '<div class="acts">' + (d.actions[i.letter] || []).map(([k, label]) =>
+          `<button data-act="${esc(k)}" data-letter="${esc(i.letter)}">${esc(label)}</button>`).join('') + '</div>';
+    }
+  }
+  if (inv.length && inv.every(i => 'weight' in i)) {
+    const st = d.state.status || {};
+    h += `<div class="item b"><span>Total${st.capacity ? ` (${st.capacity} before you're Burdened)` : ''}</span><span class="w">${inv.reduce((a, i) => a + i.weight, 0)}</span></div>`;
+  }
+  if (menu) h += '<div class="acts"><button data-keys="&#13;">Done</button><button data-keys="&#27;">Cancel</button></div>';
+  return h;
+}
+
+function chat(d) {
+  const el = $('#chat'), atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  el.innerHTML = d.chat.map(([kind, text]) => `<div class="${esc(kind)}">${esc(text)}</div>`).join('')
+    + (d.busy ? '<div class="dim">thinking...</div>' : '');
+  if (atEnd) el.scrollTop = el.scrollHeight;
+}
+
+function savesList(d) {
+  const u = d.saves;
+  $('#saves').style.display = u ? 'grid' : 'none';
+  if (!u) return;
+  $('#savestitle').textContent = u.naming != null ? `New game, name: ${u.naming}_`
+    : u.confirm === 'd' ? 'Delete this? Click Delete again to confirm.'
+    : u.confirm === 'p' ? 'Keep only the newest 3 checkpoints of this character? Click Prune again.'
+    : 'Saves (arrows and Enter work too)';
+  $('#saves .list').innerHTML = u.items.length ? u.items.map((it, k) =>
+    `<div class="row${k === u.sel ? ' sel' : ''}" data-sel="${k}"><span>${esc(it.char)}</span><span>${esc(it.what)}</span><span>${esc(it.when)}</span></div>`).join('')
+    : '<div class="dim">No saved games or checkpoints yet.</div>';
+  $('#saves .row.sel')?.scrollIntoView({block: 'nearest'});
+}
+
+function render(d) {
+  last = d;
+  $('#panel').innerHTML = character(d) + fight(d) + inventory(d);
+  chat(d);
+  savesList(d);
+}
+
+const stream = new EventSource('/events');
+stream.addEventListener('out', m => term.write(Uint8Array.from(atob(JSON.parse(m.data)), c => c.charCodeAt(0))));
+stream.addEventListener('state', m => render(JSON.parse(m.data)));
+
+// clicks
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-cmd],[data-group],[data-letter],[data-keys],[data-sel],[data-key],#opensaves,#newgame');
+  if (!t) return;
+  if (t.dataset.cmd) post('/command', {name: t.dataset.cmd});
+  else if (t.id === 'opensaves') post('/saves', {});
+  else if (t.id === 'newgame') { const name = prompt('New character name:'); if (name) post('/saves', {key: 'n'}).then(() => post('/saves', {key: name})).then(() => post('/saves', {key: '\r'})); }
+  else if (t.dataset.sel) post('/saves', {sel: +t.dataset.sel, key: e.detail > 1 ? '\r' : ''});
+  else if (t.dataset.key) post('/saves', {key: t.dataset.key});
+  else if (t.dataset.group) { open.has(t.dataset.group) ? open.delete(t.dataset.group) : open.add(t.dataset.group); localStorageSet('nh.open', JSON.stringify([...open])); render(last); }
+  else if (t.dataset.keys) post('/key', {data: t.dataset.keys});
+  else if (t.dataset.act) { popup = null; post('/item', {key: t.dataset.act, letter: t.dataset.letter}); }
+  else if (t.dataset.letter) {
+    if (last.menu || last.asked) post('/item', {key: '', letter: t.dataset.letter});
+    else { popup = popup === t.dataset.letter ? null : t.dataset.letter; render(last); return; }
+  }
+  if (!e.target.closest('#ask')) term.focus();
+});
+
+$('#ask').addEventListener('submit', e => {
+  e.preventDefault();
+  const q = $('#ask input').value.trim();
+  if (q) post('/ask', {q});
+  $('#ask input').value = '';
+  term.focus();
+});
+</script>
+</body>
+</html>
