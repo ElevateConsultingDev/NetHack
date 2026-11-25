@@ -32,6 +32,7 @@ COMMANDS = {"fog": ctrl_opt("F"), "down": ctrl_opt("D"), "up": ctrl_opt("U"), "w
 SORTS = {"newest": lambda i: -i["mtime"],
          "deepest": lambda i: (-(i["dlvl"] or 0), -(i["turn"] or 0)),
          "turns": lambda i: -(i["turn"] or 0),
+         "fewest": lambda i: (i["turn"] is None, i["turn"] or 0),
          "level": lambda i: (-(i["xlvl"] or 0), -(i["turn"] or 0))}
 SGR = {"black": 0, "red": 1, "green": 2, "brown": 3, "blue": 4, "magenta": 5, "cyan": 6, "white": 7}
 
